@@ -16,3 +16,4 @@
 - 2026-10-28 공간 관계는 미리 계산해 넣지 않고 SPARQL의 `geof:sf*` 함수로 그때그때 계산한다. pyoxigraph 0.5.13에서 sfIntersects, sfTouches, sfOverlaps, sfContains, sfWithin, sfDisjoint, sfEquals, sfCrosses가 맞게 동작하는 것을 확인했다. `geof:distance`, `geof:buffer`는 지원하지 않아 거리 조건은 파이썬에서 따로 계산해야 한다.
 - 2026-10-28 어휘 이름공간은 `https://yeodh10.github.io/jeungmi-geokg/def#`(접두어 `jgk:`)로 한다. 객체 URI(`/id/`)와 나눈다.
 - 2026-10-28 원본 압축 파일과 건축물대장 CSV를 `data/raw/_archives/`에 모으고 `src/ingest/unpack.py`로 푼다. 다른 컴퓨터에서도 같은 상태를 만들기 위해서다.
+- 2026-10-28 pandas는 3.0.3, pyogrio는 0.12.1로 한 단계 낮춘다. 두 번째 개발 컴퓨터(Windows 11, 스마트 앱 컨트롤 켜짐)에서 pandas 3.1.0의 `index`, `nattype` 모듈과 pyogrio 0.13.0의 `Lerc` DLL이 평판 부족으로 차단됐다. 낮춘 버전은 차단되지 않고 geopandas 1.2.0과 함께 GeoPackage 읽기, 쓰기가 된다.
