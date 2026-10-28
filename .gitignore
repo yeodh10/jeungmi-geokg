@@ -1,0 +1,22 @@
+# 원본 데이터는 커밋하지 않는다. 받는 방법은 docs/data-sources.md에 있다.
+data/raw/*
+!data/raw/.gitkeep
+
+# 이용 조건 확인이 끝나기 전까지 가공 데이터도 올리지 않는다 (docs/decisions.md 참고)
+data/processed/*
+!data/processed/.gitkeep
+
+# 비밀 값
+.env
+
+# 파이썬
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 편집기, 운영체제
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

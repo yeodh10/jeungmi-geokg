@@ -1,0 +1,27 @@
+# 대상 범위 설정
+# 중심 좌표는 추측하지 않고 공식 데이터에서 확인한 값을 쓴다.
+
+center:
+  name: 증미역 (서울 9호선)
+  # 출처: 도로명주소 내비게이션용DB 2026년 9월분, match_build_seoul.txt
+  #   건물관리번호 1150010200106660040000001
+  #   시군구용건물명 "증미역 9호선", 서울특별시 강서구 양천로 지하 560 (등촌동)
+  #   건물중심점 좌표 (원본, EPSG:5179 GRS80 UTM-K)
+  source: juso_navi_db/match_build_seoul.txt
+  source_building_id: "1150010200106660040000001"
+  source_crs: "EPSG:5179"
+  source_xy: [943583.747211, 1951121.590532]
+  # 아래 두 값은 위 원본 좌표를 pyproj로 변환한 결과다.
+  epsg4326_lonlat: [126.8612468627311, 37.55771939318886]
+  epsg5186_xy: [187740.13946078884, 550919.3081192819]
+
+radius_m: 1000
+
+crs:
+  storage: "EPSG:4326"   # 저장
+  metric: "EPSG:5186"    # 거리 계산, 범위 자르기
+
+# 범위에 걸치기만 해도 포함할지(intersects), 완전히 안에 있어야 하는지(within)
+clip_rule:
+  polygon: intersects
+  point: within
