@@ -2,7 +2,7 @@
 
 원본 파일은 저장소에 올리지 않는다(`data/raw/`는 .gitignore). 아래 방법으로 받아 `data/raw/` 아래 지정한 폴더에 풀면 `python -m src.ingest.clip_area`로 범위를 자를 수 있다.
 
-받은 압축 파일은 풀기 전 모습 그대로 `data/raw/_archives/`에 보관한다. 다시 풀어야 할 때 여기서 푼다.
+받은 압축 파일(건축물대장은 CSV 그대로)은 `data/raw/_archives/`에 보관한다. `python -m src.ingest.unpack`을 실행하면 아래 각 항목의 "풀 위치"로 필요한 파일만 풀린다.
 
 "변경 금지" 조건(공공누리 3, 4유형, CC BY-ND 계열)인 데이터는 가공해서 쓰지 않는다.
 

@@ -1,0 +1,87 @@
+@prefix jgk: <https://yeodh10.github.io/jeungmi-geokg/def#> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# 증미역 공간 지식 그래프 어휘
+# 모든 객체는 geo:Feature, 모양은 geo:Geometry로 따로 둔다.
+
+<https://yeodh10.github.io/jeungmi-geokg/def> a owl:Ontology ;
+    rdfs:label "증미역 공간 지식 그래프 어휘"@ko ;
+    owl:imports <http://www.opengis.net/ont/geosparql> .
+
+# 객체 종류
+
+jgk:Building a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "건물"@ko .
+jgk:BuildingEntrance a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "건물 출입구"@ko .
+jgk:RoadSegment a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로 구간"@ko .
+jgk:Parcel a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "필지"@ko ;
+    rdfs:comment "지금은 모양 없이 PNU만 가진다. 연속지적도를 붙이면 모양을 더한다."@ko .
+jgk:PublicFacility a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "공공시설"@ko .
+jgk:Station a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "역"@ko .
+jgk:AdminDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "행정동"@ko .
+
+# 객체 사이 관계
+
+jgk:hasEntrance a owl:ObjectProperty ; rdfs:label "출입구를 가진다"@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:BuildingEntrance .
+jgk:facesRoad a owl:ObjectProperty ; rdfs:label "도로에 면한다"@ko ;
+    rdfs:domain jgk:BuildingEntrance ; rdfs:range jgk:RoadSegment .
+jgk:locatedOn a owl:ObjectProperty ; rdfs:label "필지 위에 있다"@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:Parcel .
+jgk:within a owl:ObjectProperty ; rdfs:label "행정동에 속한다"@ko ;
+    rdfs:comment "원천 데이터의 행정동코드로 정한 소속이다. 모양끼리의 포함 관계는 geof:sfWithin으로 따로 계산한다."@ko ;
+    rdfs:domain geo:Feature ; rdfs:range jgk:AdminDong .
+
+# 상태
+
+jgk:Status a owl:Class ; rdfs:label "객체 상태"@ko .
+jgk:status a owl:ObjectProperty ; rdfs:label "상태"@ko ; rdfs:range jgk:Status .
+jgk:Active a jgk:Status ; rdfs:label "사용"@ko .
+jgk:AddressUnlinked a jgk:Status ; rdfs:label "주소 미연결"@ko .
+jgk:AddressLinked a jgk:Status ; rdfs:label "주소 연결됨"@ko .
+jgk:Retired a jgk:Status ; rdfs:label "폐지"@ko .
+
+# 공식 번호
+
+jgk:buildingMgtNo a owl:DatatypeProperty ; rdfs:label "건물관리번호"@ko ; rdfs:range xsd:string .
+jgk:gisBuildingId a owl:DatatypeProperty ; rdfs:label "GIS건물통합식별번호"@ko ; rdfs:range xsd:string .
+jgk:pnu a owl:DatatypeProperty ; rdfs:label "PNU"@ko ; rdfs:range xsd:string .
+jgk:admDongCode a owl:DatatypeProperty ; rdfs:label "행정동코드"@ko ; rdfs:range xsd:string .
+jgk:subEntranceSeq a owl:DatatypeProperty ; rdfs:label "보조출입구 일련번호"@ko ; rdfs:range xsd:string .
+
+# 건물 속성
+
+jgk:roadAddress a owl:DatatypeProperty ; rdfs:label "도로명주소"@ko ; rdfs:range xsd:string .
+jgk:useName a owl:DatatypeProperty ; rdfs:label "용도"@ko ; rdfs:range xsd:string .
+jgk:structureName a owl:DatatypeProperty ; rdfs:label "구조"@ko ; rdfs:range xsd:string .
+jgk:approvalDate a owl:DatatypeProperty ; rdfs:label "사용승인일"@ko ; rdfs:range xsd:date .
+jgk:floorsAbove a owl:DatatypeProperty ; rdfs:label "지상층수"@ko ; rdfs:range xsd:integer .
+jgk:floorsBelow a owl:DatatypeProperty ; rdfs:label "지하층수"@ko ; rdfs:range xsd:integer .
+jgk:entranceType a owl:DatatypeProperty ; rdfs:label "출입구 유형"@ko ; rdfs:range xsd:string .
+
+# 필지에 붙이는 단지 정보 (건축물대장 총괄표제부)
+
+jgk:siteArea a owl:DatatypeProperty ; rdfs:label "대지면적(㎡)"@ko ; rdfs:range xsd:decimal .
+jgk:totalFloorArea a owl:DatatypeProperty ; rdfs:label "연면적(㎡)"@ko ; rdfs:range xsd:decimal .
+jgk:households a owl:DatatypeProperty ; rdfs:label "세대수"@ko ; rdfs:range xsd:integer .
+jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물수"@ko ; rdfs:range xsd:integer .
+jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; rdfs:range xsd:string .
+
+# 출처
+
+jgk:Dataset a owl:Class ; rdfs:label "원천 데이터"@ko .
+jgk:sourceGisBuildingId a owl:DatatypeProperty ; rdfs:label "모양을 가져온 GIS 건물 번호"@ko ;
+    rdfs:domain geo:Geometry ; rdfs:range xsd:string .
+
+jgk:dataset-gis-building a jgk:Dataset ;
+    dcterms:title "국토교통부 GIS건물통합정보 (AL_D010, 서울)"@ko ;
+    dcterms:source <https://www.data.go.kr/data/15052097/fileData.do> .
+jgk:dataset-navi-db a jgk:Dataset ;
+    dcterms:title "행정안전부 도로명주소 내비게이션용DB (2026년 9월분)"@ko ;
+    dcterms:source <https://www.data.go.kr/data/15050419/fileData.do> .
+jgk:dataset-building-register a jgk:Dataset ;
+    dcterms:title "서울시 건축물대장 총괄표제부"@ko ;
+    dcterms:source <https://data.seoul.go.kr/dataList/OA-23051/S/1/datasetView.do> .

@@ -13,3 +13,6 @@
 - 2026-10-28 건물관리번호를 못 붙인 GIS 건물은 GIS건물통합식별번호(A1)로 `building-gis/` URI를 따로 만들고 "주소 미연결"로 표시한다. 자세한 규칙은 docs/uri-policy.md.
 - 2026-10-28 건물 상세 속성은 GIS건물통합정보 안의 대장 속성을 쓴다. 건축물대장 총괄표제부는 대지 단위 자료라 필지 객체에 단지 정보를 붙이는 데만 쓴다.
 - 2026-10-28 도로명주소 한글(주소DB)은 보류한다. 받아 둔 파일은 쓰지 않는다.
+- 2026-10-28 공간 관계는 미리 계산해 넣지 않고 SPARQL의 `geof:sf*` 함수로 그때그때 계산한다. pyoxigraph 0.5.13에서 sfIntersects, sfTouches, sfOverlaps, sfContains, sfWithin, sfDisjoint, sfEquals, sfCrosses가 맞게 동작하는 것을 확인했다. `geof:distance`, `geof:buffer`는 지원하지 않아 거리 조건은 파이썬에서 따로 계산해야 한다.
+- 2026-10-28 어휘 이름공간은 `https://yeodh10.github.io/jeungmi-geokg/def#`(접두어 `jgk:`)로 한다. 객체 URI(`/id/`)와 나눈다.
+- 2026-10-28 원본 압축 파일과 건축물대장 CSV를 `data/raw/_archives/`에 모으고 `src/ingest/unpack.py`로 푼다. 다른 컴퓨터에서도 같은 상태를 만들기 위해서다.

@@ -45,9 +45,10 @@ python -m venv .venv
 cp .env.example .env                                      # 키 값을 채운다
 ```
 
-원본을 `data/raw/`에 풀었다면 범위 자르기:
+원본 압축 파일을 `data/raw/_archives/`에 넣고 풀기, 범위 자르기 (7-Zip이 없으면 먼저 `pip install py7zr`):
 
 ```bash
+.venv/Scripts/python -m src.ingest.unpack
 .venv/Scripts/python -m src.ingest.clip_area
 ```
 
@@ -91,3 +92,26 @@ docs/            설계 문서, 결정 기록
 - [ ] 도로명주소 전자지도 받기 (승인 대기)
 - [ ] 민원행정기관, 전자지도 이용 조건 확인
 - [ ] 필지 경계(연속지적도) 붙이기 (나중에)
+- [x] 다른 컴퓨터에서 원본을 다시 풀 수 있게 `src/ingest/unpack.py` 추가 (10/28)
+- [ ] 2주차: 객체 쪼개기, URI 부여, 그래프 구축 (진행 중, 아래 "이어서 할 일")
+
+## 이어서 할 일 (2026-10-28 퇴근 시점)
+
+다른 컴퓨터에서 이어 할 때:
+
+1. `git clone` 후 위 "실행" 순서대로 가상환경을 만든다.
+2. 원본 압축 파일 5개(`data/raw/_archives/`, 약 570MB)를 옮겨 와 같은 자리에 둔다.
+3. `unpack`, `clip_area`를 차례로 실행하면 `data/processed/jeungmi_area.gpkg`가 다시 생긴다.
+
+2주차 작업 상태:
+
+- 끝남: 어휘 정의 `src/graph/ontology.ttl`, URI 함수 `src/model/uri.py`
+- 다음: `src/model/build_objects.py`로 건물, 출입구, 필지, 행정동 객체를 만든다. 규칙은 docs/uri-policy.md.
+  - 건물관리번호 건물: 중심점을 포함하는 GIS 폴리곤을 모양으로, 없으면 중심점을 점 모양으로
+  - 주소 미연결 건물: GIS 폴리곤 628개, `building-gis/{A1}`
+  - A1 중복은 A0를 뺀 속성과 모양이 같으면 하나로 합친다 (A0까지 비교하면 안 합쳐진다)
+  - 필지 PNU: GIS A2, 없으면 내비 지번의 대표지번(jibun_seq 0)으로 만든다. 산여부 0은 1, 1은 2
+  - 보조출입구 19개는 주소(도로명코드, 지하여부, 본번, 부번)가 같은 건물 6 ~ 25개에 모두 잇는다
+  - 행정동은 내비 행정동코드로 잇는다. 주소 미연결 건물은 행정동 경계(전자지도)가 와야 이을 수 있다
+- 그다음: `src/graph/build_graph.py`로 Turtle을 만들고, pyoxigraph에 올려 SPARQL로 확인한다.
+- 공공시설, 역 URI 규칙은 아직 초안이라 정한 뒤 넣는다.
