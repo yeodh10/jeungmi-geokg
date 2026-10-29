@@ -1,6 +1,7 @@
-"""변경 제안 검토 화면과 API.
+"""변경 제안 검토 화면, 지도 화면과 API.
 
-실행: uvicorn src.review.app:app --port 8000  (그다음 브라우저에서 http://localhost:8000)
+실행: uvicorn src.review.app:app --port 8000
+  검토 화면 http://localhost:8000 , 지도 화면 http://localhost:8000/map
 제안을 승인하면 그래프에 바로 반영되고, 반려하면 기록만 남는다.
 """
 from __future__ import annotations
@@ -80,10 +81,58 @@ def decide(pid: str, body: DecisionIn):
 
 @app.get("/api/feature")
 def feature(uri: str):
-    """그래프에 지금 들어 있는 객체의 속성. 승인 전후를 비교해 볼 때 쓴다."""
-    q = f"SELECT ?p ?o WHERE {{ <{uri}> ?p ?o }} ORDER BY ?p"
-    rows = [{"p": term(s["p"]), "o": term(s["o"])} for s in store().query(q)]
-    return {"uri": uri, "in_graph": bool(rows), "triples": rows}
+    """그래프에 지금 들어 있는 객체의 속성과 이 객체를 가리키는 객체. 이름은 어휘의 한국어 이름표를 쓴다."""
+    q = f"""PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?p ?o ?pl ?ol WHERE {{ <{uri}> ?p ?o .
+  OPTIONAL {{ ?p rdfs:label ?pl FILTER(LANG(?pl) = "ko") }}
+  OPTIONAL {{ ?o rdfs:label ?ol FILTER(LANG(?ol) = "ko") }} }} ORDER BY ?p"""
+    rows = [{"p": term(s["p"]), "o": term(s["o"]), "p_label": term(s["pl"]), "o_label": term(s["ol"])}
+            for s in store().query(q)]
+    q_in = f"""PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?s ?p ?pl ?sl WHERE {{ ?s ?p <{uri}> . FILTER(?p != <http://www.opengis.net/ont/geosparql#hasGeometry>
+  && ?p != <http://www.opengis.net/ont/geosparql#hasDefaultGeometry>)
+  OPTIONAL {{ ?p rdfs:label ?pl FILTER(LANG(?pl) = "ko") }}
+  OPTIONAL {{ ?s rdfs:label ?sl }} }} LIMIT 200"""
+    inbound = [{"s": term(s["s"]), "p": term(s["p"]), "p_label": term(s["pl"]), "s_label": term(s["sl"])}
+               for s in store().query(q_in)]
+    return {"uri": uri, "in_graph": bool(rows), "triples": rows, "inbound": inbound}
+
+
+LAYER_QUERY = {
+    "building": "jgk:Building", "entrance": "jgk:BuildingEntrance",
+    "facility": "jgk:PublicFacility", "station": "jgk:Station",
+}
+layer_cache: dict = {}
+
+
+@app.get("/api/layers/{kind}")
+def layer(kind: str):
+    """지도에 그릴 객체를 그래프에서 꺼내 GeoJSON으로 준다 (원천 그래프 + 승인된 변경)."""
+    if kind not in LAYER_QUERY:
+        raise HTTPException(404, "없는 레이어")
+    key = (kind, id(store()))
+    if key not in layer_cache:
+        q = f"""PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?f ?wkt ?label ?status ?use ?addr ?type WHERE {{
+  ?f a {LAYER_QUERY[kind]} ; geo:hasDefaultGeometry/geo:asWKT ?wkt ; jgk:status ?s .
+  ?s rdfs:label ?status .
+  OPTIONAL {{ ?f rdfs:label ?label }} OPTIONAL {{ ?f jgk:useName ?use }}
+  OPTIONAL {{ ?f jgk:roadAddress ?addr }} OPTIONAL {{ ?f jgk:entranceType ?type }}
+}}"""
+        feats = [{"type": "Feature", "geometry": mapping(shapely.from_wkt(term(s["wkt"]))),
+                  "properties": {k: term(s[k]) for k in ("label", "status", "use", "addr", "type")} | {"uri": term(s["f"])}}
+                 for s in store().query(q)]
+        if len(layer_cache) > 8:  # 승인으로 그래프가 바뀌면 예전 것은 버린다
+            layer_cache.clear()
+        layer_cache[key] = {"type": "FeatureCollection", "features": feats}
+    return layer_cache[key]
+
+
+@app.get("/map")
+def map_page():
+    return FileResponse(ROOT / "web" / "map.html")
 
 
 @app.get("/api/proposals/{pid}/context")

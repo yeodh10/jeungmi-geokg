@@ -96,16 +96,21 @@ jgk:sourceGisBuildingId a owl:DatatypeProperty ; rdfs:label "모양을 가져온
 
 jgk:dataset-gis-building a jgk:Dataset ;
     dcterms:title "국토교통부 GIS건물통합정보 (AL_D010, 서울)"@ko ;
+    rdfs:label "국토교통부 GIS건물통합정보 (AL_D010, 서울)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15052097/fileData.do> .
 jgk:dataset-navi-db a jgk:Dataset ;
     dcterms:title "행정안전부 도로명주소 내비게이션용DB (2026년 9월분)"@ko ;
+    rdfs:label "행정안전부 도로명주소 내비게이션용DB (2026년 9월분)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15050419/fileData.do> .
 jgk:dataset-public-office a jgk:Dataset ;
     dcterms:title "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
+    rdfs:label "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
     dcterms:source <https://business.juso.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;
+    rdfs:label "행정안전부 행정표준코드 기관코드"@ko ;
     dcterms:source <https://www.data.go.kr/data/15077870/openapi.do> .
 jgk:dataset-building-register a jgk:Dataset ;
     dcterms:title "서울시 건축물대장 총괄표제부"@ko ;
+    rdfs:label "서울시 건축물대장 총괄표제부"@ko ;
     dcterms:source <https://data.seoul.go.kr/dataList/OA-23051/S/1/datasetView.do> .

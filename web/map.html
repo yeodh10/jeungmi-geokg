@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>증미역 공간 지식 그래프</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb; --accent: #2457d6;
+    --map-bg: #eef1f5; --active: #9aa5b8; --unlinked: #f79009; --linked: #12b76a; --retired: #d92d20;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+  header { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 17px; }
+  header a { color: var(--accent); font-size: 14px; }
+  header input { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 220px; font-size: 14px; }
+  .wrap { flex: 1; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
+  #map { min-height: 300px; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 14px; overflow-y: auto; min-width: 0; }
+  .layers label { display: block; font-size: 14px; margin: 4px 0; }
+  .legend { font-size: 12px; color: var(--muted); margin: 8px 0 14px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 8px; border-radius: 2px; }
+  h2 { font-size: 15px; margin: 12px 0 4px; overflow-wrap: anywhere; }
+  .uri { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  td { border-top: 1px solid var(--line); padding: 4px; vertical-align: top; overflow-wrap: anywhere; }
+  td:first-child { color: var(--muted); width: 38%; }
+  a.obj { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  #results { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
+  #results li { padding: 4px 0; cursor: pointer; color: var(--accent); }
+  .muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>증미역 공간 지식 그래프</h1>
+  <input id="q" placeholder="건물 이름이나 도로명주소 찾기">
+  <a href="/">변경 제안 검토</a>
+</header>
+<div class="wrap">
+  <div id="map"></div>
+  <aside>
+    <div class="layers">
+      <label><input type="checkbox" data-l="building" checked> 건물</label>
+      <label><input type="checkbox" data-l="entrance"> 출입구</label>
+      <label><input type="checkbox" data-l="facility" checked> 공공시설</label>
+      <label><input type="checkbox" data-l="station" checked> 역</label>
+    </div>
+    <div class="legend">건물 상태<i style="background:var(--active)"></i>사용<i style="background:var(--unlinked)"></i>주소 미연결<i style="background:var(--linked)"></i>주소 연결됨<i style="background:var(--retired)"></i>폐지</div>
+    <ul id="results"></ul>
+    <div id="info"><p class="muted">지도에서 객체를 누르면 그래프에 담긴 내용이 여기에 나옵니다.</p></div>
+  </aside>
+</div>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const BASE = "https://yeodh10.github.io/jeungmi-geokg/id/";
+const short = u => String(u).replace(BASE, "");
+// 어휘 밖(표준 어휘) 속성의 한국어 이름
+const EXT = { "22-rdf-syntax-ns#type": "종류", "rdf-schema#label": "이름", "terms/source": "출처", "geosparql#hasGeometry": "모양",
+  "geosparql#asWKT": "WKT", "owl#sameAs": "같은 객체", "prov#wasInfluencedBy": "반영된 변경 제안",
+  "geosparql#Feature": "공간 객체(Feature)", "geosparql#Geometry": "모양(Geometry)" };
+const ext = u => { for (const k in EXT) if (String(u).endsWith(k)) return EXT[k]; return null; };
+const data = {};
+const map = new maplibregl.Map({
+  container: "map", center: [126.86125, 37.55772], zoom: 14.6,
+  style: { version: 8, sources: {},
+           layers: [{ id: "bg", type: "background", paint: { "background-color": css("--map-bg") } }] },
+});
+
+map.on("load", async () => {
+  for (const k of ["building", "entrance", "facility", "station"]) {
+    data[k] = await (await fetch("/api/layers/" + k)).json();
+    map.addSource(k, { type: "geojson", data: data[k] });
+  }
+  const statusColor = ["match", ["get", "status"], "주소 미연결", css("--unlinked"), "주소 연결됨", css("--linked"), "폐지", css("--retired"), css("--active")];
+  map.addLayer({ id: "building", type: "fill", source: "building", paint: { "fill-color": statusColor, "fill-opacity": 0.75, "fill-outline-color": "#5b6577" } });
+  map.addLayer({ id: "building-pt", type: "circle", source: "building", filter: ["==", ["geometry-type"], "Point"],
+                 paint: { "circle-radius": 3, "circle-color": statusColor } });
+  map.addLayer({ id: "entrance", type: "circle", source: "entrance", layout: { visibility: "none" },
+                 paint: { "circle-radius": 2.5, "circle-color": "#2457d6" } });
+  map.addLayer({ id: "facility", type: "circle", source: "facility", paint: { "circle-radius": 6, "circle-color": "#7a5af8", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+  map.addLayer({ id: "station", type: "circle", source: "station", paint: { "circle-radius": 9, "circle-color": "#bb8f00", "circle-stroke-width": 3, "circle-stroke-color": "#fff" } });
+  for (const id of ["building", "building-pt", "entrance", "facility", "station"]) {
+    map.on("click", id, e => show(e.features[0].properties.uri));
+    map.on("mouseenter", id, () => map.getCanvas().style.cursor = "pointer");
+    map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
+  }
+});
+
+document.querySelectorAll(".layers input").forEach(cb => cb.onchange = () => {
+  const ids = cb.dataset.l === "building" ? ["building", "building-pt"] : [cb.dataset.l];
+  ids.forEach(id => map.setLayoutProperty(id, "visibility", cb.checked ? "visible" : "none"));
+});
+
+async function show(uri) {
+  const f = await (await fetch("/api/feature?uri=" + encodeURIComponent(uri))).json();
+  const name = (f.triples.find(t => t.p.endsWith("rdf-schema#label")) || {}).o || short(uri);
+  const rows = f.triples.filter(t => !t.p.endsWith("hasDefaultGeometry")).map(t => {
+    const key = t.p_label || ext(t.p) || t.p.replace(/^.*[#/]/, "");
+    const val = t.o.startsWith(BASE) ? `<a class="obj" data-u="${esc(t.o)}">${esc(t.o_label || t.o.replace(BASE, ""))}</a>` : esc(t.o_label || ext(t.o) || t.o);
+    return `<tr><td>${esc(key)}</td><td>${val}</td></tr>`;
+  }).join("");
+  const inbound = f.inbound.map(t => `<tr><td>${esc(t.p_label || ext(t.p) || t.p.replace(/^.*[#/]/, ""))} (반대)</td><td><a class="obj" data-u="${esc(t.s)}">${esc(t.s_label || t.s.replace(BASE, ""))}</a></td></tr>`).join("");
+  document.getElementById("info").innerHTML = `<h2>${esc(name)}</h2><div class="uri">${esc(uri)}</div><table>${rows}${inbound}</table>`;
+  document.querySelectorAll("#info a.obj").forEach(a => a.onclick = () => { focus(a.dataset.u); show(a.dataset.u); });
+  focus(uri);
+}
+
+function focus(uri) {
+  for (const k in data) {
+    const f = data[k].features.find(x => x.properties.uri === uri);
+    if (!f) continue;
+    const pts = f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1);
+    const b = new maplibregl.LngLatBounds(); pts.forEach(p => b.extend(p));
+    map.fitBounds(b, { padding: 80, maxZoom: 18, duration: 400 });
+    return;
+  }
+}
+
+document.getElementById("q").oninput = e => {
+  const q = e.target.value.trim(); const ul = document.getElementById("results");
+  if (q.length < 2) { ul.innerHTML = ""; return; }
+  const hits = Object.values(data).flatMap(d => d.features)
+    .filter(f => (f.properties.label || "").includes(q) || (f.properties.addr || "").includes(q)).slice(0, 12);
+  ul.innerHTML = hits.map(f => `<li data-u="${esc(f.properties.uri)}">${esc(f.properties.label || f.properties.addr || short(f.properties.uri))}</li>`).join("") || '<li class="muted">찾은 것이 없습니다</li>';
+  ul.querySelectorAll("li[data-u]").forEach(li => li.onclick = () => show(li.dataset.u));
+};
+</script>
+</body>
+</html>
