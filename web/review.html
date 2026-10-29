@@ -6,162 +6,198 @@
 <title>변경 제안 검토</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/common.js"></script>
 <style>
-  :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
-    --accent: #2457d6; --ok: #1a7f4b; --no: #b42318; --pending: #b54708; --map-bg: #eef1f5;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif; background: var(--bg); color: var(--text); }
-  header { padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  header h1 { margin: 0; font-size: 18px; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
-  h2, .meta, li { overflow-wrap: anywhere; }
-  .filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-  .filters button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
-  .filters button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  ul.list { list-style: none; margin: 0; padding: 0; }
-  ul.list li { padding: 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
-  ul.list li.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; color: #fff; margin-right: 6px; }
-  .pending { background: var(--pending); } .approved { background: var(--ok); } .rejected { background: var(--no); }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-all; }
-  #map { height: 340px; border-radius: 6px; border: 1px solid var(--line); margin: 12px 0; }
-  h2 { font-size: 16px; margin: 0 0 6px; }
-  h3 { font-size: 14px; margin: 16px 0 6px; }
-  ul.evidence { margin: 0; padding-left: 18px; font-size: 14px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  td { border-top: 1px solid var(--line); padding: 4px; vertical-align: top; word-break: break-all; }
-  .decide { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-  .decide input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; }
-  .decide input.comment { flex: 1; min-width: 160px; }
-  .btn { border: 0; border-radius: 6px; padding: 8px 14px; color: #fff; cursor: pointer; font-size: 14px; }
-  .btn.ok { background: var(--ok); } .btn.no { background: var(--no); }
-  .legend { font-size: 12px; color: var(--muted); }
-  .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 10px; border-radius: 2px; }
-  .empty { color: var(--muted); font-size: 14px; }
-  pre { background: var(--bg); padding: 8px; border-radius: 6px; font-size: 12px; overflow-x: auto; }
+  .wrap { display: grid; grid-template-columns: 340px 1fr; height: calc(100% - 52px); }
+  .side { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+  .tabs { display: flex; gap: 4px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .tabs button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 12px; color: var(--muted); }
+  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  ul.list { list-style: none; margin: 0; padding: 8px; overflow-y: auto; flex: 1; }
+  ul.list li { padding: 10px 12px; border-radius: var(--radius); cursor: pointer; margin-bottom: 4px; border: 1px solid transparent; }
+  ul.list li:hover { background: var(--soft); }
+  ul.list li.sel { background: var(--accent-soft); border-color: #c9d8f7; }
+  ul.list .t { font-weight: 600; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
+  .detail .body { padding: 18px 22px; flex: 1; }
+  .head .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 14px; }
+  @media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
+  #map { height: 330px; border-radius: var(--radius); border: 1px solid var(--line); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .obj-title { font-weight: 600; margin: 12px 0 4px; }
+  ul.evidence { margin: 0; padding-left: 18px; }
+  ul.evidence li { margin: 3px 0; overflow-wrap: anywhere; }
+  .decide { position: sticky; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding: 12px 22px;
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .decide .field { width: auto; }
+  .decide .field.reviewer { width: 150px; }
+  .decide .field.comment { flex: 1; min-width: 180px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; height: auto; } .side { max-height: 40vh; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>변경 제안 검토</h1>
-  <p>기계가 낸 제안을 사람이 확인합니다. 승인한 제안만 지식 그래프에 반영되고, 반려한 제안도 기록으로 남습니다. <a href="/map">지도 화면</a></p>
+<header class="topbar">
+  <div class="brand">증미역 공간 지식 그래프</div>
+  <nav><a href="/map">지도</a><a href="/" class="on">변경 제안 검토<span class="count" id="pending-count" style="display:none"></span></a></nav>
 </header>
-<main>
-  <section class="panel">
-    <div class="filters" id="filters">
-      <button data-s="pending" class="on">대기</button>
-      <button data-s="approved">승인</button>
-      <button data-s="rejected">반려</button>
-      <button data-s="">전체</button>
+<div class="wrap">
+  <aside class="side">
+    <div class="tabs" id="tabs">
+      <button data-s="pending" class="on">대기</button><button data-s="approved">승인</button>
+      <button data-s="rejected">반려</button><button data-s="">전체</button>
     </div>
     <ul class="list" id="list"></ul>
+  </aside>
+  <section class="detail" id="detail">
+    <div class="empty">왼쪽에서 제안을 고르세요.<br><span class="small">기계가 낸 제안을 사람이 확인합니다. 승인한 제안만 지식 그래프에 반영되고, 반려한 제안도 기록으로 남습니다.</span></div>
   </section>
-  <section class="panel" id="detail"><p class="empty">왼쪽에서 제안을 고르세요.</p></section>
-</main>
+</div>
 <script>
-const LABEL = { pending: "대기", approved: "승인", rejected: "반려" };
-let filter = "pending", current = null, map = null;
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const short = u => String(u).replace("https://yeodh10.github.io/jeungmi-geokg/id/", "id:")
-  .replace("https://yeodh10.github.io/jeungmi-geokg/def#", "jgk:")
-  .replace("http://www.opengis.net/ont/geosparql#", "geo:")
-  .replace("http://www.w3.org/2000/01/rdf-schema#", "rdfs:")
-  .replace("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:")
-  .replace("http://purl.org/dc/terms/", "dcterms:");
+let filter = "pending", current = null, map = null, items = [];
 
-async function loadList() {
-  const r = await fetch("/api/proposals" + (filter ? "?status=" + filter : ""));
-  const items = await r.json();
+let newLabels = {};  // 아직 그래프에 없는 새 객체는 제안 안의 이름표를 쓴다
+function nameOf(names, u) {
+  const n = names[u];
+  return (n && n.label) || newLabels[u] || ext(u) || (String(u).startsWith(BASE) ? String(u).replace(BASE, "") : localName(u));
+}
+function valueText(names, o) {
+  if (o.kind === "uri") return nameOf(names, o.value);
+  if (o.datatype && o.datatype.endsWith("wktLiteral")) return "새 모양 (WKT " + o.value.length + "자)";
+  return o.value;
+}
+
+async function loadList(keep) {
+  items = await (await fetch("/api/proposals" + (filter ? "?status=" + filter : ""))).json();
   const ul = document.getElementById("list");
   ul.innerHTML = items.length ? "" : '<li class="empty">제안이 없습니다.</li>';
   for (const p of items) {
     const li = document.createElement("li");
     li.className = p.id === current ? "sel" : "";
-    li.innerHTML = `<span class="badge ${p.status}">${LABEL[p.status]}</span>${esc(p.summary)}
-      <div class="meta">${esc(p.source_kind)}, ${esc(p.created_at)}</div>`;
+    li.innerHTML = `<span class="chip ${p.action}">${ACTION[p.action]}</span> <span class="chip src">${SOURCE[p.source_kind] || p.source_kind}</span>
+      ${p.status !== "pending" ? `<span class="chip ${p.status}">${STATUS[p.status]}</span>` : ""}
+      <div class="t">${esc(p.target_name || p.summary)}</div><div class="small muted">${esc(p.summary)}</div>`;
     li.onclick = () => show(p.id);
     ul.appendChild(li);
   }
+  pendingCount();
+  if (!keep && items.length && !items.some(p => p.id === current)) show(items[0].id);
+}
+
+// 제안의 바뀌는 내용을 객체별, 속성별 '지금 -> 바뀐 뒤'로 묶는다
+function diffTables(p) {
+  const bySubject = new Map();
+  for (const c of p.changes) {
+    if (c.s.endsWith("/geometry") && c.p.endsWith("22-rdf-syntax-ns#type")) continue;
+    if (!bySubject.has(c.s)) bySubject.set(c.s, new Map());
+    const props = bySubject.get(c.s);
+    if (!props.has(c.p)) props.set(c.p, { before: [], after: [] });
+    props.get(c.p)[c.op === "remove" ? "before" : "after"].push(c.o);
+  }
+  let out = "";
+  for (const [s, props] of bySubject) {
+    const kind = (p.names[s] && p.names[s].type) || (s.endsWith("/geometry") ? "모양" : "");
+    out += `<div class="obj-title">${esc(kind)} ${esc(nameOf(p.names, s))}</div>
+      <table class="kv diff"><tr><th>속성</th><th>지금</th><th>바뀐 뒤</th></tr>`;
+    for (const [pr, v] of props) {
+      const before = v.before.map(o => `<span class="before">${esc(valueText(p.names, o))}</span>`).join("<br>");
+      const after = v.after.map(o => `<span class="after">${esc(valueText(p.names, o))}</span>`).join("<br>");
+      out += `<tr><td class="k">${esc(nameOf(p.names, pr))}</td><td>${before || '<span class="muted">없음</span>'}</td><td>${after || '<span class="muted">없앰</span>'}</td></tr>`;
+    }
+    out += "</table>";
+  }
+  return out;
 }
 
 async function show(id) {
   current = id;
-  loadList();
+  document.querySelectorAll("#list li").forEach((li, i) => li.classList.toggle("sel", items[i] && items[i].id === id));
   const p = await (await fetch("/api/proposals/" + encodeURIComponent(id))).json();
-  const inGraph = await (await fetch("/api/feature?uri=" + encodeURIComponent(p.target))).json();
+  newLabels = {};
+  p.changes.filter(c => c.op === "add" && c.p.endsWith("rdf-schema#label")).forEach(c => newLabels[c.s] = c.o.value);
+  const target = nameOf(p.names, p.target);
   const d = document.getElementById("detail");
-  d.innerHTML = `
-    <h2><span class="badge ${p.status}">${LABEL[p.status]}</span>${esc(p.summary)}</h2>
-    <div class="meta">대상 ${esc(p.target)}<br>지금 그래프에 ${inGraph.in_graph ? "있음 (트리플 " + inGraph.triples.length + "개)" : "없음"}</div>
-    <div id="map"></div>
-    <div class="legend"><i style="background:#c3cad5"></i>주변 건물<i style="background:#f79009"></i>이어질 건물<i style="background:#d92d20"></i>제안 대상</div>
-    <h3>데이터 규칙 검사 (SHACL)</h3><p id="shacl" class="meta">검사하는 중...</p>
+  d.innerHTML = `<div class="body">
+    <div class="head">
+      <div class="chips"><span class="chip ${p.action}">${ACTION[p.action]}</span><span class="chip src">${SOURCE[p.source_kind] || p.source_kind}</span>
+        <span class="chip ${p.status}">${STATUS[p.status]}</span></div>
+      <h2>${esc(p.summary)}</h2>
+      <div class="small muted">대상 <a href="/map?focus=${encodeURIComponent(p.target)}">${esc(target)}</a>, ${esc(p.source_detail)}</div>
+      <div class="uri">${esc(p.target)}</div>
+    </div>
+    <div id="shacl" class="banner wait" style="margin-top:12px">데이터 규칙(SHACL)을 검사하는 중...</div>
+    <div class="cols">
+      <div><h3>무엇이 바뀌나</h3>${diffTables(p)}</div>
+      <div><h3>위치</h3><div id="map"></div>
+        <div class="legend"><span><i class="sw" style="background:var(--active);opacity:.6"></i> 그래프의 주변 건물</span>
+          <span><i class="sw" style="background:var(--retired)"></i> 제안 대상</span>
+          <span><i class="sw" style="background:#f79009"></i> 함께 바뀌거나 이어지는 객체</span></div></div>
+    </div>
     <h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul>
-    <h3>그래프에 넣을 내용 (${p.changes.length}개)</h3>
-    <table>${p.changes.map(c => `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(short(c.s))}</td><td>${esc(short(c.p))}</td><td>${esc(c.o.kind === "uri" ? short(c.o.value) : c.o.value)}</td></tr>`).join("")}</table>
-    ${p.status === "pending" ? `
-      <div class="decide">
-        <input id="reviewer" placeholder="검토자 이름">
-        <input id="comment" class="comment" placeholder="의견 (선택)">
-        <button class="btn ok" onclick="decide('approved')">승인</button>
-        <button class="btn no" onclick="decide('rejected')">반려</button>
-      </div>` : `<h3>결정</h3><p class="meta">${esc(p.decision.reviewer)}, ${esc(p.decision.at)}${p.decision.comment ? ", " + esc(p.decision.comment) : ""}</p>`}
-    <h3>승인하면 실행할 SPARQL</h3><pre>${esc(p.sparql_update)}</pre>`;
+    <details><summary>트리플로 보기 (${p.changes.length}개)</summary><table class="kv">${p.changes.map(c =>
+      `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(c.s.replace(BASE, "id:"))}</td><td>${esc(localName(c.p))}</td><td>${esc(c.o.kind === "uri" ? c.o.value.replace(BASE, "id:") : c.o.value.slice(0, 80))}</td></tr>`).join("")}</table></details>
+    <details><summary>승인하면 실행할 SPARQL</summary><pre>${esc(p.sparql_update)}</pre></details>
+    ${p.decision ? `<h3>결정</h3><p>${STATUS[p.status]}, ${esc(p.decision.reviewer)}, ${esc(p.decision.at)}${p.decision.comment ? ", " + esc(p.decision.comment) : ""}</p>` : ""}
+  </div>
+  ${p.status === "pending" ? `<div class="decide">
+    <input id="reviewer" class="field reviewer" placeholder="검토자 이름">
+    <input id="comment" class="field comment" placeholder="의견 (선택)">
+    <button class="btn ok" id="approve" onclick="decide('approved')">승인</button>
+    <button class="btn no" onclick="decide('rejected')">반려</button></div>` : ""}`;
+  try { document.getElementById("reviewer").value = localStorage.getItem("reviewer") || ""; } catch (e) {}
   drawMap(id);
-  if (p.status === "pending") {
-    const v = await (await fetch(`/api/proposals/${encodeURIComponent(id)}/validate`)).json();
-    const el = document.getElementById("shacl");
-    if (el) el.innerHTML = v.conforms ? "반영해도 규칙을 모두 지킵니다."
-      : "규칙을 어겨 승인할 수 없습니다:<br>" + v.results.map(r => esc(r.message)).join("<br>");
-  } else {
-    const el = document.getElementById("shacl");
-    if (el) el.textContent = "결정이 끝난 제안입니다.";
-  }
+  const el = document.getElementById("shacl");
+  if (p.status !== "pending") { el.className = "banner wait"; el.textContent = "결정이 끝난 제안입니다."; return; }
+  const v = await (await fetch(`/api/proposals/${encodeURIComponent(id)}/validate`)).json();
+  if (current !== id) return;
+  el.className = "banner " + (v.conforms ? "ok" : "no");
+  el.innerHTML = v.conforms ? "반영해도 데이터 규칙(SHACL)을 모두 지킵니다."
+    : "데이터 규칙을 어겨 승인할 수 없습니다: " + v.results.map(r => esc(r.message)).join(", ");
+  const ab = document.getElementById("approve");
+  if (ab && !v.conforms) ab.disabled = true, ab.style.opacity = 0.4;
 }
 
 async function drawMap(id) {
   const r = await fetch(`/api/proposals/${encodeURIComponent(id)}/context`);
-  if (!r.ok) return;
+  if (!r.ok || current !== id) return;
   const gj = await r.json();
   if (map) map.remove();
-  map = new maplibregl.Map({
-    container: "map",
-    style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": getComputedStyle(document.documentElement).getPropertyValue("--map-bg").trim() } }] },
-  });
-  map.on("load", () => {
+  map = new maplibregl.Map({ container: "map", style: baseStyle(), attributionControl: { compact: true } });
+  whenStyleReady(map, () => {
     map.addSource("ctx", { type: "geojson", data: gj });
-    map.addLayer({ id: "bld", type: "fill", source: "ctx", filter: ["==", ["geometry-type"], "Polygon"],
-      paint: { "fill-color": ["match", ["get", "role"], "linked", "#f79009", "#c3cad5"], "fill-outline-color": "#7a8394" } });
-    map.addLayer({ id: "pt", type: "circle", source: "ctx", filter: ["==", ["get", "role"], "target"],
-      paint: { "circle-radius": 7, "circle-color": "#d92d20", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
-    const b = new maplibregl.LngLatBounds();
-    gj.features.forEach(f => (f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1)).forEach(c => b.extend(c)));
-    map.resize();
-    if (!b.isEmpty()) map.fitBounds(b, { padding: 20, duration: 0 });
-    map.on("click", "bld", e => new maplibregl.Popup().setLngLat(e.lngLat)
-      .setHTML(`${esc(e.features[0].properties.label || "(이름 없음)")}<br><small>${esc(short(e.features[0].properties.uri))}</small>`).addTo(map));
+    const color = ["match", ["get", "role"], "target", css("--retired"), "changed", "#f79009", "linked", "#f79009", css("--active")];
+    map.addLayer({ id: "poly", type: "fill", source: "ctx", filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "fill-color": color, "fill-opacity": ["match", ["get", "role"], "building", 0.45, 0.85], "fill-outline-color": "#2f4778" } });
+    map.addLayer({ id: "pt", type: "circle", source: "ctx", filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-radius": ["match", ["get", "role"], "target", 8, "changed", 6, 3], "circle-color": color,
+               "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+    const focus = gj.features.filter(f => f.properties.role !== "building");
+    const b = boundsOf(focus.length ? focus : gj.features);
+    if (!b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 17, duration: 0 });
+    map.on("click", "poly", e => new maplibregl.Popup().setLngLat(e.lngLat)
+      .setHTML(`${esc(e.features[0].properties.label || "(이름 없음)")}<br><a href="/map?focus=${encodeURIComponent(e.features[0].properties.uri)}">지도에서 보기</a>`).addTo(map));
   });
 }
 
 async function decide(result) {
   const reviewer = document.getElementById("reviewer").value.trim();
-  if (!reviewer) { alert("검토자 이름을 적어 주세요."); return; }
+  if (!reviewer) { document.getElementById("reviewer").focus(); return; }
+  try { localStorage.setItem("reviewer", reviewer); } catch (e) {}
   const comment = document.getElementById("comment").value;
   const r = await fetch(`/api/proposals/${encodeURIComponent(current)}/decision`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result, reviewer, comment }) });
-  if (!r.ok) { alert((await r.json()).detail); return; }
-  show(current);
+  if (!r.ok) { const el = document.getElementById("shacl"); el.className = "banner no"; el.textContent = (await r.json()).detail; return; }
+  const idx = items.findIndex(p => p.id === current);
+  await loadList(true);
+  const next = items[Math.min(idx, items.length - 1)];
+  if (next) show(next.id); else { current = null; document.getElementById("detail").innerHTML = '<div class="empty">남은 제안이 없습니다.</div>'; }
 }
 
-document.getElementById("filters").onclick = e => {
-  if (!e.target.dataset || e.target.dataset.s === undefined) return;
+document.getElementById("tabs").onclick = e => {
+  if (e.target.dataset.s === undefined) return;
   filter = e.target.dataset.s;
-  document.querySelectorAll("#filters button").forEach(b => b.classList.toggle("on", b === e.target));
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b === e.target));
   loadList();
 };
 loadList();

@@ -13,6 +13,7 @@ import geopandas as gpd
 import shapely
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from shapely.geometry import Point, mapping
 
@@ -24,8 +25,16 @@ PAGE = ROOT / "web" / "review.html"
 CONTEXT_RADIUS_M = 150
 
 app = FastAPI(title="증미역 GeoKG 변경 제안 검토")
+app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
 proposals = ProposalStore()
 state = {"store": None}
+NAME_QUERY = """PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT ?u ?l ?addr ?tl ?baddr ?et WHERE {{ VALUES ?u {{ {values} }}
+  OPTIONAL {{ ?u rdfs:label ?l FILTER(LANG(?l) = "ko" || LANG(?l) = "") }}
+  OPTIONAL {{ ?u jgk:roadAddress ?addr }}
+  OPTIONAL {{ ?u jgk:entranceType ?et . ?b jgk:hasEntrance ?u ; jgk:roadAddress ?baddr }}
+  OPTIONAL {{ ?u a ?t . ?t rdfs:label ?tl FILTER(STRSTARTS(STR(?t), STR(jgk:))) }} }}"""
 
 
 def store():
@@ -36,6 +45,23 @@ def store():
 
 def term(v) -> str | None:
     return None if v is None else (v.value if hasattr(v, "value") else str(v))
+
+
+def names(uris) -> dict[str, dict]:
+    """URI마다 사람이 읽을 이름: 이름표, 없으면 도로명주소. 종류 이름도 같이 준다."""
+    uris = sorted({u for u in uris if u and u.startswith("http")})
+    out: dict[str, dict] = {}
+    for i in range(0, len(uris), 200):
+        values = " ".join(f"<{u}>" for u in uris[i:i + 200])
+        for s in store().query(NAME_QUERY.format(values=values)):
+            u = term(s["u"])
+            d = out.setdefault(u, {})
+            entrance = f"{term(s['baddr'])} {term(s['et'])}" if s["et"] is not None and s["baddr"] is not None else None
+            if not d.get("label"):  # 출입구는 이름이 없어서 건물 주소와 출입구 유형으로 부른다
+                d["label"] = term(s["l"]) or term(s["addr"]) or entrance
+            if not d.get("type"):
+                d["type"] = term(s["tl"])
+    return out
 
 
 class DecisionIn(BaseModel):
@@ -52,8 +78,14 @@ def page():
 @app.get("/api/proposals")
 def list_proposals(status: str | None = None):
     items = [p for p in proposals.load() if status in (None, p.status)]
+    named = names(p.target for p in items)
+
+    def name(p):  # 그래프에 아직 없는 새 객체는 제안 안의 이름표를 쓴다
+        return named.get(p.target, {}).get("label") or next(
+            (c.o.value for c in p.changes if c.s == p.target and c.p.endswith("rdf-schema#label")), None)
     return [{"id": p.id, "status": p.status, "summary": p.summary, "action": p.action,
-             "source_kind": p.source_kind, "target": p.target, "created_at": p.created_at} for p in items]
+             "source_kind": p.source_kind, "target": p.target, "created_at": p.created_at,
+             "target_name": name(p), "target_type": p.target_type} for p in items]
 
 
 @app.get("/api/proposals/{pid}")
@@ -61,7 +93,9 @@ def get_proposal(pid: str):
     p = proposals.get(pid)
     if p is None:
         raise HTTPException(404, "없는 제안")
-    return {**p.model_dump(), "sparql_update": p.sparql_update()}
+    uris = {p.target} | {c.s for c in p.changes} | {c.p for c in p.changes} \
+        | {c.o.value for c in p.changes if c.o.kind == "uri"}
+    return {**p.model_dump(), "sparql_update": p.sparql_update(), "names": names(uris)}
 
 
 @app.get("/api/proposals/{pid}/validate")
@@ -111,7 +145,8 @@ SELECT ?s ?p ?pl ?sl WHERE {{ ?s ?p <{uri}> . FILTER(?p != <http://www.opengis.n
   OPTIONAL {{ ?s rdfs:label ?sl }} }} LIMIT 200"""
     inbound = [{"s": term(s["s"]), "p": term(s["p"]), "p_label": term(s["pl"]), "s_label": term(s["sl"])}
                for s in store().query(q_in)]
-    return {"uri": uri, "in_graph": bool(rows), "triples": rows, "inbound": inbound}
+    named = names([uri] + [r["o"] for r in rows] + [r["s"] for r in inbound])
+    return {"uri": uri, "in_graph": bool(rows), "triples": rows, "inbound": inbound, "names": named}
 
 
 LAYER_QUERY = {
@@ -191,13 +226,22 @@ SELECT ?b ?wkt ?label ?status WHERE {{
   OPTIONAL {{ ?b rdfs:label ?label }}
   FILTER(geof:sfIntersects(?wkt, "{circle.wkt}"^^geo:wktLiteral))
 }}"""
+    changed = {c.s for c in p.changes} - {p.target}  # 대상 말고 함께 바뀌는 객체 (예: 폐지되는 출입구)
+    role = lambda u: "target" if u == p.target else "changed" if u in changed else "linked" if u in linked else "building"
     features = [{
         "type": "Feature", "geometry": mapping(shapely.from_wkt(term(s["wkt"]))),
-        "properties": {"uri": term(s["b"]), "label": term(s["label"]), "status": term(s["status"]),
-                       "role": "linked" if term(s["b"]) in linked else "building"},
+        "properties": {"uri": term(s["b"]), "label": term(s["label"]), "status": term(s["status"]), "role": role(term(s["b"]))},
     } for s in store().query(q)]
-    for c in p.changes:
-        if c.p.endswith("#asWKT"):
-            features.append({"type": "Feature", "geometry": mapping(shapely.from_wkt(c.o.value)),
-                             "properties": {"uri": p.target, "label": p.summary, "role": "target"}})
+    drawn = {f["properties"]["uri"] for f in features}
+    # 대상과 함께 바뀌는 객체의 모양: 제안에 새 모양이 있으면 그것을, 없으면 지금 그래프의 모양을 쓴다
+    new_wkt = {c.s.removesuffix("/geometry"): c.o.value for c in p.changes if c.p.endswith("#asWKT")}
+    for u in [p.target, *sorted(changed)]:
+        if u in drawn:
+            continue
+        wkt = new_wkt.get(u) or next((term(s["w"]) for s in store().query(
+            f"SELECT ?w WHERE {{ <{u}> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry>/"
+            f"<http://www.opengis.net/ont/geosparql#asWKT> ?w }}")), None)
+        if wkt:
+            features.append({"type": "Feature", "geometry": mapping(shapely.from_wkt(wkt)),
+                             "properties": {"uri": u, "label": p.summary if u == p.target else None, "role": role(u)}})
     return {"type": "FeatureCollection", "features": features}

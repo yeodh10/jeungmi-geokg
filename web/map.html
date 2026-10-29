@@ -6,160 +6,187 @@
 <title>증미역 공간 지식 그래프</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/common.js"></script>
 <style>
-  :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb; --accent: #2457d6;
-    --map-bg: #eef1f5; --active: #9aa5b8; --unlinked: #f79009; --linked: #12b76a; --retired: #d92d20;
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
-  header { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  header h1 { margin: 0; font-size: 17px; }
-  header a { color: var(--accent); font-size: 14px; }
-  header input { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; min-width: 220px; font-size: 14px; }
-  .wrap { flex: 1; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
-  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
+  .wrap { display: grid; grid-template-columns: 380px 1fr; height: calc(100% - 52px); }
+  .side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+  .sec { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .sec h3 { margin: 0 0 8px; }
+  .row { display: flex; gap: 6px; }
+  .row .btn { flex: none; white-space: nowrap; }
   #map { min-height: 300px; }
-  aside { background: var(--panel); border-left: 1px solid var(--line); padding: 14px; overflow-y: auto; min-width: 0; }
-  .layers label { display: block; font-size: 14px; margin: 4px 0; }
-  .legend { font-size: 12px; color: var(--muted); margin: 8px 0 14px; }
-  .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 8px; border-radius: 2px; }
-  h2 { font-size: 15px; margin: 12px 0 4px; overflow-wrap: anywhere; }
-  .uri { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  td { border-top: 1px solid var(--line); padding: 4px; vertical-align: top; overflow-wrap: anywhere; }
-  td:first-child { color: var(--muted); width: 38%; }
-  a.obj { color: var(--accent); cursor: pointer; text-decoration: underline; }
-  #results { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
-  #results li { padding: 4px 0; cursor: pointer; color: var(--accent); }
-  .muted { color: var(--muted); font-size: 13px; }
-  #askf { display: flex; gap: 6px; }
-  #askf button { border: 0; border-radius: 6px; background: var(--accent); color: #fff; padding: 6px 12px; cursor: pointer; }
-  pre { background: var(--bg); padding: 8px; border-radius: 6px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
+  .layer { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .layer .n { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .status-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 4px 0 0 22px; font-size: 12px; color: var(--muted); }
+  ul.hits { list-style: none; margin: 8px 0 0; padding: 0; }
+  ul.hits li { padding: 5px 6px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+  ul.hits li:hover { background: var(--soft); }
+  .info h2 { margin-top: 8px; }
+  .links a { display: inline-block; margin: 0 8px 2px 0; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height: auto; } .side { order: 2; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>증미역 공간 지식 그래프</h1>
-  <input id="q" placeholder="건물 이름이나 도로명주소 찾기">
-  <form id="askf"><input id="ask" placeholder="질문하기 (예: 증미역 300m 안 학교)"> <button>묻기</button></form>
-  <a href="/">변경 제안 검토</a>
+<header class="topbar">
+  <div class="brand">증미역 공간 지식 그래프<small>반경 1km, GeoSPARQL 1.1</small></div>
+  <nav><a href="/map" class="on">지도</a><a href="/">변경 제안 검토<span class="count" id="pending-count" style="display:none"></span></a></nav>
 </header>
 <div class="wrap">
-  <div id="map"></div>
-  <aside>
-    <div class="layers">
-      <label><input type="checkbox" data-l="building" checked> 건물</label>
-      <label><input type="checkbox" data-l="entrance"> 출입구</label>
-      <label><input type="checkbox" data-l="facility" checked> 공공시설</label>
-      <label><input type="checkbox" data-l="station" checked> 역</label>
+  <aside class="side">
+    <div class="sec">
+      <h3>찾기</h3>
+      <input id="q" class="field" placeholder="건물 이름이나 도로명주소 (예: 양천로 550)">
+      <ul class="hits" id="hits"></ul>
     </div>
-    <div class="legend">건물 상태<i style="background:var(--active)"></i>사용<i style="background:var(--unlinked)"></i>주소 미연결<i style="background:var(--linked)"></i>주소 연결됨<i style="background:var(--retired)"></i>폐지</div>
-    <ul id="results"></ul>
-    <div id="info"><p class="muted">지도에서 객체를 누르면 그래프에 담긴 내용이 여기에 나옵니다.</p></div>
+    <div class="sec">
+      <h3>질문하기</h3>
+      <form id="askf" class="row"><input id="ask" class="field" placeholder="예: 증미역 300m 안 학교"><button class="btn">묻기</button></form>
+      <div class="small muted" style="margin-top:4px">질문을 SPARQL로 바꿔 그래프에 묻습니다 (Claude API 필요).</div>
+    </div>
+    <div class="sec" id="layers">
+      <h3>레이어</h3>
+      <label class="layer"><input type="checkbox" data-l="building" checked><i class="sw" style="background:var(--active)"></i>건물<span class="n" id="n-building"></span></label>
+      <div class="status-legend">
+        <span><i class="sw" style="background:var(--active)"></i> 사용</span><span><i class="sw" style="background:var(--unlinked)"></i> 주소 미연결</span>
+        <span><i class="sw" style="background:var(--linked)"></i> 주소 연결됨</span><span><i class="sw" style="background:var(--retired)"></i> 폐지</span>
+      </div>
+      <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
+      <label class="layer"><input type="checkbox" data-l="facility" checked><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
+      <label class="layer"><input type="checkbox" data-l="station" checked><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
+      <label class="layer"><input type="checkbox" data-l="osm" checked><i class="sw" style="background:#d9dde3"></i>배경지도 (OpenStreetMap)</label>
+    </div>
+    <div class="sec info" id="info"><div class="muted">지도에서 객체를 누르거나 찾기로 고르면 그래프에 담긴 내용이 여기에 나옵니다.</div></div>
   </aside>
+  <div id="map"></div>
 </div>
 <script>
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const BASE = "https://yeodh10.github.io/jeungmi-geokg/id/";
-const short = u => String(u).replace(BASE, "");
-// 어휘 밖(표준 어휘) 속성의 한국어 이름
-const EXT = { "22-rdf-syntax-ns#type": "종류", "rdf-schema#label": "이름", "terms/source": "출처", "geosparql#hasGeometry": "모양",
-  "geosparql#asWKT": "WKT", "owl#sameAs": "같은 객체", "prov#wasInfluencedBy": "반영된 변경 제안",
-  "geosparql#Feature": "공간 객체(Feature)", "geosparql#Geometry": "모양(Geometry)" };
-const ext = u => { for (const k in EXT) if (String(u).endsWith(k)) return EXT[k]; return null; };
 const data = {};
-const map = new maplibregl.Map({
-  container: "map", center: [126.86125, 37.55772], zoom: 14.6,
-  style: { version: 8, sources: {},
-           layers: [{ id: "bg", type: "background", paint: { "background-color": css("--map-bg") } }] },
-});
+const KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "floorsBelow", "approvalDate", "lineName",
+  "facilityType", "agencyName", "agencyCode", "entranceType", "subEntranceSeq", "buildingMgtNo", "gisBuildingId", "pnu",
+  "admDongCode", "siteArea", "totalFloorArea", "households", "mainBuildingCount", "complexMainUse", "retiredOn"];
+const LINKS = ["within", "locatedOn", "housedIn", "hasEntrance", "sameAs", "wasInfluencedBy"];
+const station = BASE + "station/1150010200106660040000001";
 
-map.on("load", async () => {
-  for (const k of ["building", "entrance", "facility", "station"]) {
-    data[k] = await (await fetch("/api/layers/" + k)).json();
+const map = new maplibregl.Map({ container: "map", style: baseStyle(), center: [126.86125, 37.55772], zoom: 15, attributionControl: { compact: true } });
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+
+// 지도 준비와 데이터 받기를 동시에 시작한다
+const KINDS = ["building", "entrance", "facility", "station"];
+const loading = Promise.all(KINDS.map(k => fetch("/api/layers/" + k).then(r => r.json()).then(j => data[k] = j)));
+
+whenStyleReady(map, async () => {
+  await loading;
+  for (const k of KINDS) {
     map.addSource(k, { type: "geojson", data: data[k] });
+    document.getElementById("n-" + k).textContent = data[k].features.length.toLocaleString() + "개";
   }
   const statusColor = ["match", ["get", "status"], "주소 미연결", css("--unlinked"), "주소 연결됨", css("--linked"), "폐지", css("--retired"), css("--active")];
-  map.addLayer({ id: "building", type: "fill", source: "building", paint: { "fill-color": statusColor, "fill-opacity": 0.75, "fill-outline-color": "#5b6577" } });
+  map.addLayer({ id: "building", type: "fill", source: "building", filter: ["!=", ["geometry-type"], "Point"],
+                 paint: { "fill-color": statusColor, "fill-opacity": 0.7, "fill-outline-color": "#4b5565" } });
   map.addLayer({ id: "building-pt", type: "circle", source: "building", filter: ["==", ["geometry-type"], "Point"],
-                 paint: { "circle-radius": 3, "circle-color": statusColor } });
+                 paint: { "circle-radius": 3.5, "circle-color": statusColor, "circle-stroke-width": 1, "circle-stroke-color": "#fff" } });
   map.addLayer({ id: "entrance", type: "circle", source: "entrance", layout: { visibility: "none" },
-                 paint: { "circle-radius": 2.5, "circle-color": "#2457d6" } });
-  map.addLayer({ id: "facility", type: "circle", source: "facility", paint: { "circle-radius": 6, "circle-color": "#7a5af8", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
-  map.addLayer({ id: "station", type: "circle", source: "station", paint: { "circle-radius": 9, "circle-color": "#bb8f00", "circle-stroke-width": 3, "circle-stroke-color": "#fff" } });
-  for (const id of ["building", "building-pt", "entrance", "facility", "station"]) {
-    map.on("click", id, e => show(e.features[0].properties.uri));
+                 paint: { "circle-radius": 2.5, "circle-color": css("--accent") } });
+  map.addLayer({ id: "facility", type: "circle", source: "facility",
+                 paint: { "circle-radius": 6, "circle-color": css("--facility"), "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+  map.addLayer({ id: "station", type: "circle", source: "station",
+                 paint: { "circle-radius": 9, "circle-color": css("--station"), "circle-stroke-width": 3, "circle-stroke-color": "#fff" } });
+  map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "sel-line", type: "line", source: "sel", paint: { "line-color": css("--select"), "line-width": 3 } });
+  map.addLayer({ id: "sel-pt", type: "circle", source: "sel", filter: ["==", ["geometry-type"], "Point"],
+                 paint: { "circle-radius": 11, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 3, "circle-stroke-color": css("--select") } });
+  map.addSource("answer", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "answer-fill", type: "fill", source: "answer", filter: ["!=", ["geometry-type"], "Point"], paint: { "fill-color": "#e31b54", "fill-opacity": 0.55 } });
+  map.addLayer({ id: "answer-pt", type: "circle", source: "answer", filter: ["==", ["geometry-type"], "Point"],
+                 paint: { "circle-radius": 8, "circle-color": "#e31b54", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+  for (const id of ["station", "facility", "entrance", "building-pt", "building", "answer-pt", "answer-fill"]) {
     map.on("mouseenter", id, () => map.getCanvas().style.cursor = "pointer");
     map.on("mouseleave", id, () => map.getCanvas().style.cursor = "");
   }
+  map.on("click", e => {  // 겹친 객체는 역, 공공시설, 출입구, 건물 순으로 고른다
+    const hit = map.queryRenderedFeatures(e.point, { layers: ["station", "facility", "entrance", "building-pt", "building", "answer-pt", "answer-fill"] })
+      .find(f => f.properties.uri);
+    if (hit) show(hit.properties.uri);
+  });
+  const focus = new URLSearchParams(location.search).get("focus");
+  show(focus || station, !focus);
+  pendingCount();
 });
 
-document.querySelectorAll(".layers input").forEach(cb => cb.onchange = () => {
-  const ids = cb.dataset.l === "building" ? ["building", "building-pt"] : [cb.dataset.l];
+document.querySelectorAll("#layers input").forEach(cb => cb.onchange = () => {
+  const ids = { building: ["building", "building-pt"], osm: ["osm"] }[cb.dataset.l] || [cb.dataset.l];
   ids.forEach(id => map.setLayoutProperty(id, "visibility", cb.checked ? "visible" : "none"));
 });
 
-async function show(uri) {
-  const f = await (await fetch("/api/feature?uri=" + encodeURIComponent(uri))).json();
-  const name = (f.triples.find(t => t.p.endsWith("rdf-schema#label")) || {}).o || short(uri);
-  const rows = f.triples.filter(t => !t.p.endsWith("hasDefaultGeometry")).map(t => {
-    const key = t.p_label || ext(t.p) || t.p.replace(/^.*[#/]/, "");
-    const val = t.o.startsWith(BASE) ? `<a class="obj" data-u="${esc(t.o)}">${esc(t.o_label || t.o.replace(BASE, ""))}</a>` : esc(t.o_label || ext(t.o) || t.o);
-    return `<tr><td>${esc(key)}</td><td>${val}</td></tr>`;
-  }).join("");
-  const inbound = f.inbound.map(t => `<tr><td>${esc(t.p_label || ext(t.p) || t.p.replace(/^.*[#/]/, ""))} (반대)</td><td><a class="obj" data-u="${esc(t.s)}">${esc(t.s_label || t.s.replace(BASE, ""))}</a></td></tr>`).join("");
-  document.getElementById("info").innerHTML = `<h2>${esc(name)}</h2><div class="uri">${esc(uri)}</div><table>${rows}${inbound}</table>`;
-  document.querySelectorAll("#info a.obj").forEach(a => a.onclick = () => { focus(a.dataset.u); show(a.dataset.u); });
-  focus(uri);
+function featureOf(uri) {
+  for (const k in data) { const f = data[k].features.find(x => x.properties.uri === uri); if (f) return f; }
+  return null;
 }
 
-function focus(uri) {
-  for (const k in data) {
-    const f = data[k].features.find(x => x.properties.uri === uri);
-    if (!f) continue;
-    const pts = f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1);
-    const b = new maplibregl.LngLatBounds(); pts.forEach(p => b.extend(p));
-    map.fitBounds(b, { padding: 80, maxZoom: 18, duration: 400 });
-    return;
-  }
+function link(names, u) {
+  const n = names[u] || {};
+  return `<a href="#" data-u="${esc(u)}">${esc(n.label || u.replace(BASE, ""))}</a>`;
 }
+
+async function show(uri, quiet) {
+  const f = await (await fetch("/api/feature?uri=" + encodeURIComponent(uri))).json();
+  const names = f.names || {};
+  const by = {};
+  for (const t of f.triples) (by[localName(t.p)] ||= []).push(t);
+  const me = names[uri] || {};
+  const status = (by.status || [])[0];
+  const title = me.label || (me.type ? `${me.type} ${uri.replace(BASE, "").split("/").pop()}` : uri.replace(BASE, ""));
+  const main = KEY_ORDER.filter(k => by[k]).map(k => `<tr><td class="k">${esc(by[k][0].p_label || k)}</td><td>${by[k].map(t => esc(t.o)).join(", ")}</td></tr>`).join("");
+  const links = LINKS.filter(k => by[k]).map(k => `<tr><td class="k">${esc(by[k][0].p_label || ext(by[k][0].p) || k)}</td><td class="links">${by[k].map(t => link(names, t.o)).join(" ")}</td></tr>`).join("");
+  const inbound = {};
+  for (const t of f.inbound) (inbound[t.p_label || ext(t.p) || localName(t.p)] ||= []).push(t.s);
+  const back = Object.entries(inbound).map(([k, list]) => `<tr><td class="k">${esc(k)} (이 객체를)</td><td class="links">${list.slice(0, 30).map(s => link(names, s)).join(" ")}${list.length > 30 ? ` 외 ${list.length - 30}개` : ""}</td></tr>`).join("");
+  const sources = (by.source || []).map(t => esc(t.o_label || t.o)).join("<br>");
+  document.getElementById("info").innerHTML = `
+    <div><span class="chip type">${esc(me.type || "객체")}</span> ${status ? `<span class="chip ${status.o.endsWith("Retired") ? "retire" : "src"}">${esc(status.o_label || localName(status.o))}</span>` : ""}</div>
+    <h2>${esc(title)}</h2><div class="uri">${esc(uri)}</div>
+    ${f.in_graph ? "" : '<div class="banner no" style="margin-top:8px">그래프에 없는 URI입니다.</div>'}
+    ${main ? `<h3>주요 정보</h3><table class="kv">${main}</table>` : ""}
+    ${links || back ? `<h3>연결</h3><table class="kv">${links}${back}</table>` : ""}
+    ${sources ? `<h3>출처</h3><div class="small">${sources}</div>` : ""}
+    <details><summary>모든 트리플 (${f.triples.length}개)</summary><table class="kv">${f.triples.map(t =>
+      `<tr><td class="k">${esc(t.p_label || ext(t.p) || localName(t.p))}</td><td>${esc((t.o_label || t.o).slice(0, 160))}</td></tr>`).join("")}</table></details>`;
+  document.querySelectorAll("#info a[data-u]").forEach(a => a.onclick = ev => { ev.preventDefault(); show(a.dataset.u); });
+  const feat = featureOf(uri);
+  map.getSource("sel").setData({ type: "FeatureCollection", features: feat ? [feat] : [] });
+  if (feat && !quiet) map.fitBounds(boundsOf([feat]), { padding: 120, maxZoom: 18, duration: 500 });
+  history.replaceState(null, "", "/map?focus=" + encodeURIComponent(uri));
+}
+
+document.getElementById("q").oninput = e => {
+  const q = e.target.value.trim(); const ul = document.getElementById("hits");
+  if (q.length < 2) { ul.innerHTML = ""; return; }
+  const hits = Object.values(data).flatMap(d => d.features)
+    .filter(f => (f.properties.label || "").includes(q) || (f.properties.addr || "").includes(q)).slice(0, 15);
+  ul.innerHTML = hits.map(f => `<li data-u="${esc(f.properties.uri)}"><b>${esc(f.properties.label || f.properties.addr || "")}</b>
+    <span class="small muted">${esc(f.properties.label && f.properties.addr ? f.properties.addr : "")}</span></li>`).join("") || '<li class="muted">찾은 것이 없습니다</li>';
+  ul.querySelectorAll("li[data-u]").forEach(li => li.onclick = () => show(li.dataset.u));
+};
 
 document.getElementById("askf").onsubmit = async e => {
   e.preventDefault();
   const question = document.getElementById("ask").value.trim();
   if (!question) return;
   const info = document.getElementById("info");
-  info.innerHTML = '<p class="muted">질문을 SPARQL로 바꾸는 중...</p>';
+  info.innerHTML = '<div class="banner wait">질문을 SPARQL로 바꾸는 중...</div>';
   const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
   const a = await r.json();
-  if (!r.ok) { info.innerHTML = `<p class="muted">${esc(a.detail)}</p>`; return; }
-  const src = map.getSource("answer");
-  if (src) src.setData(a.geojson); else {
-    map.addSource("answer", { type: "geojson", data: a.geojson });
-    map.addLayer({ id: "answer-fill", type: "fill", source: "answer", filter: ["!=", ["geometry-type"], "Point"], paint: { "fill-color": "#e31b54", "fill-opacity": 0.6 } });
-    map.addLayer({ id: "answer-pt", type: "circle", source: "answer", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 8, "circle-color": "#e31b54", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
-  }
-  const b = new maplibregl.LngLatBounds();
-  a.geojson.features.forEach(f => (f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1)).forEach(c => b.extend(c)));
-  if (!b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 17, duration: 400 });
-  const head = a.vars.filter(v => !a.rows.some(r => /^(POINT|POLYGON|MULTI)/.test(String(r[a.vars.indexOf(v)]))));
-  info.innerHTML = `<h2>${esc(a.question)}</h2><p>${esc(a.explanation)}</p><p class="muted">결과 ${a.rows.length}행</p>
-    <table>${a.rows.slice(0, 50).map(r => `<tr>${head.map(v => { const x = r[a.vars.indexOf(v)] ?? "";
-      return `<td>${String(x).startsWith(BASE) ? `<a class="obj" data-u="${esc(x)}">${esc(short(x))}</a>` : esc(x)}</td>`; }).join("")}</tr>`).join("")}</table>
-    <h3>실행한 SPARQL</h3><pre>${esc(a.sparql)}</pre>`;
-  document.querySelectorAll("#info a.obj").forEach(x => x.onclick = () => show(x.dataset.u));
-};
-
-document.getElementById("q").oninput = e => {
-  const q = e.target.value.trim(); const ul = document.getElementById("results");
-  if (q.length < 2) { ul.innerHTML = ""; return; }
-  const hits = Object.values(data).flatMap(d => d.features)
-    .filter(f => (f.properties.label || "").includes(q) || (f.properties.addr || "").includes(q)).slice(0, 12);
-  ul.innerHTML = hits.map(f => `<li data-u="${esc(f.properties.uri)}">${esc(f.properties.label || f.properties.addr || short(f.properties.uri))}</li>`).join("") || '<li class="muted">찾은 것이 없습니다</li>';
-  ul.querySelectorAll("li[data-u]").forEach(li => li.onclick = () => show(li.dataset.u));
+  if (!r.ok) { info.innerHTML = `<div class="banner no">${esc(a.detail)}</div>`; return; }
+  map.getSource("answer").setData(a.geojson);
+  if (a.geojson.features.length) map.fitBounds(boundsOf(a.geojson.features), { padding: 80, maxZoom: 17, duration: 500 });
+  const cols = a.vars.filter(v => !a.rows.some(r => /^(POINT|POLYGON|MULTI)/.test(String(r[a.vars.indexOf(v)]))));
+  info.innerHTML = `<h2>${esc(a.question)}</h2><p>${esc(a.explanation)}</p><div class="small muted">결과 ${a.rows.length}행, 지도에 빨간색으로 표시</div>
+    <table class="kv">${a.rows.slice(0, 50).map(r => `<tr>${cols.map(v => { const x = r[a.vars.indexOf(v)] ?? "";
+      return `<td>${String(x).startsWith(BASE) ? `<a href="#" data-u="${esc(x)}">${esc(x.replace(BASE, ""))}</a>` : esc(x)}</td>`; }).join("")}</tr>`).join("")}</table>
+    <details><summary>실행한 SPARQL</summary><pre>${esc(a.sparql)}</pre></details>`;
+  info.querySelectorAll("a[data-u]").forEach(x => x.onclick = ev => { ev.preventDefault(); show(x.dataset.u); });
 };
 </script>
 </body>

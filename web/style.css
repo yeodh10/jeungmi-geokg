@@ -1,0 +1,63 @@
+/* 검토 화면과 지도 화면이 같이 쓰는 모양 */
+:root {
+  --bg: #f4f6f8; --panel: #ffffff; --text: #18202b; --muted: #5f6b7a; --line: #e2e6eb; --soft: #f0f3f6;
+  --accent: #1f5bd8; --accent-soft: #e8effc;
+  --ok: #157f4a; --ok-soft: #e6f4ec; --no: #b42318; --no-soft: #fdecea; --warn: #b54708; --warn-soft: #fef3e6;
+  --active: #5b7fc7; --unlinked: #f08c00; --linked: #12a467; --retired: #d92d20;
+  --facility: #6e47d6; --station: #b98900; --select: #1f5bd8;
+  --radius: 8px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 14px/1.5 "Pretendard", "Malgun Gothic", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+a { color: var(--accent); }
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+
+.topbar { height: 52px; display: flex; align-items: center; gap: 20px; padding: 0 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.topbar .brand { font-weight: 700; font-size: 16px; white-space: nowrap; }
+.topbar .brand small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.topbar nav { display: flex; gap: 4px; }
+.topbar nav a { padding: 6px 12px; border-radius: 6px; text-decoration: none; color: var(--muted); }
+.topbar nav a.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.topbar .count { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px; border-radius: 9px; background: var(--warn); color: #fff; font-size: 12px; text-align: center; }
+
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.chip.create { background: var(--ok-soft); color: var(--ok); }
+.chip.update { background: var(--accent-soft); color: var(--accent); }
+.chip.retire { background: var(--no-soft); color: var(--no); }
+.chip.link { background: #e9f7f1; color: var(--linked); }
+.chip.pending { background: var(--warn-soft); color: var(--warn); }
+.chip.approved { background: var(--ok-soft); color: var(--ok); }
+.chip.rejected { background: var(--no-soft); color: var(--no); }
+.chip.src { background: var(--soft); color: var(--muted); font-weight: 500; }
+.chip.type { background: var(--soft); color: var(--text); }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.uri { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+h2 { font-size: 17px; margin: 6px 0; overflow-wrap: anywhere; }
+h3 { font-size: 13px; margin: 18px 0 6px; color: var(--muted); font-weight: 600; text-transform: none; }
+table.kv { width: 100%; border-collapse: collapse; }
+table.kv td, table.kv th { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; text-align: left; }
+table.kv th { font-weight: 600; color: var(--muted); font-size: 12px; background: var(--soft); white-space: nowrap; }
+table.diff td:nth-child(2), table.diff td:nth-child(3) { width: 34%; }
+table.kv td.k { color: var(--muted); width: 32%; }
+.before { color: var(--no); text-decoration: line-through; }
+.after { color: var(--ok); font-weight: 600; }
+details { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--panel); }
+details summary { cursor: pointer; color: var(--muted); }
+pre { background: var(--soft); padding: 10px; border-radius: 6px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; margin: 8px 0 0; }
+.banner { padding: 8px 12px; border-radius: var(--radius); font-size: 13px; }
+.banner.ok { background: var(--ok-soft); color: var(--ok); }
+.banner.no { background: var(--no-soft); color: var(--no); }
+.banner.wait { background: var(--soft); color: var(--muted); }
+.legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.sw.dot { border-radius: 50%; }
+.empty { color: var(--muted); padding: 24px 8px; text-align: center; }
+.btn { border: 0; border-radius: 6px; padding: 8px 16px; color: #fff; background: var(--accent); font-weight: 600; }
+.btn.ok { background: var(--ok); } .btn.no { background: var(--no); }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.field { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); width: 100%; }
+.maplibregl-popup-content { font: 13px/1.4 "Pretendard", "Malgun Gothic", sans-serif; }
