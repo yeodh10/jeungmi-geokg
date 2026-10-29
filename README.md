@@ -39,6 +39,8 @@
 
 ## 실행
 
+아래 명령은 프로젝트 폴더에서 Git Bash 기준으로 적었습니다. Windows PowerShell에서는 `.venv/Scripts/python`을 `.\.venv\Scripts\python.exe`로 바꿔 씁니다 (PowerShell은 `.\`로 시작해야 현재 폴더의 실행 파일로 봅니다).
+
 ```bash
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt   # macOS, Linux는 .venv/bin/python
