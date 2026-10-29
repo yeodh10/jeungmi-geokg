@@ -57,7 +57,8 @@ def main() -> None:
         "공공시설": objects["public_facility"]["with_agency_code"],
         "도로": objects["road"]["total"], "도로 구간": objects["road"]["segments"],
         "법정동": objects["legal_dong"], "기초구역": objects["basic_zone"],
-        "국가기본도 건물": objects["basemap"].get("basemap_buildings", 0), "국가기본도와 이은 건물": objects["basemap"].get("linked", 0),
+        "국가기본도 건물": objects["basemap"].get("map_buildings", 0), "국가기본도와 이은 건물": objects["basemap"].get("linked", 0),
+        "수치지형도 건물": objects["digital_map"].get("map_buildings", 0), "수치지형도와 이은 건물": objects["digital_map"].get("linked", 0),
     }
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))

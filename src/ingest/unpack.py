@@ -28,6 +28,8 @@ PLAN = [
     ("도로명주소전자지도_서울특별시*.zip", "juso_emap", None),
     # 국토정보플랫폼 수치지형도 Ver2.0 (도엽 하나에 압축 하나). {sheet}는 파일 이름의 도엽코드 8자리
     ("(B010)수치지도_*.zip", "ngii_digital_map/{sheet}", None),
+    # 국토정보플랫폼 국가기본도 (사용자 정의 영역). 레이어마다 압축이 하나씩 들어 있어 레이어 이름 폴더로 푼다
+    ("(B022)국가기본도*.zip", "ngii_basemap", "nested"),
     # 도로명주소 한글(주소DB)은 보류 중이라 풀지 않는다 (docs/decisions.md)
 ]
 
@@ -56,6 +58,23 @@ def unpack_zip(src: Path, dest: Path, patterns: list[str] | None) -> list[str]:
             with z.open(info) as fin, open(dest / Path(name).name, "wb") as fout:
                 shutil.copyfileobj(fin, fout)
             done.append(Path(name).name)
+    return done
+
+
+def unpack_nested_zip(src: Path, dest: Path) -> list[str]:
+    """압축 안의 압축(레이어 이름.zip)을 dest/레이어 이름/ 으로 푼다."""
+    import io
+    done = []
+    with zipfile.ZipFile(src) as outer:
+        for info in outer.infolist():
+            layer = Path(zip_name(info)).stem
+            with zipfile.ZipFile(io.BytesIO(outer.read(info))) as inner:
+                for f in inner.infolist():
+                    if f.is_dir():
+                        continue
+                    (dest / layer).mkdir(parents=True, exist_ok=True)
+                    (dest / layer / Path(zip_name(f)).name).write_bytes(inner.read(f))
+                    done.append(f"{layer}/{Path(zip_name(f)).name}")
     return done
 
 
@@ -100,7 +119,9 @@ def main() -> None:
         for src, sub in jobs:
             dest = args.raw_dir / sub
             dest.mkdir(parents=True, exist_ok=True)
-            if src.suffix == ".zip":
+            if files == "nested":
+                done = unpack_nested_zip(src, dest)
+            elif src.suffix == ".zip":
                 done = unpack_zip(src, dest, files)
             elif src.suffix == ".7z":
                 done = unpack_7z(src, dest, files)

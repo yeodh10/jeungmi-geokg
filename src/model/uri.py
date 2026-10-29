@@ -66,10 +66,16 @@ def basic_zone(zone_no: str) -> str:
     return f"{BASE}/basic-zone/{zone_no}"
 
 
-def basemap_feature(ufid: str) -> str:
-    """국가기본도(수치지형도) 지형지물의 유일식별자(UFID) 34자리."""
+def basemap_feature(nf_id: str) -> str:
+    """국가기본도 지형지물의 객체ID(nf_id) 17자리. 예: BLD01000000GFQR7T"""
+    assert len(nf_id) == 17 and nf_id.isalnum(), nf_id
+    return f"{BASE}/basemap/{nf_id}"
+
+
+def digital_map_feature(ufid: str) -> str:
+    """수치지형도 Ver2.0 지형지물의 유일식별자(UFID) 34자리."""
     assert len(ufid) == 34 and ufid.isalnum(), ufid
-    return f"{BASE}/basemap/{ufid}"
+    return f"{BASE}/digital-map/{ufid}"
 
 
 def geometry(feature_uri: str) -> str:

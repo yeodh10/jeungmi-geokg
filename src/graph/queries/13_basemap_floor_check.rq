@@ -1,11 +1,11 @@
-# 품질 점검: 같은 건물인데 층수가 다른 곳 (건축물대장 지상층수와 국가기본도 층수)
+# 품질 점검: 같은 건물인데 층수가 다른 곳 (건축물대장 지상층수와 국가기본도, 수치지형도 층수)
 # 어느 쪽이 맞는지는 이 쿼리로 정하지 않는다. 차이가 큰 곳부터 사람이 보도록 차이 순으로 줄 세운다
 PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?b ?label ?registerFloors ?basemapFloors ?kind (ABS(?registerFloors - ?basemapFloors) AS ?gap) WHERE {
-  ?b jgk:basemapFeature ?m ; jgk:floorsAbove ?registerFloors .
-  ?m jgk:basemapFloors ?basemapFloors ; jgk:basemapKind ?kind .
+SELECT ?map ?b ?label ?registerFloors ?mapFloors (ABS(?registerFloors - ?mapFloors) AS ?gap) WHERE {
+  { ?b jgk:basemapFeature ?m . BIND("국가기본도" AS ?map) } UNION { ?b jgk:digitalMapFeature ?m . BIND("수치지형도" AS ?map) }
+  ?b jgk:floorsAbove ?registerFloors . ?m jgk:mapFloors ?mapFloors .
   OPTIONAL { ?b rdfs:label ?label }
-  FILTER(?registerFloors != ?basemapFloors)
+  FILTER(?registerFloors != ?mapFloors)
 } ORDER BY DESC(?gap) LIMIT 20

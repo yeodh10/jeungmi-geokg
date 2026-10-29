@@ -530,6 +530,7 @@ LAYER_QUERY = {
     "building": "jgk:Building", "entrance": "jgk:BuildingEntrance",
     "facility": "jgk:PublicFacility", "station": "jgk:Station",
     "road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong", "basemap": "jgk:BaseMapFeature",
+    "digitalmap": "jgk:DigitalMapFeature",
 }
 LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "baddr", "bkind")
 layer_cache: dict = {}  # (레이어, 그래프 판 번호) -> 응답 본문(bytes)
@@ -545,7 +546,7 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
   ?f a {LAYER_QUERY[kind]} ; geo:hasDefaultGeometry/geo:asWKT ?wkt0 ; jgk:status ?s .
   ?s rdfs:label ?status0 .
   OPTIONAL {{ ?f rdfs:label ?label0 }} OPTIONAL {{ ?f jgk:useName ?use0 }}
-  OPTIONAL {{ ?f jgk:roadAddress ?addr0 }} OPTIONAL {{ ?f jgk:entranceType ?type0 }} OPTIONAL {{ ?f jgk:basemapKind ?bkind0 }}
+  OPTIONAL {{ ?f jgk:roadAddress ?addr0 }} OPTIONAL {{ ?f jgk:entranceType ?type0 }} OPTIONAL {{ ?f jgk:mapKind ?bkind0 }}
   OPTIONAL {{ ?f jgk:within ?d . ?d a jgk:AdminDong ; rdfs:label ?dong0 }}
   {entrance}
 }} GROUP BY ?f"""
@@ -553,7 +554,7 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
     for s in store().query(q):
         props = {k: term(s[k]) for k in LAYER_FIELDS}
         baddr = props.pop("baddr")
-        props["type"] = props["type"] or props.pop("bkind")  # 국가기본도 건물은 종류(아파트, 무벽건물 등)
+        props["type"] = props["type"] or props.pop("bkind")  # 수치지형도 건물은 종류(아파트, 무벽건물 등)
         props.pop("bkind", None)
         props["addr"] = props["addr"] or baddr  # 출입구는 그 출입구를 가진 건물의 도로명주소
         feats.append({"type": "Feature", "geometry": rounded(shapely.from_wkt(term(s["wkt"]))),

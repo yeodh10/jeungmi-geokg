@@ -32,6 +32,7 @@ DATASET_PUBLIC_OFFICE = JGK["dataset-public-office"]
 DATASET_AGENCY_CODE = JGK["dataset-agency-code"]
 DATASET_EMAP = JGK["dataset-juso-emap"]
 DATASET_NGII = JGK["dataset-ngii-digital-map"]
+DATASET_KBM = JGK["dataset-ngii-basemap"]
 SOURCE_OF = {"navi": DATASET_NAVI, "emap": DATASET_EMAP, "gis": DATASET_GIS, "register": DATASET_REGISTER}
 
 
@@ -117,25 +118,46 @@ def add_emap(g: Graph, proc: Path) -> None:
         g.add((URIRef(r.parcel_uri), JGK.inLegalDong, URIRef(r.legal_dong_uri)))
 
 
-def add_basemap(g: Graph, proc: Path) -> None:
-    """국가기본도(수치지형도) 건물과, 우리 건물에서 그 건물로 가는 연결."""
+def add_maps(g: Graph, proc: Path) -> None:
+    """국가기본도와 수치지형도 건물, 그리고 우리 건물에서 그 건물로 가는 연결."""
     for r in read_optional(proc, "basemap_building").itertuples():
         s = URIRef(r.uri)
         add_feature(g, s, JGK.BaseMapFeature, "Active")
         g.add((s, JGK.featureCode, JGK["basemap-B0010000"]))
+        add(g, s, JGK.basemapId, r.nf_id)
+        add(g, s, JGK.molitUfid, r.molit_ufid)
+        add(g, s, RDFS.label, r.name, lang="ko")
+        add(g, s, JGK.mapKindCode, r.kind_code)
+        add(g, s, JGK.mapUseCode, r.use_code)
+        add(g, s, JGK.mapFloors, None if pd.isna(r.floors) else int(r.floors), XSD.integer)
+        add(g, s, JGK.pnu, r.pnu)
+        add(g, s, JGK.matchIoU, None if pd.isna(r.match_iou) else round(float(r.match_iou), 3), XSD.decimal)
+        g.add((s, DCTERMS.source, DATASET_KBM))
+        add_geometry(g, s, r.geometry)
+    for r in read_optional(proc, "digital_map_building").itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.DigitalMapFeature, "Active")
+        g.add((s, JGK.featureCode, JGK["basemap-B0010000"]))
         add(g, s, JGK.ufid, r.ufid)
         add(g, s, JGK.sheetCode, r.sheet_code)
         add(g, s, RDFS.label, r.name, lang="ko")
-        add(g, s, JGK.basemapKind, r.kind)
-        add(g, s, JGK.basemapUse, r.use)
-        add(g, s, JGK.basemapFloors, None if pd.isna(r.floors) else int(r.floors), XSD.integer)
+        add(g, s, JGK.mapKind, r.kind)
+        add(g, s, JGK.mapUse, r.use)
+        add(g, s, JGK.mapFloors, None if pd.isna(r.floors) else int(r.floors), XSD.integer)
         add(g, s, JGK.matchIoU, None if pd.isna(r.match_iou) else round(float(r.match_iou), 3), XSD.decimal)
         g.add((s, DCTERMS.source, DATASET_NGII))
         add_geometry(g, s, r.geometry)
-    path = proc / "building_basemap.csv"
-    if path.exists():
-        for r in pd.read_csv(path, dtype=str).itertuples():
-            g.add((URIRef(r.building_uri), JGK.basemapFeature, URIRef(r.basemap_uri)))
+    for name, prop in (("basemap", JGK.basemapFeature), ("digital_map", JGK.digitalMapFeature)):
+        path = proc / f"building_{name}.csv"
+        if not path.exists():
+            continue
+        for r in pd.read_csv(path, dtype=str, keep_default_na=False).itertuples():
+            g.add((URIRef(r.building_uri), prop, URIRef(r.map_uri)))
+            if name == "basemap":  # 견준 결과는 지도 쪽 객체에 적는다 (공개 보류가 같이 걸린다)
+                m = URIRef(r.map_uri)
+                g.add((m, JGK.pnuAgrees, Literal(r.pnu_same == "True")))
+                if r.address_same in ("True", "False"):
+                    g.add((m, JGK.addressAgrees, Literal(r.address_same == "True")))
 
 
 def build(proc: Path = PROC) -> Graph:
@@ -238,7 +260,7 @@ def build(proc: Path = PROC) -> Graph:
     for r in facility_links.itertuples():
         g.add((URIRef(r.facility_uri), JGK.housedIn, URIRef(r.building_uri)))
     add_emap(g, proc)
-    add_basemap(g, proc)
+    add_maps(g, proc)
     return g
 
 

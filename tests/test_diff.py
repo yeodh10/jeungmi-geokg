@@ -15,8 +15,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
 FILES = ["objects.gpkg", "facility_building.csv", "parcel.csv", "admin_dong.csv", "building_entrance.csv",
-         "road.csv", "entrance_road.csv", "building_zone.csv", "parcel_legal_dong.csv", "building_basemap.csv"]
-EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone", "basemap_building"]
+         "road.csv", "entrance_road.csv", "building_zone.csv", "parcel_legal_dong.csv", "building_basemap.csv",
+         "building_digital_map.csv"]
+EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone", "basemap_building", "digital_map_building"]
 FAKE_MGT = "1150010200199990000000001"  # 시험용 건물관리번호 (실제 번호 아님)
 
 
@@ -40,9 +41,10 @@ def make_next_snapshot(dst: Path) -> dict:
     zone = pd.read_csv(dst / "building_zone.csv", dtype=str, keep_default_na=False)
     zone = zone[zone["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
     zone.to_csv(dst / "building_zone.csv", index=False)
-    bm = pd.read_csv(dst / "building_basemap.csv", dtype=str)
-    bm = bm[bm["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
-    bm.to_csv(dst / "building_basemap.csv", index=False)
+    for f in ("building_basemap.csv", "building_digital_map.csv"):
+        bm = pd.read_csv(dst / f, dtype=str)
+        bm = bm[bm["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
+        bm.to_csv(dst / f, index=False)
     (dst / "objects.gpkg").unlink()
     for n, g in layers.items():
         g.to_file(dst / "objects.gpkg", layer=n, driver="GPKG", engine="pyogrio")

@@ -1,9 +1,11 @@
-# 국가기본도(수치지형도) 건물과 이어진 우리 건물: 상태별 개수와 겹침 정도(IoU) 평균
-# 우리 건물 모양은 GIS건물통합정보, 국가기본도 건물은 국토지리정보원 수치지형도 Ver2.0. 서로 가장 많이 겹치고 IoU 0.5 이상인 짝만 잇는다
+# 국가기본도, 수치지형도 건물과 이어진 우리 건물: 지도별, 상태별 개수와 겹침 정도(IoU) 평균
+# 우리 건물 모양은 GIS건물통합정보다. 서로 가장 많이 겹치고 IoU 0.5 이상인 짝만 잇는다. 받은 영역이 지도마다 다르다
 PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?status (COUNT(?b) AS ?buildings) (COUNT(?m) AS ?linked) (ROUND(SUM(IF(BOUND(?iou), ?iou, 0)) / COUNT(?m) * 1000) / 1000 AS ?meanIoU) WHERE {
-  ?b a jgk:Building ; jgk:status/rdfs:label ?status .
-  OPTIONAL { ?b jgk:basemapFeature ?m . ?m jgk:matchIoU ?iou }
-} GROUP BY ?status
+SELECT ?map ?status (COUNT(?b) AS ?linked) (ROUND(AVG(?iou) * 1000) / 1000 AS ?meanIoU)
+       (SUM(IF(?pnu, 1, 0)) AS ?pnuSame) (SUM(IF(?addr, 1, 0)) AS ?addressSame) WHERE {
+  { ?b jgk:basemapFeature ?m . BIND("국가기본도" AS ?map) } UNION { ?b jgk:digitalMapFeature ?m . BIND("수치지형도" AS ?map) }
+  ?b jgk:status/rdfs:label ?status . ?m jgk:matchIoU ?iou .
+  OPTIONAL { ?m jgk:pnuAgrees ?pnu } OPTIONAL { ?m jgk:addressAgrees ?addr }
+} GROUP BY ?map ?status ORDER BY ?map ?status

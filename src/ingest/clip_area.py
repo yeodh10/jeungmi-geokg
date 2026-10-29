@@ -150,7 +150,17 @@ def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
         # 도곽: 받은 도엽이 범위의 어디까지 덮는지. 비교는 도곽 안에서만 한다
         layers["ngii_sheet"] = gpd.GeoDataFrame(pd.concat([read(d, "N3A_H0010000") for d in sheets], ignore_index=True), crs=NGII_CRS)
     else:
-        print("[없음] data/raw/ngii_digital_map -> 국가기본도 없이 진행")
+        print("[없음] data/raw/ngii_digital_map -> 수치지형도 없이 진행")
+
+    # 9. 국가기본도 (국토정보플랫폼 '국가기본도' 사용자 정의 영역 내려받기, EPSG:5179, 글자는 UTF-8)
+    kbm = raw / "ngii_basemap"
+    if (kbm / "건물").exists():
+        read = lambda d: gpd.read_file(next((kbm / d).glob("*.shp")), encoding="utf-8", engine="pyogrio").set_crs(NAVI_CRS, allow_override=True)
+        layers["ngii_basemap_building"] = clip(read("건물"), area, metric, rule_poly)
+        # 내려받은 영역: 1:5,000 도엽 색인이 그 영역으로 잘려 들어 있다
+        layers["ngii_basemap_area"] = read("도엽인덱스5K")[["mapidcd_no", "geometry"]]
+    else:
+        print("[없음] data/raw/ngii_basemap -> 국가기본도 없이 진행")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     if out_gpkg.exists():
