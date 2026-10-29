@@ -34,12 +34,16 @@
   #results { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
   #results li { padding: 4px 0; cursor: pointer; color: var(--accent); }
   .muted { color: var(--muted); font-size: 13px; }
+  #askf { display: flex; gap: 6px; }
+  #askf button { border: 0; border-radius: 6px; background: var(--accent); color: #fff; padding: 6px 12px; cursor: pointer; }
+  pre { background: var(--bg); padding: 8px; border-radius: 6px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
 </style>
 </head>
 <body>
 <header>
   <h1>증미역 공간 지식 그래프</h1>
   <input id="q" placeholder="건물 이름이나 도로명주소 찾기">
+  <form id="askf"><input id="ask" placeholder="질문하기 (예: 증미역 300m 안 학교)"> <button>묻기</button></form>
   <a href="/">변경 제안 검토</a>
 </header>
 <div class="wrap">
@@ -122,6 +126,32 @@ function focus(uri) {
     return;
   }
 }
+
+document.getElementById("askf").onsubmit = async e => {
+  e.preventDefault();
+  const question = document.getElementById("ask").value.trim();
+  if (!question) return;
+  const info = document.getElementById("info");
+  info.innerHTML = '<p class="muted">질문을 SPARQL로 바꾸는 중...</p>';
+  const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+  const a = await r.json();
+  if (!r.ok) { info.innerHTML = `<p class="muted">${esc(a.detail)}</p>`; return; }
+  const src = map.getSource("answer");
+  if (src) src.setData(a.geojson); else {
+    map.addSource("answer", { type: "geojson", data: a.geojson });
+    map.addLayer({ id: "answer-fill", type: "fill", source: "answer", filter: ["!=", ["geometry-type"], "Point"], paint: { "fill-color": "#e31b54", "fill-opacity": 0.6 } });
+    map.addLayer({ id: "answer-pt", type: "circle", source: "answer", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 8, "circle-color": "#e31b54", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+  }
+  const b = new maplibregl.LngLatBounds();
+  a.geojson.features.forEach(f => (f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1)).forEach(c => b.extend(c)));
+  if (!b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 17, duration: 400 });
+  const head = a.vars.filter(v => !a.rows.some(r => /^(POINT|POLYGON|MULTI)/.test(String(r[a.vars.indexOf(v)]))));
+  info.innerHTML = `<h2>${esc(a.question)}</h2><p>${esc(a.explanation)}</p><p class="muted">결과 ${a.rows.length}행</p>
+    <table>${a.rows.slice(0, 50).map(r => `<tr>${head.map(v => { const x = r[a.vars.indexOf(v)] ?? "";
+      return `<td>${String(x).startsWith(BASE) ? `<a class="obj" data-u="${esc(x)}">${esc(short(x))}</a>` : esc(x)}</td>`; }).join("")}</tr>`).join("")}</table>
+    <h3>실행한 SPARQL</h3><pre>${esc(a.sparql)}</pre>`;
+  document.querySelectorAll("#info a.obj").forEach(x => x.onclick = () => show(x.dataset.u));
+};
 
 document.getElementById("q").oninput = e => {
   const q = e.target.value.trim(); const ul = document.getElementById("results");

@@ -130,6 +130,28 @@ SELECT ?f ?wkt ?label ?status ?use ?addr ?type WHERE {{
     return layer_cache[key]
 
 
+class AskIn(BaseModel):
+    question: str
+
+
+@app.post("/api/ask")
+def ask_question(body: AskIn):
+    """자연어 질문 -> SPARQL -> 결과와 지도용 GeoJSON. LLM 호출이 안 되면 503."""
+    import anthropic
+
+    from src.query.nl import ask
+    if not body.question.strip():
+        raise HTTPException(400, "질문이 비었다")
+    try:
+        return ask(body.question.strip(), store=store())
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError, TypeError) as e:
+        raise HTTPException(503, f"Claude API를 쓸 수 없다 (.env의 ANTHROPIC_API_KEY 확인): {e}")
+    except anthropic.APIError as e:
+        raise HTTPException(502, f"Claude API 오류: {e}")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 @app.get("/map")
 def map_page():
     return FileResponse(ROOT / "web" / "map.html")

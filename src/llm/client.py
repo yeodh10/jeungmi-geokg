@@ -28,16 +28,20 @@ def get_client() -> anthropic.Anthropic:
     return anthropic.Anthropic()
 
 
-def parse(client, schema: type[T], system: str, user: str, effort: str = "high") -> T:
-    """구조화 출력으로 한 번 부르고, 스키마로 검증된 결과를 돌려준다."""
+def parse(client, schema: type[T], system: str, user: str | list, effort: str = "high") -> T:
+    """구조화 출력으로 한 번 부르고, 스키마로 검증된 결과를 돌려준다.
+
+    system은 매번 같은 글이라 캐시해 둔다. user에 대화 목록(list)을 주면 그대로 messages로 쓴다.
+    """
+    messages = user if isinstance(user, list) else [{"role": "user", "content": user}]
     response = client.beta.messages.parse(
         model=MODEL,
         max_tokens=16000,
         betas=[FALLBACK_BETA],
         fallbacks="default",
         output_config={"effort": effort},
-        system=system,
-        messages=[{"role": "user", "content": user}],
+        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+        messages=messages,
         output_format=schema,
     )
     if response.stop_reason == "refusal":
