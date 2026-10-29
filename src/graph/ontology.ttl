@@ -84,7 +84,7 @@ jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; r
 jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
 jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
 jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko .
-jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice)"@ko .
+jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice, notice-table)"@ko .
 jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "승인한 사람"@ko .
 jgk:decidedAt a owl:DatatypeProperty ; rdfs:label "승인 시각"@ko ; rdfs:range xsd:dateTime .
 

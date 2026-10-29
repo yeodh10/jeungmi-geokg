@@ -61,7 +61,7 @@ class Decision(BaseModel):
 class Proposal(BaseModel):
     id: str
     created_at: str
-    source_kind: Literal["rule-candidate", "data-diff", "llm-notice"]
+    source_kind: Literal["rule-candidate", "data-diff", "llm-notice", "notice-table"]
     source_detail: str
     action: Literal["create", "update", "retire", "link"]
     target: str
