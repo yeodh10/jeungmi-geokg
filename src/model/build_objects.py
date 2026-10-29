@@ -246,12 +246,15 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     reg_dup = int(reg["pnu"].duplicated().sum())
     reg = reg.drop_duplicates("pnu").set_index("pnu")
     pnus = sorted(set(buildings["pnu"].dropna()) | set(reg.index.dropna()))
+    # 필지 번호를 어느 자료에서 얻었는지 (GIS A2, 내비 대표지번, 총괄표제부)
+    pnu_sources = buildings.dropna(subset=["pnu"]).groupby("pnu")["attr_source"].agg(set).to_dict()
     parcels = []
     for p in pnus:
         assert len(p) == 19 and p.isdigit(), p
         r = reg.loc[p] if p in reg.index else None
+        srcs = set(pnu_sources.get(p, set())) | ({"register"} if r is not None else set())
         parcels.append({
-            "uri": uri.parcel(p), "pnu": p,
+            "uri": uri.parcel(p), "pnu": p, "sources": ";".join(sorted(srcs)),
             "site_area": text(r["대지면적"]) if r is not None else None,
             "total_floor_area": text(r["연면적"]) if r is not None else None,
             "households": to_int(r["세대수"]) if r is not None else None,

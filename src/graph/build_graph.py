@@ -91,8 +91,9 @@ def build(proc: Path = PROC) -> Graph:
         add(g, s, JGK.households, r.households, XSD.integer)
         add(g, s, JGK.mainBuildingCount, r.main_building_count, XSD.integer)
         add(g, s, JGK.complexMainUse, r.complex_main_use)
-        if present(r.site_area):
-            g.add((s, DCTERMS.source, DATASET_REGISTER))
+        source_of = {"gis": DATASET_GIS, "navi": DATASET_NAVI, "register": DATASET_REGISTER}
+        for k in filter(None, r.sources.split(";")):
+            g.add((s, DCTERMS.source, source_of[k]))
 
     for r in buildings.itertuples():
         s = URIRef(r.uri)

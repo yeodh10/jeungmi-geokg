@@ -100,6 +100,7 @@ async function show(id) {
     <div class="meta">대상 ${esc(p.target)}<br>지금 그래프에 ${inGraph.in_graph ? "있음 (트리플 " + inGraph.triples.length + "개)" : "없음"}</div>
     <div id="map"></div>
     <div class="legend"><i style="background:#c3cad5"></i>주변 건물<i style="background:#f79009"></i>이어질 건물<i style="background:#d92d20"></i>제안 대상</div>
+    <h3>데이터 규칙 검사 (SHACL)</h3><p id="shacl" class="meta">검사하는 중...</p>
     <h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul>
     <h3>그래프에 넣을 내용 (${p.changes.length}개)</h3>
     <table>${p.changes.map(c => `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(short(c.s))}</td><td>${esc(short(c.p))}</td><td>${esc(c.o.kind === "uri" ? short(c.o.value) : c.o.value)}</td></tr>`).join("")}</table>
@@ -112,6 +113,15 @@ async function show(id) {
       </div>` : `<h3>결정</h3><p class="meta">${esc(p.decision.reviewer)}, ${esc(p.decision.at)}${p.decision.comment ? ", " + esc(p.decision.comment) : ""}</p>`}
     <h3>승인하면 실행할 SPARQL</h3><pre>${esc(p.sparql_update)}</pre>`;
   drawMap(id);
+  if (p.status === "pending") {
+    const v = await (await fetch(`/api/proposals/${encodeURIComponent(id)}/validate`)).json();
+    const el = document.getElementById("shacl");
+    if (el) el.innerHTML = v.conforms ? "반영해도 규칙을 모두 지킵니다."
+      : "규칙을 어겨 승인할 수 없습니다:<br>" + v.results.map(r => esc(r.message)).join("<br>");
+  } else {
+    const el = document.getElementById("shacl");
+    if (el) el.textContent = "결정이 끝난 제안입니다.";
+  }
 }
 
 async function drawMap(id) {

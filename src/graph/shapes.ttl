@@ -1,0 +1,106 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix jgk: <https://yeodh10.github.io/jeungmi-geokg/def#> .
+@prefix jgks: <https://yeodh10.github.io/jeungmi-geokg/def/shapes#> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# 증미역 공간 지식 그래프 데이터 규칙 (SHACL)
+# 원천 그래프 전체와, 승인 전 변경 제안을 이 규칙으로 검사한다 (src/graph/validate.py).
+
+# 모든 공간 객체: 상태는 정확히 하나, 정해진 값 중 하나
+jgks:Feature a sh:NodeShape ;
+    sh:targetClass geo:Feature ;
+    sh:property [ sh:path jgk:status ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( jgk:Active jgk:AddressUnlinked jgk:AddressLinked jgk:Retired ) ;
+                  sh:message "상태는 정확히 하나이고 사용, 주소 미연결, 주소 연결됨, 폐지 중 하나여야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:class jgk:Dataset ;
+                  sh:message "출처(원천 데이터)가 하나 이상 있어야 한다"@ko ] .
+
+# 폐지된 객체에는 폐지 확인일이 있어야 한다
+jgks:Retired a sh:NodeShape ;
+    sh:targetClass geo:Feature ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "폐지 상태인데 폐지 확인일(jgk:retiredOn)이 없다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT $this WHERE { $this jgk:status jgk:Retired . FILTER NOT EXISTS { $this jgk:retiredOn ?d } }""" ] .
+
+# 모양이 있는 객체(필지, 행정동 제외): 기본 모양이 정확히 하나
+jgks:HasGeometry a sh:NodeShape ;
+    sh:targetClass jgk:Building, jgk:BuildingEntrance, jgk:PublicFacility, jgk:Station ;
+    sh:property [ sh:path geo:hasDefaultGeometry ; sh:minCount 1 ; sh:maxCount 1 ; sh:class geo:Geometry ;
+                  sh:message "기본 모양(geo:hasDefaultGeometry)이 정확히 하나 있어야 한다"@ko ] .
+
+jgks:Geometry a sh:NodeShape ;
+    sh:targetClass geo:Geometry ;
+    sh:property [ sh:path geo:asWKT ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype geo:wktLiteral ;
+                  sh:message "모양에는 WKT가 정확히 하나 있어야 한다"@ko ] .
+
+# 건물: 건물관리번호(25자리) 또는 GIS건물통합식별번호(28자리) 중 정확히 하나로 식별
+jgks:Building a sh:NodeShape ;
+    sh:targetClass jgk:Building ;
+    sh:xone (
+        [ sh:path jgk:buildingMgtNo ; sh:minCount 1 ]
+        [ sh:path jgk:gisBuildingId ; sh:minCount 1 ]
+    ) ;
+    sh:message "건물은 건물관리번호와 GIS건물통합식별번호 중 정확히 하나로 식별해야 한다"@ko ;
+    sh:property [ sh:path jgk:buildingMgtNo ; sh:maxCount 1 ; sh:pattern "^[0-9]{25}$" ;
+                  sh:message "건물관리번호는 숫자 25자리여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:gisBuildingId ; sh:maxCount 1 ; sh:pattern "^[0-9]{28}$" ;
+                  sh:message "GIS건물통합식별번호는 숫자 28자리여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:locatedOn ; sh:maxCount 1 ; sh:class jgk:Parcel ;
+                  sh:message "건물은 필지 하나 위에 있어야 한다"@ko ] ;
+    sh:property [ sh:path jgk:within ; sh:maxCount 1 ; sh:class jgk:AdminDong ] ;
+    sh:property [ sh:path jgk:hasEntrance ; sh:class jgk:BuildingEntrance ] ;
+    sh:property [ sh:path jgk:floorsAbove ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ;
+                  sh:message "지상층수는 0 이상의 정수 하나"@ko ] ;
+    sh:property [ sh:path jgk:floorsBelow ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path jgk:approvalDate ; sh:maxCount 1 ; sh:datatype xsd:date ] ;
+    sh:property [ sh:path jgk:useName ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path jgk:roadAddress ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+# 주소 미연결 건물은 건물관리번호가 없어야 하고, 주소 연결 건물은 행정동에 속해야 한다
+jgks:BuildingStatus a sh:NodeShape ;
+    sh:targetClass jgk:Building ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "건물관리번호가 있는데 상태가 주소 미연결이다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT $this WHERE { $this jgk:status jgk:AddressUnlinked ; jgk:buildingMgtNo ?n }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "건물관리번호가 있는 건물이 행정동에 속하지 않는다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT $this WHERE { $this jgk:buildingMgtNo ?n . FILTER NOT EXISTS { $this jgk:within ?d } }""" ] .
+
+jgks:Parcel a sh:NodeShape ;
+    sh:targetClass jgk:Parcel ;
+    sh:property [ sh:path jgk:pnu ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{10}[12][0-9]{8}$" ;
+                  sh:message "PNU는 법정동코드 10자리, 대지구분(1, 2), 본번 4자리, 부번 4자리여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:households ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ;
+                  sh:message "세대수는 0 이상의 정수 하나"@ko ] ;
+    sh:property [ sh:path jgk:siteArea ; sh:maxCount 1 ; sh:datatype xsd:decimal ; sh:minExclusive 0 ;
+                  sh:message "대지면적은 0보다 커야 한다 (원천 건축물대장 값 확인 필요)"@ko ] .
+
+jgks:Entrance a sh:NodeShape ;
+    sh:targetClass jgk:BuildingEntrance ;
+    sh:property [ sh:path jgk:entranceType ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( "주출입구" "공용" "차량용" "보행자용" ) ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "어느 건물에도 이어지지 않은 출입구다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT $this WHERE { FILTER NOT EXISTS { ?b jgk:hasEntrance $this } }""" ] .
+
+jgks:PublicFacility a sh:NodeShape ;
+    sh:targetClass jgk:PublicFacility ;
+    sh:property [ sh:path jgk:agencyCode ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{7}$" ;
+                  sh:message "행정표준코드 기관코드는 숫자 7자리 하나여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:housedIn ; sh:class jgk:Building ] .
+
+jgks:Station a sh:NodeShape ;
+    sh:targetClass jgk:Station ;
+    sh:property [ sh:path jgk:housedIn ; sh:minCount 1 ; sh:class jgk:Building ;
+                  sh:message "역은 역사 건물과 이어져야 한다"@ko ] .
+
+jgks:AdminDong a sh:NodeShape ;
+    sh:targetClass jgk:AdminDong ;
+    sh:property [ sh:path jgk:admDongCode ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{10}$" ] .

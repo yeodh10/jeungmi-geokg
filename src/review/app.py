@@ -64,10 +64,26 @@ def get_proposal(pid: str):
     return {**p.model_dump(), "sparql_update": p.sparql_update()}
 
 
+@app.get("/api/proposals/{pid}/validate")
+def validate_proposal(pid: str):
+    """제안을 반영했을 때 대상 객체가 SHACL 규칙(src/graph/shapes.ttl)을 지키는지."""
+    from src.graph.validate import check_proposal
+    p = proposals.get(pid)
+    if p is None:
+        raise HTTPException(404, "없는 제안")
+    conforms, results = check_proposal(store(), p)
+    return {"conforms": conforms, "results": results}
+
+
 @app.post("/api/proposals/{pid}/decision")
 def decide(pid: str, body: DecisionIn):
     if not body.reviewer.strip():
         raise HTTPException(400, "검토자 이름이 필요하다")
+    if body.result == "approved":
+        check = validate_proposal(pid)
+        if not check["conforms"]:  # 규칙을 어기는 제안은 승인할 수 없다 (반려는 된다)
+            raise HTTPException(409, "데이터 규칙을 어겨 승인할 수 없다: "
+                                + "; ".join(sorted({r["message"] for r in check["results"]})))
     try:
         p = proposals.decide(pid, body.result, body.reviewer.strip(), body.comment)
     except KeyError:
