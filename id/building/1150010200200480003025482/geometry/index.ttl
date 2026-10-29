@@ -1,0 +1,2 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200200480003025482/geometry> <http://www.opengis.net/ont/geosparql#asWKT> "POINT (126.8583643 37.5528257)"^^<http://www.opengis.net/ont/geosparql#wktLiteral> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200200480003025482/geometry> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Geometry> .

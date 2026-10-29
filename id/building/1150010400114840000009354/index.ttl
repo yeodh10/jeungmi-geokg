@@ -1,0 +1,14 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#within> <https://yeodh10.github.io/jeungmi-geokg/id/admin-dong/1150060500> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#useName> "교육및복지시설" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 허준로 186" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#hasEntrance> <https://yeodh10.github.io/jeungmi-geokg/id/entrance/1150010400114840000009354-main> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "4"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <https://yeodh10.github.io/jeungmi-geokg/def#buildingMgtNo> "1150010400114840000009354" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://www.w3.org/2000/01/rdf-schema#label> "가양초등학교"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Building> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114840000009354> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

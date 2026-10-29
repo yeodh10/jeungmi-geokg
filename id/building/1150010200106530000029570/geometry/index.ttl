@@ -1,0 +1,3 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106530000029570/geometry> <https://yeodh10.github.io/jeungmi-geokg/def#sourceGisBuildingId> "1977187370904503506800000000" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106530000029570/geometry> <http://www.opengis.net/ont/geosparql#asWKT> "POLYGON ((126.8580147 37.5554506, 126.8578024 37.5551836, 126.8577099 37.5552293, 126.857903 37.5554784, 126.8579394 37.5554885, 126.8580147 37.5554506))"^^<http://www.opengis.net/ont/geosparql#wktLiteral> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106530000029570/geometry> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Geometry> .

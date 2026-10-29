@@ -1,0 +1,5 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106460013> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106460013> <https://yeodh10.github.io/jeungmi-geokg/def#pnu> "1150010200106460013" .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106460013> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-gis-building> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106460013> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Parcel> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106460013> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

@@ -1,0 +1,10 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <https://yeodh10.github.io/jeungmi-geokg/def#within> <https://yeodh10.github.io/jeungmi-geokg/id/admin-dong/1150052000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <https://yeodh10.github.io/jeungmi-geokg/def#lineName> "서울 지하철 9호선" .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <https://yeodh10.github.io/jeungmi-geokg/def#housedIn> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106660040000001> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://www.w3.org/2000/01/rdf-schema#label> "증미역"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Station> .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

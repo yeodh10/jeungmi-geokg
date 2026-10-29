@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#within> <https://yeodh10.github.io/jeungmi-geokg/id/admin-dong/1147053000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#useName> "업무시설" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 양천구 목동중앙북로7나길 41" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#locatedOn> <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1147010200106070013> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#hasEntrance> <https://yeodh10.github.io/jeungmi-geokg/id/entrance/1147010200106070013017946-main> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "9"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <https://yeodh10.github.io/jeungmi-geokg/def#buildingMgtNo> "1147010200106070013017946" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://www.w3.org/2000/01/rdf-schema#label> "현진파크빌"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Building> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106070013017946> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .
