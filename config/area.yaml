@@ -17,6 +17,12 @@ center:
 
 radius_m: 1000
 
+# 역 객체로 만들 역사 건물. 이름과 번호는 내비게이션용DB에서 확인한 값이다.
+stations:
+  - name: 증미역
+    line: 서울 지하철 9호선
+    bldg_mgt_no: "1150010200106660040000001"
+
 crs:
   storage: "EPSG:4326"   # 저장
   metric: "EPSG:5186"    # 거리 계산, 범위 자르기

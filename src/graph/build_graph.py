@@ -28,6 +28,8 @@ STATUS = {"Active": JGK.Active, "AddressUnlinked": JGK.AddressUnlinked,
 DATASET_GIS = JGK["dataset-gis-building"]
 DATASET_NAVI = JGK["dataset-navi-db"]
 DATASET_REGISTER = JGK["dataset-building-register"]
+DATASET_PUBLIC_OFFICE = JGK["dataset-public-office"]
+DATASET_AGENCY_CODE = JGK["dataset-agency-code"]
 
 
 def present(v) -> bool:
@@ -59,6 +61,9 @@ def main() -> None:
     gpkg = PROC / "objects.gpkg"
     buildings = gpd.read_file(gpkg, layer="building")
     entrances = gpd.read_file(gpkg, layer="entrance")
+    stations = gpd.read_file(gpkg, layer="station")
+    facilities = gpd.read_file(gpkg, layer="public_facility")
+    facility_links = pd.read_csv(PROC / "facility_building.csv", dtype=str)
     parcels = pd.read_csv(PROC / "parcel.csv", dtype=str, keep_default_na=False)
     dongs = pd.read_csv(PROC / "admin_dong.csv", dtype=str, keep_default_na=False)
     links = pd.read_csv(PROC / "building_entrance.csv", dtype=str)
@@ -123,6 +128,32 @@ def main() -> None:
 
     for r in links.itertuples():
         g.add((URIRef(r.building_uri), JGK.hasEntrance, URIRef(r.entrance_uri)))
+
+    for r in stations.itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.Station, "Active")
+        add(g, s, RDFS.label, r.name, lang="ko")
+        add(g, s, JGK.lineName, r.line)
+        g.add((s, JGK.housedIn, URIRef(r.building_uri)))
+        if present(r.adm_dong_code):
+            g.add((s, JGK.within, dong_uri[r.adm_dong_code]))
+        g.add((s, DCTERMS.source, DATASET_NAVI))
+        add_geometry(g, s, r.geometry)
+
+    for r in facilities.itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.PublicFacility, "Active")
+        add(g, s, RDFS.label, r.label, lang="ko")
+        add(g, s, JGK.agencyCode, r.agency_code)
+        add(g, s, JGK.agencyName, r.agency_name)
+        add(g, s, JGK.facilityType, r.facility_type)
+        if present(r.adm_dong_code):
+            g.add((s, JGK.within, dong_uri[r.adm_dong_code]))
+        g.add((s, DCTERMS.source, DATASET_PUBLIC_OFFICE))
+        g.add((s, DCTERMS.source, DATASET_AGENCY_CODE))
+        add_geometry(g, s, r.geometry)
+    for r in facility_links.itertuples():
+        g.add((URIRef(r.facility_uri), JGK.housedIn, URIRef(r.building_uri)))
 
     g.serialize(OUT_TTL, format="turtle", encoding="utf-8")
     print(f"triples: {len(g)} -> {OUT_TTL.relative_to(ROOT)}")

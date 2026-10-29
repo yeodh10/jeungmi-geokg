@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from src.model import uri
 
 ROOT = Path(__file__).resolve().parents[2]
 PROC = ROOT / "data" / "processed"
+AGENCY_DIR = ROOT / "data" / "raw" / "agency_code"
 AREA_GPKG = PROC / "jeungmi_area.gpkg"
 OUT_GPKG = PROC / "objects.gpkg"
 
@@ -87,6 +89,45 @@ def dedupe_gis(bld: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, pd.DataFrame, i
     bld = bld[keep.values]
     conflict = bld["A1"].duplicated(keep=False)
     return bld[~conflict.values], bld[conflict.values].drop(columns="geometry"), merged
+
+
+def load_agencies() -> pd.DataFrame:
+    """행정표준코드 기관코드 중 현존(존폐여부 0)인 기관만 읽는다."""
+    path = next(AGENCY_DIR.glob("*유형분류 의미추가*.txt"))
+    cols = ["기관코드", "전체기관명", "최하위기관명", "존폐여부"]
+    ag = pd.read_csv(path, sep="\t", dtype=str, encoding="cp949", keep_default_na=False,
+                     quoting=3, usecols=cols)
+    ag = ag[ag["존폐여부"] == "0"].copy()
+    ag["name"] = ag["최하위기관명"].str.replace(r"\s+", "", regex=True)
+    return ag
+
+
+def match_agency(name: str, sido: str, sigungu: str, ag: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+    """민원행정기관 이름을 기관코드에 맞춘다. 앞 규칙에서 후보가 나오면 그 후보로 끝낸다.
+
+    1. 이름이 같은 기관 (시도 이름이 전체기관명에 들어 있어야 한다)
+    2. "OO동주민센터"는 시군구 아래의 "OO동"
+    3. 기관코드 이름이 우리 이름의 끝부분과 같은 기관 (예: 서울강서염창지구대 -> 염창지구대)
+    """
+    name = re.sub(r"\s+", "", name)
+    in_sido = ag[ag["전체기관명"].str.contains(sido[:2])]
+    c = in_sido[in_sido["name"] == name]
+    if len(c):
+        return c, "이름 일치"
+    m = re.fullmatch(r"(.+동)(주민센터|행정복지센터)", name)
+    if m:
+        c = in_sido[(in_sido["name"] == m.group(1)) & in_sido["전체기관명"].str.contains(sigungu)]
+        if len(c):
+            return c, "동 이름 일치"
+    c = in_sido[in_sido["name"].str.len().ge(4) & in_sido["name"].map(name.endswith)]
+    return c, "이름 끝부분 일치" if len(c) else "후보 없음"
+
+
+def parse_road_address(addr: str) -> tuple[str, str, str]:
+    """'서울특별시 강서구 양천로 646-28' -> (지하여부, 본번, 부번)"""
+    under = "1" if " 지하 " in f" {addr} " else "0"
+    main, _, sub = addr.split()[-1].partition("-")
+    return under, main, sub or "0"
 
 
 def main() -> None:
@@ -209,10 +250,56 @@ def main() -> None:
     dongs = (centers[["adm_dong_code", "adm_dong_name"]].drop_duplicates().sort_values("adm_dong_code"))
     dongs.insert(0, "uri", dongs["adm_dong_code"].map(uri.admin_dong))
 
+    # 7. 역: config/area.yaml에 적은 역사 건물의 건물관리번호를 그대로 쓴다
+    by_mgt = buildings.set_index("bldg_mgt_no")
+    stations = gpd.GeoDataFrame([{
+        "uri": uri.station(s["bldg_mgt_no"]), "name": s["name"], "line": s["line"],
+        "building_uri": uri.building(s["bldg_mgt_no"]),
+        "adm_dong_code": by_mgt.loc[s["bldg_mgt_no"], "adm_dong_code"],
+        "geometry": by_mgt.loc[s["bldg_mgt_no"], "geometry"],
+    } for s in cfg["stations"]], geometry="geometry", crs=storage)
+
+    # 8. 공공시설: 행정표준코드 기관코드로 URI를 붙이고, 도로명주소가 같은 건물에 housedIn으로 잇는다
+    offices = gpd.read_file(AREA_GPKG, layer="public_office")
+    agencies = load_agencies()
+    addr_index = centers.set_index(ADDRESS_KEY)["bldg_mgt_no"]
+    bld_geom = by_mgt["geometry"]  # 건물관리번호 -> 모양 (EPSG:4326, 포함 여부만 보므로 좌표계는 그대로 둔다)
+    facilities, facility_links, facility_review = [], [], []
+    for _, o in offices.iterrows():
+        sido, sigungu = o["도로명주소"].split()[:2]
+        cand, rule = match_agency(o["기관명"], sido, sigungu, agencies)
+        if len(cand) != 1:
+            facility_review.append({"기관명": o["기관명"], "유형": o["유형"], "상세분류": o["상세분류"],
+                                    "도로명주소": o["도로명주소"], "규칙": rule,
+                                    "후보": "; ".join(cand["기관코드"] + " " + cand["전체기관명"])})
+            continue
+        a = cand.iloc[0]
+        u = uri.public_facility(a["기관코드"])
+        under, main_no, sub_no = parse_road_address(o["도로명주소"])
+        road_code = str(o["시군구코드"]).zfill(5) + str(o["도로명코드"]).zfill(7)
+        key = (road_code, under, main_no, sub_no)
+        mgts = addr_index.loc[[key]].tolist() if key in addr_index.index else []
+        # 한 주소에 건물이 여럿이면(단지) 시설 위치를 품은 건물만 남긴다. 없으면 주소의 건물 전체를 둔다
+        inside = [m for m in mgts if bld_geom[m].contains(o.geometry)]
+        mgts = inside or mgts
+        facilities.append({
+            "uri": u, "agency_code": a["기관코드"], "label": o["기관명"], "agency_name": a["전체기관명"],
+            "facility_type": f"{o['유형']}/{o['상세분류']}", "match_rule": rule,
+            "adm_dong_code": dong_of[mgts[0]] if mgts else None, "geometry": o.geometry,
+        })
+        facility_links += [{"facility_uri": u, "building_uri": bld_uri[m]} for m in mgts]
+    facilities = gpd.GeoDataFrame(facilities, geometry="geometry", crs=storage)
+    assert facilities["uri"].is_unique, "기관코드 하나가 두 시설에 붙었다"
+    facility_links = pd.DataFrame(facility_links, columns=["facility_uri", "building_uri"])
+
     # 저장
     if OUT_GPKG.exists():
         OUT_GPKG.unlink()
     buildings.to_file(OUT_GPKG, layer="building", driver="GPKG", engine="pyogrio")
+    stations.to_file(OUT_GPKG, layer="station", driver="GPKG", engine="pyogrio")
+    facilities.to_file(OUT_GPKG, layer="public_facility", driver="GPKG", engine="pyogrio")
+    facility_links.to_csv(PROC / "facility_building.csv", index=False, encoding="utf-8")
+    pd.DataFrame(facility_review).to_csv(PROC / "review_public_facility.csv", index=False, encoding="utf-8")
     entrances.to_file(OUT_GPKG, layer="entrance", driver="GPKG", engine="pyogrio")
     parcels.to_csv(PROC / "parcel.csv", index=False, encoding="utf-8")
     dongs.to_csv(PROC / "admin_dong.csv", index=False, encoding="utf-8")
@@ -239,6 +326,13 @@ def main() -> None:
                    "with_complex_info": int(parcels["site_area"].notna().sum()),
                    "register_duplicate_pnu_rows": reg_dup},
         "admin_dong": len(dongs),
+        "station": len(stations),
+        "public_facility": {
+            "source_points": len(offices), "with_agency_code": len(facilities),
+            "for_review": len(facility_review),
+            "by_rule": facilities["match_rule"].value_counts().to_dict(),
+            "housed_in_building": int(facility_links["facility_uri"].nunique()),
+        },
     }
     with open(PROC / "objects_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)

@@ -33,5 +33,15 @@ def sub_entrance(sigungu_code: str, entrance_seq: str) -> str:
     return f"{BASE}/entrance/{sigungu_code}-{entrance_seq}"
 
 
+def station(bldg_mgt_no: str) -> str:
+    assert len(bldg_mgt_no) == 25, bldg_mgt_no
+    return f"{BASE}/station/{bldg_mgt_no}"
+
+
+def public_facility(agency_code: str) -> str:
+    assert len(agency_code) == 7 and agency_code.isdigit(), agency_code
+    return f"{BASE}/public-facility/{agency_code}"
+
+
 def geometry(feature_uri: str) -> str:
     return f"{feature_uri}/geometry"

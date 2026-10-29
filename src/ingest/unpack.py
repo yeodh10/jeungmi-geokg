@@ -23,6 +23,7 @@ PLAN = [
     ("*내비게이션용DB_전체분.7z", "juso_navi_db",
      ["match_build_seoul.txt", "match_jibun_seoul.txt", "match_rs_entrc.txt", "*.pdf"]),
     ("서울시 건축물대장 총괄표제부.csv", "seoul_building_register", None),
+    ("*기관코드 전체자료.zip", "agency_code", ["*유형분류 의미추가*.txt"]),
     # 도로명주소 한글(주소DB)은 보류 중이라 풀지 않는다 (docs/decisions.md)
 ]
 
@@ -31,7 +32,10 @@ def zip_name(info: zipfile.ZipInfo) -> str:
     # UTF-8 표시가 없는 zip은 이름이 CP949로 들어 있다
     if info.flag_bits & 0x800:
         return info.filename
-    return info.filename.encode("cp437").decode("cp949")
+    try:
+        return info.filename.encode("cp437").decode("cp949")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return info.filename  # 이미 제대로 읽힌 이름 (기관코드 전체자료 zip)
 
 
 def wanted(name: str, patterns: list[str] | None) -> bool:

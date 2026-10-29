@@ -1,0 +1,9 @@
+# 공공시설: 행정표준코드 기관코드, 유형, 들어 있는 건물의 도로명주소
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?facility ?code ?name ?type ?dong (COUNT(DISTINCT ?b) AS ?buildings) (SAMPLE(?addr) AS ?address) WHERE {
+  ?facility a jgk:PublicFacility ; jgk:agencyCode ?code ; rdfs:label ?name ; jgk:facilityType ?type .
+  OPTIONAL { ?facility jgk:within/rdfs:label ?dong }
+  OPTIONAL { ?facility jgk:housedIn ?b . ?b jgk:roadAddress ?addr }
+} GROUP BY ?facility ?code ?name ?type ?dong ORDER BY ?type ?name
