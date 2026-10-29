@@ -54,7 +54,8 @@ def run() -> None:
     assert not v["conforms"]
     r = c.post("/api/proposals/test-bad/decision", json={"result": "approved", "reviewer": "테스트 검토자"})
     assert r.status_code == 409 and "규칙" in r.json()["detail"], r.text
-    assert c.post("/api/proposals/test-bad/decision", json={"result": "rejected", "reviewer": "테스트 검토자"}).status_code == 200
+    assert c.post("/api/proposals/test-bad/decision",
+                  json={"result": "rejected", "reviewer": "테스트 검토자", "comment": "규칙 위반"}).status_code == 200
     print("SHACL 확인 통과:", sorted(msgs))
 
 

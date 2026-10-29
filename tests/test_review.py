@@ -34,6 +34,19 @@ def run() -> None:
     assert pending, "대기 중인 제안이 없다"
     p = pending[0]
 
+    # 목록: 결정 정보와 묶음. 같은 고시(제2026-140호)에서 나온 대기 제안 5건은 한 묶음이다
+    assert all(x["decision"] is None and x["decided_at"] is None and x["reviewer"] is None for x in pending)
+    notice = [x for x in pending if x["group"] == "notice:2026-140"]
+    assert len(notice) == 5 and {x["group_label"] for x in notice} == {"서울특별시 강서구 고시 제2026-140호"}, notice
+    assert p["group"] == f"single:{p['id']}" and p["group_label"] is None, p
+    detail = c.get(f"/api/proposals/{p['id']}").json()
+    assert detail["uri"] == f"https://yeodh10.github.io/jeungmi-geokg/id/proposal/{p['id']}" and detail["group"] == p["group"]
+    assert c.get("/api/proposals/없는-제안").status_code == 404
+
+    # 잘못된 상태 이름은 422, 오류 본문은 detail 한 문장과 원래 목록
+    bad = c.get("/api/proposals?status=bogus")
+    assert bad.status_code == 422 and bad.json()["detail"].startswith("요청 형식이 맞지 않다") and bad.json()["errors"], bad.text
+
     # 승인 전: 대상이 그래프에 없다
     assert not c.get("/api/feature", params={"uri": p["target"]}).json()["in_graph"]
 
@@ -43,6 +56,17 @@ def run() -> None:
 
     # 검토자 이름 없이는 결정할 수 없다
     assert c.post(f"/api/proposals/{p['id']}/decision", json={"result": "approved", "reviewer": " "}).status_code == 400
+    # 검토자 이름은 한 줄 50자까지, 반려에는 사유가, 의견은 1000자까지
+    for body, msg in [({"result": "approved", "reviewer": "가\n나"}, "검토자 이름은"),
+                      ({"result": "approved", "reviewer": "가\t나"}, "검토자 이름은"),
+                      ({"result": "approved", "reviewer": "가" * 51}, "검토자 이름은"),
+                      ({"result": "rejected", "reviewer": "테스트 검토자"}, "반려 사유"),
+                      ({"result": "rejected", "reviewer": "테스트 검토자", "comment": "  \n "}, "반려 사유"),
+                      ({"result": "approved", "reviewer": "테스트 검토자", "comment": "가" * 1001}, "의견은")]:
+        r = c.post(f"/api/proposals/{p['id']}/decision", json=body)
+        assert r.status_code == 400 and r.json()["detail"].startswith(msg), (body, r.text)
+    r = c.post(f"/api/proposals/{p['id']}/decision", json={"result": "maybe", "reviewer": "x"})
+    assert r.status_code == 422 and isinstance(r.json()["detail"], str), r.text
 
     r = c.post(f"/api/proposals/{p['id']}/decision",
                json={"result": "approved", "reviewer": "테스트 검토자", "comment": "전화번호는 다르지만 같은 기관"})
@@ -56,7 +80,10 @@ def run() -> None:
     assert any(t["o"] == "테스트 검토자" for t in prop["triples"])
 
     # 같은 제안을 두 번 결정할 수 없다
-    assert c.post(f"/api/proposals/{p['id']}/decision", json={"result": "rejected", "reviewer": "x"}).status_code == 409
+    r = c.post(f"/api/proposals/{p['id']}/decision", json={"result": "rejected", "reviewer": "x", "comment": "다시"})
+    assert r.status_code == 409 and r.json()["detail"] == "이미 승인된 제안이다", r.text
+    done = next(x for x in c.get("/api/proposals?status=approved").json() if x["id"] == p["id"])
+    assert done["reviewer"] == "테스트 검토자" and done["decided_at"] == done["decision"]["at"], done
 
     # 반려: 새 제안을 하나 만들어 반려하면 그래프에 들어가지 않는다
     store = ProposalStore(tmp)
@@ -64,7 +91,8 @@ def run() -> None:
                                                    "target": p["target"] + "-test"})
     clone.changes = [ch.model_copy(update={"s": p["target"] + "-test"}) for ch in clone.changes if ch.s == p["target"]]
     store.add_new([clone])
-    assert c.post("/api/proposals/test-reject/decision", json={"result": "rejected", "reviewer": "테스트 검토자"}).status_code == 200
+    assert c.post("/api/proposals/test-reject/decision",
+                  json={"result": "rejected", "reviewer": "테스트 검토자", "comment": "시험용 반려"}).status_code == 200
     review_app.state["store"] = None
     assert not c.get("/api/feature", params={"uri": p["target"] + "-test"}).json()["in_graph"]
     assert c.get("/api/proposals?status=rejected").json()[0]["id"] == "test-reject"

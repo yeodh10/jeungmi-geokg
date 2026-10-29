@@ -3,12 +3,13 @@
 실행: python -m src.query.nl "증미역 300m 안에 있는 학교는?"
 
 - LLM은 어휘 설명과 예시 쿼리(src/graph/queries)를 보고 SPARQL 한 개를 쓴다.
-- 코드가 실행 전에 확인한다: 읽기 쿼리(SELECT, ASK)만 허용, 결과 수 제한.
+- 코드가 실행 전에 확인한다: 읽기 쿼리(SELECT, ASK)만 허용, 결과 수 제한(MAX_ROWS보다 많이 달라고 해도 줄인다).
 - 거리 조건은 pyoxigraph에 geof:buffer가 없어서 LLM이 {{NEAR:객체URI:미터}} 자리표시를 쓰면 코드가 원 모양 WKT로 바꾼다.
 - 쿼리가 실패하면 오류 내용을 붙여 한 번 더 고쳐 쓰게 한다.
 """
 from __future__ import annotations
 
+import itertools
 import re
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ from shapely.geometry import mapping
 
 from src.graph.store import load_store
 from src.llm.client import get_client, parse
+from src.model.uri import BASE
 
 ROOT = Path(__file__).resolve().parents[2]
 QUERIES = ROOT / "src" / "graph" / "queries"
@@ -27,6 +29,13 @@ ONTOLOGY = ROOT / "src" / "graph" / "ontology.ttl"
 MAX_ROWS = 500
 FORBIDDEN = re.compile(r"\b(INSERT|DELETE|LOAD|CLEAR|DROP|CREATE|ADD|MOVE|COPY|SERVICE|WITH)\b", re.I)
 NEAR = re.compile(r"\{\{NEAR:(\S+?):(\d+(?:\.\d+)?)\}\}")
+WKT = re.compile(r"^(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)")
+# 금지어를 찾기 전에 지울 것: 문자열(세 겹 따옴표, 큰따옴표, 작은따옴표, \ 이스케이프), IRI, 주석(IRI와 문자열 밖의 #부터 줄 끝)
+TOKENS = re.compile(
+    r'(?P<str>"""(?:[^"\\]|\\.|"(?!""))*"""' r"|'''(?:[^'\\]|\\.|'(?!''))*'''"
+    r'|"(?:[^"\\\n\r]|\\.)*"' r"|'(?:[^'\\\n\r]|\\.)*')"
+    r'|(?P<iri><[^<>"{}|^`\\\s]*>)|(?P<comment>#[^\n\r]*)', re.S)
+TAIL = re.compile(r"(?i)\b(?:LIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?|OFFSET\s+\d+\s+LIMIT\s+(\d+))\s*$")
 PREFIXES = """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
@@ -83,15 +92,21 @@ geof:distance와 geof:buffer는 없다.
 {examples}"""
 
 
-def check(sparql: str) -> str:
+def check(sparql: str, max_rows: int = MAX_ROWS) -> str:
     body = re.sub(r"(?im)^\s*PREFIX\s+\S+\s*<[^>]*>\s*$", "", sparql).strip()
-    words = re.sub(r"[?$]\w+", "?v", re.sub(r'"[^"]*"', '""', body))  # 문자열과 변수 이름은 빼고 본다
+    body = TOKENS.sub(lambda m: "" if m.group("comment") else m.group(), body).strip()  # 주석은 지운다
+    blank = TOKENS.sub(lambda m: '""' if m.group("str") else "<>", body)
+    words = re.sub(r"[?$]\w+", "?v", blank)  # 문자열, IRI, 변수 이름은 빼고 본다
     if FORBIDDEN.search(words):
         raise ValueError("읽기 쿼리(SELECT, ASK)만 실행한다")
     if not re.match(r"(?is)^\s*(SELECT|ASK)\b", body):
         raise ValueError("SELECT 또는 ASK로 시작해야 한다")
-    if body.upper().lstrip().startswith("SELECT") and not re.search(r"(?i)\bLIMIT\s+\d+\s*$", body):
-        body += f"\nLIMIT {MAX_ROWS}"
+    tail = TAIL.search(body)
+    if tail:  # 끝의 LIMIT이 너무 크면 max_rows로 줄인다 (OFFSET은 그대로 둔다)
+        g = 1 if tail.group(1) else 2
+        body = body[:tail.start(g)] + str(min(int(tail.group(g)), max_rows)) + body[tail.end(g):]
+    elif body.upper().lstrip().startswith("SELECT"):
+        body += f"\nLIMIT {max_rows}"
     return body
 
 
@@ -109,32 +124,52 @@ def fill_near(sparql: str, store) -> str:
     return NEAR.sub(repl, sparql)
 
 
+def geometry_vars(names: list[str], rows: list[list]) -> list[str]:
+    """값이 WKT 모양으로 보이는 변수 이름. 화면도 이 목록으로 모양 열을 고른다."""
+    return [n for i, n in enumerate(names) if any(isinstance(r[i], str) and WKT.match(r[i]) for r in rows)]
+
+
 def run_sparql(store, sparql: str) -> dict:
-    res = store.query(PREFIXES + fill_near(check(sparql), store))
+    # 하나 더 읽어 보고 MAX_ROWS를 넘어 잘렸는지 안다
+    res = store.query(PREFIXES + fill_near(check(sparql, MAX_ROWS + 1), store))
     if isinstance(res, bool) or res.__class__.__name__ == "QueryBoolean":
-        return {"boolean": bool(res), "vars": [], "rows": []}
+        return {"boolean": bool(res), "vars": [], "rows": [], "truncated": False, "geometry_vars": []}
     names = [v.value for v in res.variables]
-    rows = [[(s[n].value if s[n] is not None else None) for n in names] for s in res]
-    return {"vars": names, "rows": rows}
+    rows = [[(s[n].value if s[n] is not None else None) for n in names]
+            for s in itertools.islice(res, MAX_ROWS + 1)]
+    return {"vars": names, "rows": rows[:MAX_ROWS], "truncated": len(rows) > MAX_ROWS,
+            "geometry_vars": geometry_vars(names, rows[:MAX_ROWS])}
 
 
 def to_geojson(result: dict) -> dict:
-    """WKT로 보이는 열이 있으면 그 행들을 지도용 GeoJSON으로 만든다."""
+    """WKT로 보이는 열이 있으면 그 행들을 지도용 GeoJSON으로 만든다. 지도에서 객체를 열 수 있게 uri를 넣는다."""
+    rows = result.get("rows", [])
+    gvars = result.get("geometry_vars")
+    if gvars is None:
+        gvars = geometry_vars(result.get("vars", []), rows)
     feats = []
-    for row in result.get("rows", []):
+    for row in rows:
         props = dict(zip(result["vars"], row))
-        for v in row:
-            if isinstance(v, str) and re.match(r"^(POINT|POLYGON|MULTIPOLYGON|LINESTRING)", v):
-                feats.append({"type": "Feature", "geometry": mapping(shapely.from_wkt(v)),
-                              "properties": {k: x for k, x in props.items() if x is not v}})
-                break
+        gv = next((k for k in gvars if isinstance(props.get(k), str) and WKT.match(props[k])), None)
+        if gv is None:
+            continue
+        try:
+            geom = mapping(shapely.from_wkt(props[gv]))
+        except shapely.errors.GEOSException:  # 모양처럼 보이지만 읽을 수 없는 값은 지도에 그리지 않는다
+            continue
+        props = {k: x for k, x in props.items() if k != gv}
+        if not props.get("uri"):
+            props["uri"] = next((x for x in row if isinstance(x, str) and x.startswith(BASE)
+                                 and not x.endswith("/geometry")), None)
+        feats.append({"type": "Feature", "geometry": geom, "properties": props})
     return {"type": "FeatureCollection", "features": feats}
 
 
-def ask(question: str, client=None, store=None) -> dict:
+def ask(question: str, client=None, store=None, system: str | None = None) -> dict:
+    """system을 주면 그 프롬프트를 쓴다 (검토 API는 그래프 판마다 한 번만 만들어 둔다)."""
     store = store or load_store()
     client = client or get_client()
-    system = build_system(store)
+    system = system or build_system(store)
     prompt = question
     last_error = None
     for _ in range(2):
@@ -142,8 +177,10 @@ def ask(question: str, client=None, store=None) -> dict:
         try:
             result = run_sparql(store, draft.sparql)
             return {"question": question, "sparql": draft.sparql, "explanation": draft.explanation,
-                    **result, "geojson": to_geojson(result)}
-        except Exception as e:  # 쿼리 오류는 내용을 붙여 새 질문으로 한 번 더 쓰게 한다
+                    **result, "geojson": to_geojson(result), "names": {}}
+        # pyoxigraph 쿼리 오류(문법은 SyntaxError, 없는 함수 같은 실행 오류는 RuntimeError, HTTP와 저장소는 OSError)와
+        # check(), fill_near()의 ValueError만 내용을 붙여 한 번 더 쓰게 한다. 나머지는 그대로 올린다.
+        except (SyntaxError, OSError, RuntimeError, ValueError) as e:
             last_error = e
             prompt = (f"질문: {question}\n\n앞서 쓴 쿼리:\n{draft.sparql}\n\n"
                       f"실행하니 오류가 났다: {e}\n오류를 고친 쿼리를 다시 써라.")

@@ -129,7 +129,7 @@ git worktree remove ../jeungmi-geokg-pages
 테스트 (LLM 부분은 가짜 클라이언트로 돌아서 키가 없어도 됩니다. 제안 기록은 임시 복사본만 씁니다):
 
 ```bash
-for t in test_review test_diff test_notice test_nl test_shacl test_address_retirement; do .venv/Scripts/python -m tests.$t; done
+for t in test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api; do .venv/Scripts/python -m tests.$t; done
 ```
 
 ## 주요 기능
@@ -139,6 +139,9 @@ for t in test_review test_diff test_notice test_nl test_shacl test_address_retir
 - 제안은 출처(`rule-candidate`, `data-diff`, `llm-notice`, `notice-table`)와 상관없이 같은 형식입니다. 대상 URI, 근거, 넣고 뺄 트리플, 위치를 담습니다.
 - 검토 화면은 바뀌는 내용을 객체별로 "지금 → 바뀐 뒤"로 보여 주고, 반영 결과를 SHACL로 미리 검사해 규칙을 어기면 승인을 막습니다.
 - 승인하면 바뀐 객체가 `prov:wasInfluencedBy`로 제안을 가리키고, 제안에는 승인한 사람과 시각이 남습니다. 반려한 제안도 기록에 남습니다.
+- 검토 화면: 같은 고시에서 나온 제안을 묶어 보여 주고(예: "서울특별시 강서구 고시 제2026-140호, 이 고시 5건"), 검색, 종류와 출처 거르기, 정렬, 결정 이력(누가, 언제, 사유)을 볼 수 있습니다. 반려에는 사유가 꼭 있어야 하고, 단축키(j, k 이동, a 승인, r 반려, / 검색, ? 안내)로 빠르게 처리합니다.
+- 지도 화면: 자료 범위(1km 원), 건물 상태별 거르기와 개수, 행정동별 강조, 공백을 무시한 찾기, 객체마다 공개 URI 페이지와 Turtle 링크, 반영된 변경 제안 이력을 보여 줍니다. 확대 위치와 고른 객체가 주소창에 남아 그대로 공유할 수 있습니다.
+- API는 URI 입력을 검사해 SPARQL 주입을 막고, 제안 파일 쓰기를 잠가 동시 결정이 섞이지 않게 하며, 지도 레이어를 gzip과 ETag로 보냅니다.
 
 ### 자동 갱신
 
@@ -204,5 +207,8 @@ docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
 - [ ] 새 기준일 자료(내비게이션용DB 10월분 등)로 자동 갱신 실제로 돌려 보기
 - [ ] 필지 경계(연속지적도) 붙이기
 - [ ] 시연 영상 ([docs/demo.md](docs/demo.md) 순서대로)
+- [ ] 같은 고시 제안 묶어 승인 (SHACL 통과한 것만, 앞 제안을 반영한 상태로 다음 제안을 검사)
+- [ ] 결정 정정 기록 (반려 기록은 지우지 않는 설계와 맞춰 "정정"을 새 기록으로 남기기)
+- [ ] 서버 시작 때 그래프 미리 불러오기, 자연어 질의 쿼리 시간 제한
 
 다른 컴퓨터에서 이어 할 때는 `git clone`, 가상환경 만들기, 원본 압축 파일 6개(`data/raw/_archives/`, 약 590MB)와 고시공고 폴더(`data/raw/notices/`)를 같은 자리에 두고 `python -m src.pipeline --unpack`을 실행하면 됩니다.

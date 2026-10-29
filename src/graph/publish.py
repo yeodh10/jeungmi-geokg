@@ -54,9 +54,14 @@ def term_nt(t) -> str:
     return str(t)  # pyoxigraph 항은 N-Triples 표기로 바뀐다
 
 
-def main() -> None:
+def hold_sources() -> set[str]:
+    """공개를 보류한 출처의 URI. 지도 화면 API(src.review.app)도 같은 목록으로 공개 여부를 판단한다."""
     with open(ROOT / "config" / "area.yaml", encoding="utf-8") as f:
-        hold = {JGK + s for s in yaml.safe_load(f).get("publish", {}).get("hold_sources", [])}
+        return {JGK + s for s in (yaml.safe_load(f).get("publish") or {}).get("hold_sources") or []}
+
+
+def main() -> None:
+    hold = hold_sources()
     store = load_store()
 
     triples = defaultdict(list)

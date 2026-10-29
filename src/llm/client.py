@@ -1,6 +1,6 @@
 """Claude API 호출 공통 설정.
 
-키는 .env의 ANTHROPIC_API_KEY에서 읽는다 (없으면 SDK가 다른 인증 수단을 찾는다).
+키는 .env의 ANTHROPIC_API_KEY에서 읽는다 (없으면 SDK가 다른 인증 수단을 찾고, 그것도 없으면 MissingAPIKey).
 안전 분류기가 요청을 거절하면 서버가 다른 모델로 다시 돌리도록 fallbacks를 켠다.
 """
 from __future__ import annotations
@@ -23,9 +23,16 @@ class LLMRefused(RuntimeError):
     pass
 
 
+class MissingAPIKey(RuntimeError):
+    """키도 다른 인증 수단도 찾지 못했다."""
+
+
 def get_client() -> anthropic.Anthropic:
     load_dotenv(ROOT / ".env")
-    return anthropic.Anthropic()
+    client = anthropic.Anthropic()
+    if client.api_key is None and client.auth_token is None and getattr(client, "credentials", None) is None:
+        raise MissingAPIKey("ANTHROPIC_API_KEY가 없다")
+    return client
 
 
 def parse(client, schema: type[T], system: str, user: str | list, effort: str = "high") -> T:

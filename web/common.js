@@ -43,6 +43,34 @@ function boundsOf(features) {
   return b;
 }
 
+// API를 부르고 JSON을 받는다. 실패하면 화면에 그대로 보일 한국어 문장을 담은 Error를 던진다
+//   opts.json이 있으면 POST로 JSON 본문을 보낸다. 나머지 opts(signal 등)는 fetch에 그대로 넘긴다
+//   err.status는 HTTP 상태 코드 (서버에 닿지 못하면 0). 요청을 끊으면 AbortError를 그대로 던진다
+async function fetchJSON(url, opts = {}) {
+  const { json, ...init } = opts;
+  if (json !== undefined) {
+    init.method = init.method || "POST";
+    init.headers = { "Content-Type": "application/json", ...(init.headers || {}) };
+    init.body = JSON.stringify(json);
+  }
+  const fail = (status, message) => Object.assign(new Error(message), { status });
+  let r;
+  try { r = await fetch(url, init); }
+  catch (e) {
+    if (e && e.name === "AbortError") throw e;
+    throw fail(0, "서버에 연결하지 못했습니다");
+  }
+  let body = null, parsed = true;
+  try { body = await r.json(); }
+  catch (e) {
+    if (e && e.name === "AbortError") throw e;
+    parsed = false;
+  }
+  if (r.ok && parsed) return body;
+  const d = body && body.detail;
+  throw fail(r.status, typeof d === "string" ? d : Array.isArray(d) ? "요청 형식이 맞지 않습니다" : `서버 오류 (상태 코드 ${r.status})`);
+}
+
 async function pendingCount() {
   try {
     const n = (await (await fetch("/api/proposals?status=pending")).json()).length;

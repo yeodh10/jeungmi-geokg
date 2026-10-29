@@ -60,7 +60,11 @@ def check_proposal(store: ox.Store, proposal) -> tuple[bool, list[dict]]:
     """
     trial = ox.Store()
     trial.bulk_extend(store.quads_for_pattern(None, None, None, None))
-    trial.update(proposal.sparql_update())
+    try:
+        trial.update(proposal.sparql_update())
+    except (SyntaxError, OSError, RuntimeError, ValueError) as e:  # 반영조차 못 하는 제안은 승인할 수 없다
+        return False, [{"focus": proposal.target, "path": "", "shape": "", "value": "",
+                        "message": f"제안을 그래프에 반영하지 못했다: {e}"}]
     target = ox.NamedNode(proposal.target)
     focus = [target] + [q.object for q in trial.quads_for_pattern(target, HAS_GEOMETRY, None, None)]
     lines = set()

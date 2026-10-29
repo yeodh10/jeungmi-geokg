@@ -9,11 +9,16 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import tempfile
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+import pyoxigraph as ox
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.model import uri
 
@@ -24,6 +29,19 @@ JGK = "https://yeodh10.github.io/jeungmi-geokg/def#"
 PROV = "http://www.w3.org/ns/prov#"
 DCTERMS = "http://purl.org/dc/terms/"
 XSD = "http://www.w3.org/2001/XMLSchema#"
+LANG_TAG = re.compile(r"^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$")
+NOTICE_NO = re.compile(r"고시\s*제\s*([\d-]+)\s*호")
+ECHAR = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}  # SPARQL 문자열 안의 이스케이프
+_lock = threading.Lock()  # 같은 프로세스 안에서 읽고 고치고 저장하는 동안 다른 결정이 끼어들지 않게 한다
+
+
+def iri(v: str) -> str:
+    """SPARQL의 <...> 안에 그대로 넣어도 되는 IRI인지 pyoxigraph로 만들어 보고 확인한다."""
+    try:
+        ox.NamedNode(v)
+    except ValueError as e:
+        raise ValueError(f"올바른 IRI가 아니다: {v!r} ({e})") from None
+    return v
 
 
 class Term(BaseModel):
@@ -33,10 +51,28 @@ class Term(BaseModel):
     datatype: str | None = None
     lang: str | None = None
 
+    @field_validator("datatype")
+    @classmethod
+    def _datatype(cls, v):
+        return None if v is None else iri(v)
+
+    @field_validator("lang")
+    @classmethod
+    def _lang(cls, v):
+        if v is not None and not LANG_TAG.match(v):
+            raise ValueError(f"올바른 언어 태그가 아니다: {v!r}")
+        return v
+
+    @model_validator(mode="after")
+    def _uri_value(self):
+        if self.kind == "uri":
+            iri(self.value)
+        return self
+
     def sparql(self) -> str:
         if self.kind == "uri":
             return f"<{self.value}>"
-        v = self.value.replace("\\", "\\\\").replace('"', '\\"')
+        v = re.sub(r'[\\"\n\r\t]', lambda m: ECHAR[m.group()], self.value)  # 줄바꿈이 든 값도 문법이 깨지지 않게
         if self.lang:
             return f'"{v}"@{self.lang}'
         if self.datatype:
@@ -49,6 +85,11 @@ class Change(BaseModel):
     s: str
     p: str
     o: Term
+
+    @field_validator("s", "p")
+    @classmethod
+    def _iri(cls, v):
+        return iri(v)
 
 
 class Decision(BaseModel):
@@ -72,6 +113,11 @@ class Proposal(BaseModel):
     location: tuple[float, float] | None = None  # 경도, 위도 (검토 화면 지도용)
     status: Literal["pending", "approved", "rejected"] = "pending"
     decision: Decision | None = None
+
+    @field_validator("target")
+    @classmethod
+    def _target(cls, v):
+        return iri(v)
 
     @property
     def uri(self) -> str:
@@ -104,12 +150,27 @@ class Proposal(BaseModel):
         return " ;\n".join(parts)
 
 
+def group_of(p: Proposal) -> tuple[str, str | None]:
+    """검토 화면에서 함께 볼 묶음. 같은 고시에서 나왔으면 고시 번호로, 아니면 같은 표나 같은 비교에서 나온 것끼리 묶는다."""
+    for e in p.evidence:
+        m = NOTICE_NO.search(e)
+        if m:
+            named = re.search(r"\(([^()]*" + NOTICE_NO.pattern + r"[^()]*)\)", e)
+            return f"notice:{m.group(1)}", (named.group(1) if named else m.group(0)).strip()
+    if p.id.startswith(("table-", "llm-", "diff-")) and "-" in p.id:
+        return p.id.rsplit("-", 1)[0], p.source_detail
+    return f"single:{p.id}", None
+
+
+DONE_KO = {"approved": "승인된", "rejected": "반려된"}
+
+
 def now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
 class ProposalStore:
-    """제안 목록을 JSON 파일 하나에 둔다. 혼자 쓰는 시연용이라 파일 잠금은 하지 않는다."""
+    """제안 목록을 JSON 파일 하나에 둔다. 같은 프로세스 안에서는 잠그고, 여러 프로세스가 함께 쓰는 것은 막지 않는다."""
 
     def __init__(self, path: Path | None = None):
         self.path = Path(path or os.environ.get("JGK_PROPOSALS", DEFAULT_PATH))
@@ -121,31 +182,42 @@ class ProposalStore:
         return [Proposal.model_validate(p) for p in data]
 
     def save(self, proposals: list[Proposal]) -> None:
+        """같은 폴더의 임시 파일에 다 쓴 뒤 바꿔 끼운다. 쓰다가 멈춰도 원래 파일은 그대로 남는다."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps([p.model_dump() for p in proposals], ensure_ascii=False, indent=2),
-                       encoding="utf-8")
-        tmp.replace(self.path)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=self.path.parent,
+                                         prefix=self.path.name + ".", suffix=".tmp") as f:
+            f.write(json.dumps([p.model_dump() for p in proposals], ensure_ascii=False, indent=2))
+        for i in range(10):  # Windows에서는 누가 파일을 읽는 중이면 잠깐 바꿔 끼울 수 없다
+            try:
+                os.replace(f.name, self.path)
+                return
+            except PermissionError:
+                if i == 9:
+                    os.unlink(f.name)
+                    raise
+                time.sleep(0.03)
 
     def get(self, pid: str) -> Proposal | None:
         return next((p for p in self.load() if p.id == pid), None)
 
     def add_new(self, new: list[Proposal]) -> int:
         """같은 id가 이미 있으면 건너뛴다. 결정이 난 제안을 덮어쓰지 않기 위해서다."""
-        current = self.load()
-        known = {p.id for p in current}
-        fresh = [p for p in new if p.id not in known]
-        self.save(current + fresh)
+        with _lock:
+            current = self.load()
+            known = {p.id for p in current}
+            fresh = [p for p in new if p.id not in known]
+            self.save(current + fresh)
         return len(fresh)
 
     def decide(self, pid: str, result: str, reviewer: str, comment: str = "") -> Proposal:
-        proposals = self.load()
-        p = next((p for p in proposals if p.id == pid), None)
-        if p is None:
-            raise KeyError(pid)
-        if p.status != "pending":
-            raise ValueError(f"이미 {p.status} 처리된 제안이다")
-        p.status = result
-        p.decision = Decision(result=result, reviewer=reviewer, at=now(), comment=comment)
-        self.save(proposals)
+        with _lock:
+            proposals = self.load()
+            p = next((p for p in proposals if p.id == pid), None)
+            if p is None:
+                raise KeyError(pid)
+            if p.status != "pending":
+                raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다")
+            p.status = result
+            p.decision = Decision(result=result, reviewer=reviewer, at=now(), comment=comment)
+            self.save(proposals)
         return p

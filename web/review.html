@@ -11,51 +11,137 @@
 <style>
   .wrap { display: grid; grid-template-columns: 340px 1fr; height: calc(100% - 52px); }
   .side { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
-  .tabs { display: flex; gap: 4px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 4px; padding: 12px 12px 8px; flex-wrap: wrap; }
   .tabs button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 12px; color: var(--muted); }
-  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-  ul.list { list-style: none; margin: 0; padding: 8px; overflow-y: auto; flex: 1; }
-  ul.list li { padding: 10px 12px; border-radius: var(--radius); cursor: pointer; margin-bottom: 4px; border: 1px solid transparent; }
-  ul.list li:hover { background: var(--soft); }
-  ul.list li.sel { background: var(--accent-soft); border-color: #c9d8f7; }
-  ul.list .t { font-weight: 600; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  .tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filters { display: grid; gap: 6px; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+  .filters .row { display: flex; gap: 6px; }
+  .filters select.field { flex: 1; min-width: 0; padding: 5px 6px; font-size: 12px; }
+  .list { margin: 0; padding: 8px; overflow-y: auto; flex: 1; }
+  .list .item { display: block; width: 100%; text-align: left; background: none; color: inherit; padding: 10px 12px;
+                border-radius: var(--radius); margin-bottom: 4px; border: 1px solid transparent; }
+  .list .item:hover { background: var(--soft); }
+  .list .item[aria-current="true"] { background: var(--accent-soft); border-color: #c9d8f7; }
+  .list .item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .list .item > span { display: block; }
+  .list .t { font-weight: 600; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  .list .dec { margin-top: 3px; color: var(--text); }
+  .list .why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list .ghead { font-size: 12px; font-weight: 600; color: var(--text); padding: 10px 4px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+  .list .ghead:first-child { border-top: 0; margin-top: 0; padding-top: 2px; }
+  .list .ghead .gsum { display: block; font-weight: 400; color: var(--muted); }
+  .list-toggle { display: none; margin: 0 12px 8px; }
   .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
   .detail .body { padding: 18px 22px; flex: 1; }
   .head .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .head:focus { outline: none; }
   .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 14px; }
   @media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
   #map { height: 330px; border-radius: var(--radius); border: 1px solid var(--line); }
+  #map.nomap { height: auto; padding: 28px 12px; text-align: center; color: var(--muted); background: var(--soft); }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .map-sum { margin-top: 4px; }
   .obj-title { font-weight: 600; margin: 12px 0 4px; }
   ul.evidence { margin: 0; padding-left: 18px; }
   ul.evidence li { margin: 3px 0; overflow-wrap: anywhere; }
-  .decide { position: sticky; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding: 12px 22px;
-            display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .decide .field { width: auto; }
-  .decide .field.reviewer { width: 150px; }
-  .decide .field.comment { flex: 1; min-width: 180px; }
-  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; height: auto; } .side { max-height: 40vh; } }
+  table.kv.decision td:last-child { white-space: pre-wrap; }
+  .applied { margin-top: 6px; }
+  #shacl .btn { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
+  .decide { position: sticky; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 22px 12px;
+            display: flex; gap: 8px 12px; align-items: flex-end; flex-wrap: wrap; }
+  .decide label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+  .decide .f-reviewer { width: 150px; }
+  .decide .f-comment { flex: 1; min-width: 220px; }
+  .decide textarea.field { resize: vertical; min-height: 36px; display: block; }
+  .decide .btns { display: flex; gap: 8px; align-items: center; }
+  .decide .err { flex-basis: 100%; }
+  .decide .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .hint-err { color: var(--no); font-size: 12px; }
+  .hint-err:empty { display: none; }
+  .reasons { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+  .reasons button { border: 1px solid var(--line); background: var(--soft); color: var(--muted); border-radius: 999px; padding: 0 9px; font-size: 12px; }
+  .reasons button:hover { color: var(--text); }
+  .toast { position: fixed; top: 60px; left: 50%; transform: translate(-50%, -8px); z-index: 30; max-width: calc(100% - 32px);
+           background: var(--text); color: #fff; padding: 9px 16px; border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.18);
+           opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast a { color: #9fc0ff; }
+  .help-btn { margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-weight: 700; flex: none; }
+  .help-box { position: fixed; top: 58px; right: 14px; z-index: 40; width: 270px; background: var(--panel); border: 1px solid var(--line);
+              border-radius: var(--radius); box-shadow: 0 6px 22px rgba(0,0,0,.14); padding: 12px 14px; }
+  .help-box h3 { margin: 0 0 6px; }
+  .help-box table td { padding: 3px 4px; vertical-align: top; }
+  kbd { display: inline-block; min-width: 20px; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
+        background: var(--soft); font: 12px/1.6 ui-monospace, Consolas, monospace; text-align: center; }
+  @media (max-width: 860px) {
+    .topbar { height: auto; min-height: 52px; flex-wrap: wrap; padding: 6px 16px; gap: 6px 14px; }
+    .topbar .brand { white-space: normal; }
+    .wrap { grid-template-columns: 1fr; height: auto; }
+    .side { max-height: 32vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    .side.folded { max-height: none; }
+    .side.folded .filters, .side.folded .list { display: none; }
+    .list-toggle { display: block; }
+    .detail { overflow: visible; }
+    .detail .body { padding: 14px 16px; }
+    .decide { padding: 10px 16px 12px; }
+    .decide .f-reviewer { width: 100%; }
+  }
 </style>
 </head>
 <body>
 <header class="topbar">
   <div class="brand">증미역 공간 지식 그래프</div>
   <nav><a href="/map">지도</a><a href="/" class="on">변경 제안 검토<span class="count" id="pending-count" style="display:none"></span></a></nav>
+  <button class="help-btn" id="help-btn" type="button" aria-expanded="false" aria-controls="help" title="단축키 안내 (?)">?</button>
 </header>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="help-box" id="help" role="dialog" aria-label="단축키 안내" hidden>
+  <h3>단축키</h3>
+  <table>
+    <tr><td><kbd>j</kbd></td><td>다음 제안</td></tr>
+    <tr><td><kbd>k</kbd></td><td>이전 제안</td></tr>
+    <tr><td><kbd>a</kbd></td><td>승인 (규칙 검사를 통과했을 때)</td></tr>
+    <tr><td><kbd>r</kbd></td><td>반려 사유 쓰기 (의견 칸으로)</td></tr>
+    <tr><td><kbd>/</kbd></td><td>검색칸으로</td></tr>
+    <tr><td><kbd>?</kbd></td><td>이 안내 열고 닫기</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>목록에서 옮기기, <kbd>Enter</kbd>로 열기</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>의견 칸에서 반려</td></tr>
+  </table>
+  <p class="small muted" style="margin:8px 0 0">입력칸에 글을 쓰는 동안에는 한 글자 단축키가 듣지 않습니다.</p>
+</div>
 <div class="wrap">
-  <aside class="side">
-    <div class="tabs" id="tabs">
-      <button data-s="pending" class="on">대기</button><button data-s="approved">승인</button>
-      <button data-s="rejected">반려</button><button data-s="">전체</button>
+  <aside class="side" id="side">
+    <div class="tabs" id="tabs" role="tablist" aria-label="제안 상태">
+      <button type="button" role="tab" data-s="pending" aria-controls="list">대기</button><button type="button" role="tab" data-s="approved" aria-controls="list">승인</button>
+      <button type="button" role="tab" data-s="rejected" aria-controls="list">반려</button><button type="button" role="tab" data-s="all" aria-controls="list">전체</button>
     </div>
-    <ul class="list" id="list"></ul>
+    <button type="button" class="btn ghost list-toggle" id="list-toggle" aria-expanded="true" aria-controls="list">목록 접기</button>
+    <div class="filters">
+      <input id="q" type="search" class="field" placeholder="검색: 이름, 요약, URI, 검토자" aria-label="제안 검색" autocomplete="off">
+      <div class="row">
+        <select id="f-action" class="field" aria-label="종류"></select>
+        <select id="f-source" class="field" aria-label="출처"></select>
+        <select id="f-sort" class="field" aria-label="정렬">
+          <option value="created">만든 시각순</option><option value="decided">결정 시각 최신순</option><option value="group">묶음별</option>
+        </select>
+      </div>
+    </div>
+    <div class="list" id="list" role="region" aria-label="제안 목록"></div>
   </aside>
   <section class="detail" id="detail">
     <div class="empty">왼쪽에서 제안을 고르세요.<br><span class="small">기계가 낸 제안을 사람이 확인합니다. 승인한 제안만 지식 그래프에 반영되고, 반려한 제안도 기록으로 남습니다.</span></div>
   </section>
 </div>
 <script>
-let filter = "pending", current = null, map = null, items = [];
+const $ = id => document.getElementById(id);
+const enc = encodeURIComponent;
+const STATUSES = ["pending", "approved", "rejected", "all"];
+const TAB_NAME = { pending: "대기", approved: "승인", rejected: "반려", all: "전체" };
+const DEFAULT_SORT = { pending: "group", approved: "decided", rejected: "decided", all: "created" };
+const REASONS = ["대상을 잘못 찾음", "고시 해석 오류", "중복 제안", "근거 부족"];
+
+let filter = "pending", sort = DEFAULT_SORT.pending, query = "", actionF = "", sourceF = "";
+let all = [], view = [], current = null, shown = null, map = null, ctrl = null, shaclOk = false, toastTimer = null;
 
 let newLabels = {};  // 아직 그래프에 없는 새 객체는 제안 안의 이름표를 쓴다
 function nameOf(names, u) {
@@ -68,21 +154,173 @@ function valueText(names, o) {
   return o.value;
 }
 
-async function loadList(keep) {
-  items = await (await fetch("/api/proposals" + (filter ? "?status=" + filter : ""))).json();
-  const ul = document.getElementById("list");
-  ul.innerHTML = items.length ? "" : '<li class="empty">제안이 없습니다.</li>';
-  for (const p of items) {
-    const li = document.createElement("li");
-    li.className = p.id === current ? "sel" : "";
-    li.innerHTML = `<span class="chip ${p.action}">${ACTION[p.action]}</span> <span class="chip src">${SOURCE[p.source_kind] || p.source_kind}</span>
-      ${p.status !== "pending" ? `<span class="chip ${p.status}">${STATUS[p.status]}</span>` : ""}
-      <div class="t">${esc(p.target_name || p.summary)}</div><div class="small muted">${esc(p.summary)}</div>`;
-    li.onclick = () => show(p.id);
-    ul.appendChild(li);
+// ISO 시각을 '10/29 11:27' (full이면 '2026-10-29 11:27')로
+function when(iso, full) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d)) return iso || "";
+  const z = n => String(n).padStart(2, "0");
+  const hm = `${z(d.getHours())}:${z(d.getMinutes())}`;
+  return full ? `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${hm}` : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+const timeOf = iso => { const t = Date.parse(iso || ""); return isNaN(t) ? 0 : t; };
+const narrow = () => matchMedia("(max-width: 860px)").matches;
+const proposalUri = p => p.uri || BASE + "proposal/" + p.id;
+
+// 목록 API에 decision이 없던 예전 서버도 받아 준다
+function decisionOf(p) {
+  if (p.decision) return p.decision;
+  if (p.reviewer || p.decided_at) return { result: p.status, reviewer: p.reviewer || "", at: p.decided_at || "", comment: "" };
+  return null;
+}
+// 같은 고시나 같은 묶음에서 온 제안끼리 같은 값. 서버가 group을 주지 않으면 id 앞부분으로 가늠한다
+function groupOf(p) {
+  if (p.group) return p.group;
+  const cut = /^(table|llm|diff)-/.test(p.id) ? p.id.lastIndexOf("-") : -1;
+  return cut > 0 ? p.id.slice(0, cut) : "single:" + p.id;
+}
+
+// 주소창 쿼리와 화면 상태를 맞춘다 (지도 화면의 '/?id=...' 링크가 그 제안을 연다)
+function readURL() {
+  const u = new URLSearchParams(location.search);
+  const s = u.get("status");
+  filter = STATUSES.includes(s) ? s : s === "" ? "all" : "pending";
+  query = u.get("q") || "";
+  actionF = ACTION[u.get("action")] ? u.get("action") : "";
+  sourceF = SOURCE[u.get("source")] ? u.get("source") : "";
+  sort = ["created", "decided", "group"].includes(u.get("sort")) ? u.get("sort") : DEFAULT_SORT[filter];
+  return u.get("id");
+}
+function saveURL() {
+  const u = new URLSearchParams();
+  u.set("status", filter);
+  if (query) u.set("q", query);
+  if (actionF) u.set("action", actionF);
+  if (sourceF) u.set("source", sourceF);
+  if (sort !== DEFAULT_SORT[filter]) u.set("sort", sort);
+  if (current) u.set("id", current);
+  history.replaceState(null, "", location.pathname + "?" + u.toString());
+}
+
+function fillControls() {
+  $("f-action").innerHTML = '<option value="">모든 종류</option>' + Object.entries(ACTION).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("f-source").innerHTML = '<option value="">모든 출처</option>' + Object.entries(SOURCE).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("q").value = query; $("f-action").value = actionF; $("f-source").value = sourceF; $("f-sort").value = sort;
+}
+
+function updateTabs() {
+  const n = s => s === "all" ? all.length : all.filter(p => p.status === s).length;
+  document.querySelectorAll("#tabs [role=tab]").forEach(b => {
+    const on = b.dataset.s === filter;
+    b.setAttribute("aria-selected", on);
+    b.tabIndex = on ? 0 : -1;
+    b.textContent = TAB_NAME[b.dataset.s] + (all.length ? " " + n(b.dataset.s) : "");
+  });
+  const el = $("pending-count"), k = n("pending");
+  el.textContent = k; el.style.display = k ? "inline-block" : "none";
+}
+
+// 상태 탭, 검색어, 종류, 출처로 거르고 정렬한 목록 (그리는 순서 그대로라 j, k와 다음 제안 고르기도 이것을 쓴다)
+function filtered() {
+  const q = query.trim().toLowerCase();
+  return all.filter(p => (filter === "all" || p.status === filter) && (!actionF || p.action === actionF)
+    && (!sourceF || p.source_kind === sourceF)
+    && (!q || [p.target_name, p.summary, p.target, p.reviewer || (decisionOf(p) || {}).reviewer]
+      .some(v => v && String(v).toLowerCase().includes(q))));
+}
+
+function itemHTML(p) {
+  const d = decisionOf(p);
+  const why = d && p.status === "rejected" && d.comment ? d.comment.split("\n")[0] : "";
+  return `<button type="button" class="item" data-id="${esc(p.id)}" tabindex="-1">
+    <span><span class="chip ${p.action}">${ACTION[p.action] || esc(p.action)}</span> <span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
+      ${p.status !== "pending" ? `<span class="chip ${p.status}">${STATUS[p.status]}</span>` : ""}</span>
+    <span class="t">${esc(p.target_name || p.summary)}</span><span class="small muted">${esc(p.summary)}</span>
+    ${d ? `<span class="small dec">${STATUS[d.result || p.status]}, ${esc(d.reviewer)}, ${esc(when(d.at))}</span>` : ""}
+    ${why ? `<span class="small muted why">사유: ${esc(why)}</span>` : ""}</button>`;
+}
+
+function renderList() {
+  const list = filtered();
+  const ul = $("list");
+  if (sort === "decided") {
+    const t = p => timeOf((decisionOf(p) || {}).at);
+    list.sort((a, b) => t(b) - t(a) || timeOf(a.created_at) - timeOf(b.created_at));
+  } else if (sort === "created") {
+    list.sort((a, b) => timeOf(a.created_at) - timeOf(b.created_at));
   }
-  pendingCount();
-  if (!keep && items.length && !items.some(p => p.id === current)) show(items[0].id);
+  let html = "";
+  if (sort === "group") {
+    // 같은 묶음끼리 모으고, 묶음이 없는 제안은 맨 뒤에 둔다. 머리 줄의 건수는 탭과 상관없이 묶음 전체를 센다
+    const groups = new Map(), singles = [];
+    for (const p of list) {
+      const g = groupOf(p);
+      if (g.startsWith("single:")) { singles.push(p); continue; }
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(p);
+    }
+    view = [];
+    for (const [g, ps] of groups) {
+      const members = all.filter(p => groupOf(p) === g);
+      const c = s => members.filter(p => p.status === s).length;
+      const label = ps[0].group_label || SOURCE[ps[0].source_kind] || ps[0].source_kind;
+      html += `<div class="ghead">${esc(label)}<span class="gsum">${g.startsWith("notice:") ? "이 고시" : "이 묶음"} ${members.length}건, 대기 ${c("pending")}, 승인 ${c("approved")}, 반려 ${c("rejected")}</span></div>`
+        + ps.map(itemHTML).join("");
+      view.push(...ps);
+    }
+    if (singles.length) {
+      if (groups.size) html += `<div class="ghead">따로 낸 제안<span class="gsum">${singles.length}건</span></div>`;
+      html += singles.map(itemHTML).join("");
+      view.push(...singles);
+    }
+  } else {
+    view = list;
+    html = list.map(itemHTML).join("");
+  }
+  const narrowed = query.trim() || actionF || sourceF;
+  ul.innerHTML = view.length ? html : `<div class="empty">${narrowed ? "조건에 맞는 제안이 없습니다." : "이 탭에는 제안이 없습니다."}</div>`;
+  markSelected();
+}
+
+const itemButton = id => [...$("list").querySelectorAll(".item")].find(b => b.dataset.id === id);
+function markSelected() {
+  const bs = [...$("list").querySelectorAll(".item")];
+  bs.forEach(b => {
+    const on = b.dataset.id === current;
+    if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+    b.tabIndex = on ? 0 : -1;
+  });
+  if (bs.length && !bs.some(b => b.tabIndex === 0)) bs[0].tabIndex = 0;
+}
+
+// 목록 전체를 한 번 받는다. 상태별 거르기는 화면이 한다
+async function loadList() {
+  if (!all.length) $("list").innerHTML = '<div class="empty">불러오는 중...</div>';
+  try {
+    all = await fetchJSON("/api/proposals");
+  } catch (err) {
+    $("list").innerHTML = `<div class="empty">목록을 불러오지 못했습니다<br><span class="small">${esc(err.message)}</span><br>
+      <button type="button" class="btn ghost" id="retry-list" style="margin-top:8px">다시 시도</button></div>`;
+    return false;
+  }
+  updateTabs();
+  renderList();
+  return true;
+}
+
+// 탭이나 거르기를 바꾼 뒤: 연 제안이 목록에 없으면 첫 제안을 열고, 목록이 비면 상세를 비운다
+function pickAfterChange() {
+  if (!view.length) { clearDetail("이 탭에는 제안이 없습니다."); return; }
+  if (!view.some(p => p.id === current)) show(view[0].id);
+  else saveURL();
+}
+
+function clearDetail(msg) {
+  if (ctrl) ctrl.abort();
+  ctrl = null; current = null; shown = null;
+  if (map) { map.remove(); map = null; }
+  $("detail").innerHTML = `<div class="empty">${esc(msg)}</div>`;
+  markSelected();
+  saveURL();
 }
 
 // 제안의 바뀌는 내용을 객체별, 속성별 '지금 -> 바뀐 뒤'로 묶는다
@@ -110,97 +348,378 @@ function diffTables(p) {
   return out;
 }
 
-async function show(id) {
-  current = id;
-  document.querySelectorAll("#list li").forEach((li, i) => li.classList.toggle("sel", items[i] && items[i].id === id));
-  const p = await (await fetch("/api/proposals/" + encodeURIComponent(id))).json();
+function decisionHTML(p) {
+  if (!p.decision) return "";
+  const d = p.decision, puri = proposalUri(p);
+  return `<h3>결정</h3><table class="kv decision"><tr><th>결과</th><th>검토자</th><th>시각</th><th>의견</th></tr>
+    <tr><td><span class="chip ${p.status}">${STATUS[p.status]}</span></td><td>${esc(d.reviewer)}</td><td>${esc(when(d.at, true))}</td>
+      <td>${d.comment ? esc(d.comment) : '<span class="muted">없음</span>'}</td></tr></table>
+    ${p.status === "approved" ? `<div class="small applied">제안 노드 <a href="/map?focus=${enc(puri)}">${esc(puri)}</a></div>
+      <div class="small applied" id="applied">그래프 반영을 확인하는 중...</div>` : ""}`;
+}
+
+function decideHTML(p) {
+  return `<div class="decide" data-id="${esc(p.id)}">
+    <div class="banner no err" id="decide-err" role="alert" hidden></div>
+    <div class="f-reviewer"><label for="reviewer">검토자</label>
+      <input id="reviewer" class="field" maxlength="50" autocomplete="name" aria-describedby="reviewer-msg">
+      <div class="hint-err" id="reviewer-msg" aria-live="polite"></div></div>
+    <div class="f-comment"><label for="comment">의견 (반려는 필수)</label>
+      <div class="reasons" role="group" aria-label="반려 사유 예시">${REASONS.map(t => `<button type="button" data-reason="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <textarea id="comment" class="field" rows="1" maxlength="1000" aria-describedby="comment-msg"></textarea>
+      <div class="hint-err" id="comment-msg" aria-live="polite"></div></div>
+    <div class="btns"><button type="button" class="btn ok" id="approve" disabled aria-describedby="shacl">승인</button>
+      <button type="button" class="btn no" id="reject">반려</button>
+      <span class="small muted" id="saving" hidden>저장하는 중...</span></div></div>`;
+}
+
+async function show(id, opts = {}) {
+  if (ctrl) ctrl.abort();  // 앞서 고른 제안의 상세, 검사, 지도 요청은 끊는다
+  ctrl = new AbortController();
+  const signal = ctrl.signal;
+  current = id; shown = null; shaclOk = false;
+  markSelected();
+  saveURL();
+  if (map) { map.remove(); map = null; }
+  const d = $("detail");
+  d.innerHTML = '<div class="empty">불러오는 중...</div>';
+  let p;
+  try {
+    p = await fetchJSON("/api/proposals/" + enc(id), { signal });
+  } catch (err) {
+    if (err.name === "AbortError" || current !== id) return;
+    d.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+    return;
+  }
+  if (current !== id) return;
+  shown = p;
   newLabels = {};
   p.changes.filter(c => c.op === "add" && c.p.endsWith("rdf-schema#label")).forEach(c => newLabels[c.s] = c.o.value);
   const target = nameOf(p.names, p.target);
-  const d = document.getElementById("detail");
+  const decided = p.status !== "pending";
+  const legend = decided
+    ? `<span><i class="sw" style="background:var(--active)"></i> 지금 쓰는 중</span><span><i class="sw" style="background:var(--retired)"></i> 지금 폐지</span>
+       <span>진하게 칠한 것이 제안 대상과 함께 바뀐 객체</span>`
+    : `<span><i class="sw" style="background:var(--active);opacity:.6"></i> 그래프의 주변 건물</span>
+       <span><i class="sw" style="background:var(--retired)"></i> 제안 대상</span>
+       <span><i class="sw" style="background:#f79009"></i> 함께 바뀌거나 이어지는 객체</span>`;
   d.innerHTML = `<div class="body">
-    <div class="head">
-      <div class="chips"><span class="chip ${p.action}">${ACTION[p.action]}</span><span class="chip src">${SOURCE[p.source_kind] || p.source_kind}</span>
-        <span class="chip ${p.status}">${STATUS[p.status]}</span></div>
+    <div class="head" id="dhead" tabindex="-1">
+      <div class="chips"><span class="chip ${p.action}">${ACTION[p.action]}</span><span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
+        <span class="chip ${p.status}">${STATUS[p.status]}</span>${p.group_label ? `<span class="chip src">${esc(p.group_label)}</span>` : ""}</div>
       <h2>${esc(p.summary)}</h2>
-      <div class="small muted">대상 <a href="/map?focus=${encodeURIComponent(p.target)}">${esc(target)}</a>, ${esc(p.source_detail)}</div>
+      <div class="small muted">대상 <a href="/map?focus=${enc(p.target)}">${esc(target)}</a>, ${esc(p.source_detail)}</div>
       <div class="uri">${esc(p.target)}</div>
     </div>
-    <div id="shacl" class="banner wait" style="margin-top:12px">데이터 규칙(SHACL)을 검사하는 중...</div>
+    <div id="shacl" class="banner wait" role="status" style="margin-top:12px">${decided ? "결정이 끝난 제안입니다." : "데이터 규칙(SHACL)을 검사하는 중..."}</div>
     <div class="cols">
       <div><h3>무엇이 바뀌나</h3>${diffTables(p)}</div>
       <div><h3>위치</h3><div id="map"></div>
-        <div class="legend"><span><i class="sw" style="background:var(--active);opacity:.6"></i> 그래프의 주변 건물</span>
-          <span><i class="sw" style="background:var(--retired)"></i> 제안 대상</span>
-          <span><i class="sw" style="background:#f79009"></i> 함께 바뀌거나 이어지는 객체</span></div></div>
+        <div class="legend">${legend}</div><div class="small muted map-sum" id="map-sum"></div></div>
     </div>
     <h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul>
     <details><summary>트리플로 보기 (${p.changes.length}개)</summary><table class="kv">${p.changes.map(c =>
       `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(c.s.replace(BASE, "id:"))}</td><td>${esc(localName(c.p))}</td><td>${esc(c.o.kind === "uri" ? c.o.value.replace(BASE, "id:") : c.o.value.slice(0, 80))}</td></tr>`).join("")}</table></details>
     <details><summary>승인하면 실행할 SPARQL</summary><pre>${esc(p.sparql_update)}</pre></details>
-    ${p.decision ? `<h3>결정</h3><p>${STATUS[p.status]}, ${esc(p.decision.reviewer)}, ${esc(p.decision.at)}${p.decision.comment ? ", " + esc(p.decision.comment) : ""}</p>` : ""}
+    ${decisionHTML(p)}
   </div>
-  ${p.status === "pending" ? `<div class="decide">
-    <input id="reviewer" class="field reviewer" placeholder="검토자 이름">
-    <input id="comment" class="field comment" placeholder="의견 (선택)">
-    <button class="btn ok" id="approve" onclick="decide('approved')">승인</button>
-    <button class="btn no" onclick="decide('rejected')">반려</button></div>` : ""}`;
-  try { document.getElementById("reviewer").value = localStorage.getItem("reviewer") || ""; } catch (e) {}
-  drawMap(id);
-  const el = document.getElementById("shacl");
-  if (p.status !== "pending") { el.className = "banner wait"; el.textContent = "결정이 끝난 제안입니다."; return; }
-  const v = await (await fetch(`/api/proposals/${encodeURIComponent(id)}/validate`)).json();
+  ${decided ? "" : decideHTML(p)}`;
+  if (!decided) wireDecide();
+  if (opts.user && narrow()) $("dhead").scrollIntoView({ block: "start" });
+  drawMap(p, signal);
+  if (p.status === "approved") checkApplied(p, signal);
+  if (!decided) validate(id, signal);
+}
+
+function wireDecide() {
+  const rv = $("reviewer"), cm = $("comment");
+  try { rv.value = localStorage.getItem("reviewer") || ""; } catch (e) {}
+  rv.oninput = () => $("reviewer-msg").textContent = "";
+  cm.oninput = () => $("comment-msg").textContent = "";
+  cm.onkeydown = e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); decide("rejected"); } };
+  document.querySelectorAll(".reasons [data-reason]").forEach(b => b.onclick = () => {
+    cm.value = b.dataset.reason; $("comment-msg").textContent = ""; cm.focus();
+  });
+  $("approve").onclick = () => decide("approved");
+  $("reject").onclick = () => decide("rejected");
+}
+
+// 승인 단추는 SHACL 검사를 통과해야 켜진다. 검사 요청이 실패하면 다시 검사할 수 있게 한다
+async function validate(id, signal) {
+  const el = $("shacl");
+  el.className = "banner wait";
+  el.textContent = "데이터 규칙(SHACL)을 검사하는 중...";
+  let v;
+  try {
+    v = await fetchJSON(`/api/proposals/${enc(id)}/validate`, { signal });
+  } catch (err) {
+    if (err.name === "AbortError" || current !== id) return;
+    el.className = "banner no";
+    el.innerHTML = `검사하지 못했습니다: ${esc(err.message)}<button type="button" class="btn ghost" id="revalidate">다시 검사</button>`;
+    $("revalidate").onclick = () => validate(id, ctrl.signal);
+    return;
+  }
   if (current !== id) return;
+  shaclOk = v.conforms;
   el.className = "banner " + (v.conforms ? "ok" : "no");
   el.innerHTML = v.conforms ? "반영해도 데이터 규칙(SHACL)을 모두 지킵니다."
     : "데이터 규칙을 어겨 승인할 수 없습니다: " + v.results.map(r => esc(r.message)).join(", ");
-  const ab = document.getElementById("approve");
-  if (ab && !v.conforms) ab.disabled = true, ab.style.opacity = 0.4;
+  const bar = document.querySelector(".decide");
+  if (bar && !bar.dataset.busy) $("approve").disabled = !shaclOk;
 }
 
-async function drawMap(id) {
-  const r = await fetch(`/api/proposals/${encodeURIComponent(id)}/context`);
-  if (!r.ok || current !== id) return;
-  const gj = await r.json();
+// 승인된 제안이 정말 그래프에 들어갔는지: 대상의 wasInfluencedBy에 이 제안 노드가 있는지 본다
+async function checkApplied(p, signal) {
+  const el = $("applied");
+  if (!el) return;
+  let f;
+  try {
+    f = await fetchJSON("/api/feature?uri=" + enc(p.target), { signal });
+  } catch (err) {
+    if (err.name === "AbortError" || current !== p.id) return;
+    el.textContent = "반영 여부를 확인하지 못했습니다: " + err.message;
+    return;
+  }
+  if (current !== p.id || !el.isConnected) return;
+  const puri = proposalUri(p);
+  const ok = (f.triples || []).some(t => t.p.endsWith("prov#wasInfluencedBy") && t.o === puri);
+  const st = (f.triples || []).find(t => t.p.endsWith("#status"));
+  const stName = st ? (st.o_label || localName(st.o)) : "";
+  el.innerHTML = ok
+    ? `<span class="chip approved">그래프에 반영됨</span>${stName ? ` 지금 상태 ${esc(stName)}` : ""}`
+    : `<span class="chip rejected">그래프에서 찾지 못함</span>${f.triples_truncated ? " (속성이 많아 일부만 확인했습니다)" : ""}`;
+}
+
+// 결정된 제안의 대상이 지금 어떤 상태인지: 그래프에서 온 값이 있으면 그것을, 없으면 제안의 상태 변경으로 가늠한다
+function statusNow(p, u, given) {
+  if (given) return given;
+  const ch = p.changes.filter(c => c.s === u && c.p.endsWith("#status"));
+  const pick = ch.find(c => c.op === (p.status === "approved" ? "add" : "remove"));
+  return pick && /Retired$/.test(pick.o.value) ? "폐지" : "";
+}
+
+// whenStyleReady와 같지만, 그 사이 다른 제안을 골라 지도가 바뀌면 기다리기를 그만둔다
+function readyThen(m, cb) {
+  if (map !== m) return;
+  if (m.isStyleLoaded()) cb();
+  else setTimeout(() => readyThen(m, cb), 50);
+}
+
+async function drawMap(p, signal) {
+  const id = p.id;
+  let gj;
+  try {
+    gj = await fetchJSON(`/api/proposals/${enc(id)}/context`, { signal });
+  } catch (err) {
+    if (err.name === "AbortError" || current !== id) return;
+    const el = $("map");
+    el.className = "nomap";
+    el.textContent = err.status === 404 ? "위치 정보가 없는 제안입니다" : "위치를 불러오지 못했습니다: " + err.message;
+    return;
+  }
+  if (current !== id) return;
+  const decided = p.status !== "pending";
+  const count = r => gj.features.filter(f => r.includes(f.properties.role)).length;
+  $("map-sum").textContent = `대상 ${count(["target"])}, 함께 바뀌는 객체 ${count(["changed", "linked"])}, 주변 건물 ${count(["building"])}`;
+  if (decided) gj.features.forEach(f => {
+    const pr = f.properties;
+    pr.now = pr.role === "building" ? (pr.status || "") : statusNow(p, pr.uri, pr.status);
+  });
   if (map) map.remove();
-  map = new maplibregl.Map({ container: "map", style: baseStyle(), attributionControl: { compact: true } });
-  whenStyleReady(map, () => {
-    map.addSource("ctx", { type: "geojson", data: gj });
-    const color = ["match", ["get", "role"], "target", css("--retired"), "changed", "#f79009", "linked", "#f79009", css("--active")];
-    map.addLayer({ id: "poly", type: "fill", source: "ctx", filter: ["==", ["geometry-type"], "Polygon"],
+  const m = map = new maplibregl.Map({ container: "map", style: baseStyle(), attributionControl: { compact: true } });
+  readyThen(m, () => {
+    m.addSource("ctx", { type: "geojson", data: gj });
+    const color = decided  // 결정이 끝나면 역할 대신 지금 상태로 칠한다
+      ? ["match", ["get", "now"], "폐지", css("--retired"), css("--active")]
+      : ["match", ["get", "role"], "target", css("--retired"), "changed", "#f79009", "linked", "#f79009", css("--active")];
+    m.addLayer({ id: "poly", type: "fill", source: "ctx", filter: ["!=", ["geometry-type"], "Point"],
       paint: { "fill-color": color, "fill-opacity": ["match", ["get", "role"], "building", 0.45, 0.85], "fill-outline-color": "#2f4778" } });
-    map.addLayer({ id: "pt", type: "circle", source: "ctx", filter: ["==", ["geometry-type"], "Point"],
+    m.addLayer({ id: "pt", type: "circle", source: "ctx", filter: ["in", ["geometry-type"], ["literal", ["Point", "MultiPoint"]]],
       paint: { "circle-radius": ["match", ["get", "role"], "target", 8, "changed", 6, 3], "circle-color": color,
                "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
     const focus = gj.features.filter(f => f.properties.role !== "building");
     const b = boundsOf(focus.length ? focus : gj.features);
-    if (!b.isEmpty()) map.fitBounds(b, { padding: 60, maxZoom: 17, duration: 0 });
-    map.on("click", "poly", e => new maplibregl.Popup().setLngLat(e.lngLat)
-      .setHTML(`${esc(e.features[0].properties.label || "(이름 없음)")}<br><a href="/map?focus=${encodeURIComponent(e.features[0].properties.uri)}">지도에서 보기</a>`).addTo(map));
+    if (!b.isEmpty()) m.fitBounds(b, { padding: 60, maxZoom: 17, duration: 0 });
+    for (const layer of ["poly", "pt"]) {
+      m.on("click", layer, e => {
+        const pr = e.features[0].properties;
+        new maplibregl.Popup().setLngLat(e.lngLat)
+          .setHTML(`${esc(pr.label || "(이름 없음)")}${pr.uri ? `<br><a href="/map?focus=${enc(pr.uri)}">지도에서 보기</a>` : ""}`).addTo(m);
+      });
+      m.on("mouseenter", layer, () => m.getCanvas().style.cursor = "pointer");
+      m.on("mouseleave", layer, () => m.getCanvas().style.cursor = "");
+    }
   });
 }
 
-async function decide(result) {
-  const reviewer = document.getElementById("reviewer").value.trim();
-  if (!reviewer) { document.getElementById("reviewer").focus(); return; }
-  try { localStorage.setItem("reviewer", reviewer); } catch (e) {}
-  const comment = document.getElementById("comment").value;
-  const r = await fetch(`/api/proposals/${encodeURIComponent(current)}/decision`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result, reviewer, comment }) });
-  if (!r.ok) { const el = document.getElementById("shacl"); el.className = "banner no"; el.textContent = (await r.json()).detail; return; }
-  const idx = items.findIndex(p => p.id === current);
-  await loadList(true);
-  const next = items[Math.min(idx, items.length - 1)];
-  if (next) show(next.id); else { current = null; document.getElementById("detail").innerHTML = '<div class="empty">남은 제안이 없습니다.</div>'; }
+function setBusy(on) {
+  const bar = document.querySelector(".decide");
+  if (!bar) return;
+  if (on) bar.dataset.busy = "1"; else delete bar.dataset.busy;
+  $("approve").disabled = on || !shaclOk;
+  $("reject").disabled = on;
+  $("saving").hidden = !on;
 }
 
-document.getElementById("tabs").onclick = e => {
-  if (e.target.dataset.s === undefined) return;
-  filter = e.target.dataset.s;
-  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b === e.target));
-  loadList();
+function toast(html) {
+  const t = $("toast");
+  t.innerHTML = html;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 6000);
+}
+
+// 결정은 지금 화면에 그려진 결정 막대의 제안(data-id)에 대해 보낸다
+async function decide(result) {
+  const bar = document.querySelector(".decide");
+  if (!bar || bar.dataset.busy) return;
+  const id = bar.dataset.id;
+  const rv = $("reviewer"), cm = $("comment"), errEl = $("decide-err");
+  errEl.hidden = true; $("reviewer-msg").textContent = ""; $("comment-msg").textContent = "";
+  if (result === "approved" && $("approve").disabled) return;
+  const reviewer = rv.value.trim();
+  if (!reviewer) { $("reviewer-msg").textContent = "검토자 이름을 쓰세요"; rv.focus(); return; }
+  const comment = cm.value;
+  if (result === "rejected" && !comment.trim()) { $("comment-msg").textContent = "반려 사유를 쓰세요"; cm.focus(); return; }
+  try { localStorage.setItem("reviewer", reviewer); } catch (e) {}
+  const item = all.find(x => x.id === id) || {};
+  const targetUri = shown && shown.id === id ? shown.target : item.target;
+  const label = shown && shown.id === id ? nameOf(shown.names, shown.target) : (item.target_name || item.summary || id);
+  const before = view.map(x => x.id);
+  setBusy(true);
+  let res;
+  try {
+    res = await fetchJSON(`/api/proposals/${enc(id)}/decision`, { json: { result, reviewer, comment } });
+  } catch (err) {
+    if (!bar.isConnected) return;
+    setBusy(false);
+    if (/반려 사유/.test(err.message)) { $("comment-msg").textContent = err.message; cm.focus(); }
+    else if (/검토자/.test(err.message)) { $("reviewer-msg").textContent = err.message; rv.focus(); }
+    else { errEl.textContent = err.message; errEl.hidden = false; }
+    return;
+  }
+  // 목록을 다시 받기 전에 방금 결정을 먼저 반영해 둔다 (다시 받기가 실패해도 맞게 보인다)
+  Object.assign(item, { status: res.status, decision: res.decision,
+    decided_at: res.decision ? res.decision.at : null, reviewer: res.decision ? res.decision.reviewer : null });
+  try { all = await fetchJSON("/api/proposals"); } catch (e) { /* 고쳐 둔 값으로 그린다 */ }
+  updateTabs();
+  renderList();
+  toast(result === "approved"
+    ? `승인했습니다: ${esc(label)}, <a href="/map?focus=${enc(targetUri)}">지도에서 확인</a>`
+    : `반려했습니다: ${esc(label)}`);
+  if (current !== id) return;  // 저장하는 동안 다른 제안으로 옮겼다
+  // 다음 제안: 방금 것 뒤쪽에서 대기 중인 첫 제안, 없으면 앞쪽에서 (전체 탭에서도 같은 제안에 머물지 않는다)
+  const idx = before.indexOf(id);
+  const pending = x => x !== id && (all.find(a => a.id === x) || {}).status === "pending";
+  const next = before.slice(idx + 1).find(pending) || before.slice(0, Math.max(idx, 0)).find(pending);
+  if (!next) { clearDetail("남은 제안이 없습니다."); return; }
+  show(next);
+  const b = itemButton(next);
+  if (b) { b.focus(); b.scrollIntoView({ block: "nearest" }); }
+}
+
+// j, k: 목록에서 다음, 이전 제안을 연다
+function move(delta) {
+  if (!view.length) return;
+  let i = view.findIndex(p => p.id === current);
+  i = i < 0 ? (delta > 0 ? 0 : view.length - 1) : Math.max(0, Math.min(view.length - 1, i + delta));
+  if (view[i].id === current) return;
+  const inList = $("list").contains(document.activeElement);
+  show(view[i].id, { user: true });
+  const b = itemButton(view[i].id);
+  if (b) { b.scrollIntoView({ block: "nearest" }); if (inList) b.focus(); }
+}
+
+function toggleHelp(open) {
+  const box = $("help"), btn = $("help-btn");
+  open = open ?? box.hidden;
+  box.hidden = !open;
+  btn.setAttribute("aria-expanded", open);
+  if (!open && box.contains(document.activeElement)) btn.focus();
+}
+
+function setTab(s) {
+  filter = s;
+  sort = DEFAULT_SORT[s];
+  $("f-sort").value = sort;
+  updateTabs();
+  renderList();
+  pickAfterChange();
+}
+
+$("tabs").onclick = e => { const b = e.target.closest("[role=tab]"); if (b) setTab(b.dataset.s); };
+$("tabs").onkeydown = e => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const i = (STATUSES.indexOf(filter) + (e.key === "ArrowRight" ? 1 : STATUSES.length - 1)) % STATUSES.length;
+  setTab(STATUSES[i]);
+  document.querySelector(`#tabs [data-s="${STATUSES[i]}"]`).focus();
 };
-loadList();
+$("q").oninput = e => { query = e.target.value; renderList(); saveURL(); };
+$("f-action").onchange = e => { actionF = e.target.value; renderList(); saveURL(); };
+$("f-source").onchange = e => { sourceF = e.target.value; renderList(); saveURL(); };
+$("f-sort").onchange = e => { sort = e.target.value; renderList(); saveURL(); };
+$("list").onclick = e => {
+  if (e.target.closest("#retry-list")) { start(); return; }
+  const b = e.target.closest(".item");
+  if (b) show(b.dataset.id, { user: true });
+};
+$("list").onkeydown = e => {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+  const bs = [...$("list").querySelectorAll(".item")];
+  if (!bs.length) return;
+  e.preventDefault();
+  let i = bs.indexOf(document.activeElement);
+  i = e.key === "Home" ? 0 : e.key === "End" ? bs.length - 1
+    : i < 0 ? 0 : Math.max(0, Math.min(bs.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)));
+  bs.forEach(b => b.tabIndex = -1);
+  bs[i].tabIndex = 0;
+  bs[i].focus();
+};
+$("list-toggle").onclick = () => {
+  const folded = $("side").classList.toggle("folded");
+  $("list-toggle").textContent = folded ? "목록 펴기" : "목록 접기";
+  $("list-toggle").setAttribute("aria-expanded", !folded);
+};
+$("help-btn").onclick = () => toggleHelp();
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !$("help").hidden) { toggleHelp(false); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;  // 입력칸 안에서는 듣지 않는다
+  const k = e.key;
+  if (k === "j") move(1);
+  else if (k === "k") move(-1);
+  else if (k === "a") { const ab = $("approve"); if (ab && !ab.disabled) decide("approved"); }
+  else if (k === "r") { const cm = $("comment"); if (cm) { e.preventDefault(); cm.focus(); } }
+  else if (k === "/") { e.preventDefault(); if ($("side").classList.contains("folded")) $("list-toggle").click(); $("q").focus(); }
+  else if (k === "?") toggleHelp();
+});
+
+// 처음 열 때: 주소창의 id가 있으면 그 제안이 든 탭(목록에 없으면 전체)으로 열고 그 제안을 연다
+let wantId = readURL();
+fillControls();
+updateTabs();
+async function start() {
+  const ok = await loadList();
+  const id = wantId;
+  wantId = null;
+  if (!ok) { if (id) show(id); return; }
+  if (id) {
+    const p = all.find(x => x.id === id);
+    const tab = !p ? "all" : filter === "all" || filter === p.status ? filter : p.status;
+    if (tab !== filter) {
+      filter = tab;
+      if (!new URLSearchParams(location.search).get("sort")) sort = DEFAULT_SORT[tab];
+    }
+    if (p && !filtered().some(x => x.id === id)) { query = actionF = sourceF = ""; }  // 거르기에 가려지면 거르기를 푼다
+    fillControls();
+    updateTabs();
+    renderList();
+    show(id);
+    return;
+  }
+  pickAfterChange();
+}
+start();
 </script>
 </body>
 </html>
