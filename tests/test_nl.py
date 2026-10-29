@@ -101,6 +101,37 @@ def run() -> None:
     resp = TestClient(review_app.app).post("/api/ask", json={"question": "아무거나"})
     assert resp.status_code == 422 and resp.json()["detail"] == "질문을 처리하지 못했다 (모델이 거절)", resp.text
     assert TestClient(review_app.app).post("/api/ask", json={"question": "  "}).status_code == 400
+
+    # 시간 제한: 오래 걸리는 쿼리는 QueryTimeout, 그 쿼리가 도는 동안 오는 쿼리는 QueryBusy, 끝나면 다시 받는다
+    import time
+
+    from src.query.nl import QueryBusy, QueryTimeout
+
+    class Slow:
+        def query(self, q):
+            time.sleep(1.0)
+            return True
+    t0 = time.perf_counter()
+    for slow_store, err in ((Slow(), QueryTimeout), (store, QueryBusy)):
+        try:
+            run_sparql(slow_store, "ASK { ?s ?p ?o }", seconds=0.2)
+            raise AssertionError(f"{err.__name__}가 나지 않았다")
+        except err:
+            pass
+    assert time.perf_counter() - t0 < 0.9, time.perf_counter() - t0
+    time.sleep(1.0)
+    assert run_sparql(store, "ASK { ?s ?p ?o }")["boolean"] is True
+    real_run = nl.run_sparql
+
+    def timeout(*a, **k):
+        raise QueryTimeout("시험 시간 초과")
+    nl.get_client = lambda: FakeClient([SparqlDraft(sparql=near, explanation="시험")])
+    nl.run_sparql = timeout
+    try:
+        resp = TestClient(review_app.app).post("/api/ask", json={"question": "아무거나"})
+    finally:
+        nl.run_sparql = real_run
+    assert resp.status_code == 504 and resp.json()["detail"] == "시험 시간 초과", resp.text
     print("자연어 질의 확인 통과:", sorted(names))
 
 

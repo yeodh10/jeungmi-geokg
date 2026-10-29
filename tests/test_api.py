@@ -237,6 +237,57 @@ SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:Building ; jgk:within ?d . ?
     assert c.get("/api/layers/nothing").status_code == 404
 
 
+def check_group_decision(c, tmp: Path, review_app) -> None:
+    """묶어 승인: 앞 제안을 반영한 그래프에서 다음 제안을 검사하고, 통과한 것만 승인한다."""
+    from src.graph.store import load_store
+    from src.review.proposals import ProposalStore, group_of
+
+    ps = ProposalStore(tmp)
+    first = next(p for p in ps.load() if p.id.startswith("table-") and p.status == "pending")
+    group = group_of(first)[0]
+    # 같은 건물을 다시 '사용'으로 두는 제안: 혼자 보면 지금 그래프와 같아 통과하지만, 앞의 폐지를 반영하면 상태가 둘이 된다
+    active = first.changes[0].o
+    again = first.model_copy(update={"id": "table-test-again", "summary": "시험: 다시 사용",
+                                     "changes": [first.changes[1].model_copy(update={"o": active})]})
+    assert ps.add_new([again]) == 1 and group_of(again)[0] == group
+    assert c.get("/api/proposals/table-test-again/validate").json()["conforms"] is True
+
+    pending = [p.id for p in ps.load() if p.status == "pending" and group_of(p)[0] == group]
+    chk = c.get("/api/groups/check", params={"group": group}).json()
+    assert [x["id"] for x in chk["items"]] == pending and chk["passing"] == len(pending) - 1, chk
+    bad = next(x for x in chk["items"] if x["id"] == "table-test-again")
+    assert not bad["conforms"] and any("상태는 정확히 하나" in m for m in bad["messages"]), bad
+
+    assert c.post("/api/groups/decision", json={"group": group, "result": "approved", "reviewer": ""}).status_code == 400
+    version = review_app.state["version"]
+    r = c.post("/api/groups/decision", json={"group": group, "result": "approved", "reviewer": "묶음 검토자"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["decided"] == [x for x in pending if x != "table-test-again"], body
+    assert [x["id"] for x in body["skipped"]] == ["table-test-again"], body["skipped"]
+    assert review_app.state["version"] == version + 1  # 묶음 하나에 판 번호는 한 번 오른다
+    saved = {p.id: p for p in ps.load()}
+    assert all(saved[x].status == "approved" and saved[x].decision.reviewer == "묶음 검토자" for x in body["decided"])
+    assert saved["table-test-again"].status == "pending"
+
+    # 서버를 다시 켜서 승인 기록으로 그래프를 만들어도 지금 그래프와 같다
+    q = f"SELECT ?t ?s WHERE {{ VALUES ?t {{ {' '.join(f'<{saved[x].target}>' for x in body['decided'])} }} ?t <{JGK}status> ?s }}"
+    live = sorted((x["t"].value, x["s"].value) for x in review_app.store().query(q))
+    fresh = sorted((x["t"].value, x["s"].value) for x in load_store(ps).query(q))
+    assert live == fresh and {s for _, s in live} == {JGK + "Retired"}, (live, fresh)
+
+    # 묶어 반려는 사유가 있어야 하고, 남은 대기 제안을 모두 반려한다
+    assert c.post("/api/groups/decision", json={"group": group, "result": "rejected", "reviewer": "묶음 검토자"}).status_code == 400
+    r = c.post("/api/groups/decision", json={"group": group, "result": "rejected", "reviewer": "묶음 검토자", "comment": "시험 반려"})
+    assert r.status_code == 200 and r.json()["decided"] == ["table-test-again"], r.text
+    assert c.get("/api/groups/check", params={"group": group}).status_code == 404
+    assert c.post("/api/groups/decision", json={"group": group, "result": "rejected", "reviewer": "a", "comment": "b"}).status_code == 404
+
+    st = c.get("/api/status").json()
+    assert st["graph_loaded"] and st["triples"] == len(review_app.store()) and st["pending"] == sum(
+        p.status == "pending" for p in ps.load()), st
+
+
 def check_errors(review_app) -> None:
     """처리 못 한 예외는 500과 detail 한 문장으로 준다."""
     from fastapi.testclient import TestClient
@@ -269,6 +320,8 @@ def run() -> None:
 
     review_app.proposals = ProposalStore(tmp)
     review_app.state["store"] = None
+    review_app.preload()  # 서버를 켤 때 하는 미리 불러오기
+    assert review_app.state["store"] is not None and review_app.system_cache
     c = TestClient(review_app.app)
 
     check_uri_injection(c, review_app)
@@ -276,6 +329,7 @@ def run() -> None:
     check_concurrency(tmp, review_app)
     check_approval_and_layers(c, tmp, review_app)
     check_map_api(c, review_app)
+    check_group_decision(c, tmp, review_app)
     check_errors(review_app)
     review_app.state["store"] = None
     shutil.rmtree(tmp.parent, ignore_errors=True)

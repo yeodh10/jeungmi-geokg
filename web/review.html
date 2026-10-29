@@ -30,6 +30,9 @@
   .list .ghead { font-size: 12px; font-weight: 600; color: var(--text); padding: 10px 4px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
   .list .ghead:first-child { border-top: 0; margin-top: 0; padding-top: 2px; }
   .list .ghead .gsum { display: block; font-weight: 400; color: var(--muted); }
+  .list .ghead .gbtn { margin-top: 5px; padding: 2px 10px; font-size: 12px; color: var(--accent); border-color: #c9d8f7; }
+  table.batch td:first-child { width: 36px; color: var(--muted); }
+  table.batch td:last-child { width: 40%; }
   .list-toggle { display: none; margin: 0 12px 8px; }
   .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
   .detail .body { padding: 18px 22px; flex: 1; }
@@ -142,6 +145,7 @@ const REASONS = ["대상을 잘못 찾음", "고시 해석 오류", "중복 제�
 
 let filter = "pending", sort = DEFAULT_SORT.pending, query = "", actionF = "", sourceF = "";
 let all = [], view = [], current = null, shown = null, map = null, ctrl = null, shaclOk = false, toastTimer = null;
+let currentGroup = null;  // 묶어 결정 화면을 연 묶음
 
 let newLabels = {};  // 아직 그래프에 없는 새 객체는 제안 안의 이름표를 쓴다
 function nameOf(names, u) {
@@ -263,7 +267,8 @@ function renderList() {
       const members = all.filter(p => groupOf(p) === g);
       const c = s => members.filter(p => p.status === s).length;
       const label = ps[0].group_label || SOURCE[ps[0].source_kind] || ps[0].source_kind;
-      html += `<div class="ghead">${esc(label)}<span class="gsum">${g.startsWith("notice:") ? "이 고시" : "이 묶음"} ${members.length}건, 대기 ${c("pending")}, 승인 ${c("approved")}, 반려 ${c("rejected")}</span></div>`
+      const gbtn = c("pending") > 1 ? `<button type="button" class="btn ghost gbtn" data-group="${esc(g)}">대기 ${c("pending")}건 묶어 결정</button>` : "";
+      html += `<div class="ghead">${esc(label)}<span class="gsum">${g.startsWith("notice:") ? "이 고시" : "이 묶음"} ${members.length}건, 대기 ${c("pending")}, 승인 ${c("approved")}, 반려 ${c("rejected")}</span>${gbtn}</div>`
         + ps.map(itemHTML).join("");
       view.push(...ps);
     }
@@ -316,7 +321,7 @@ function pickAfterChange() {
 
 function clearDetail(msg) {
   if (ctrl) ctrl.abort();
-  ctrl = null; current = null; shown = null;
+  ctrl = null; current = null; shown = null; currentGroup = null;
   if (map) { map.remove(); map = null; }
   $("detail").innerHTML = `<div class="empty">${esc(msg)}</div>`;
   markSelected();
@@ -377,7 +382,7 @@ async function show(id, opts = {}) {
   if (ctrl) ctrl.abort();  // 앞서 고른 제안의 상세, 검사, 지도 요청은 끊는다
   ctrl = new AbortController();
   const signal = ctrl.signal;
-  current = id; shown = null; shaclOk = false;
+  current = id; shown = null; shaclOk = false; currentGroup = null;
   markSelected();
   saveURL();
   if (map) { map.remove(); map = null; }
@@ -464,7 +469,7 @@ async function validate(id, signal) {
   el.className = "banner " + (v.conforms ? "ok" : "no");
   el.innerHTML = v.conforms ? "반영해도 데이터 규칙(SHACL)을 모두 지킵니다."
     : "데이터 규칙을 어겨 승인할 수 없습니다: " + v.results.map(r => esc(r.message)).join(", ");
-  const bar = document.querySelector(".decide");
+  const bar = document.querySelector(".decide[data-id]");
   if (bar && !bar.dataset.busy) $("approve").disabled = !shaclOk;
 }
 
@@ -553,7 +558,7 @@ async function drawMap(p, signal) {
 }
 
 function setBusy(on) {
-  const bar = document.querySelector(".decide");
+  const bar = document.querySelector(".decide[data-id]");
   if (!bar) return;
   if (on) bar.dataset.busy = "1"; else delete bar.dataset.busy;
   $("approve").disabled = on || !shaclOk;
@@ -571,7 +576,7 @@ function toast(html) {
 
 // 결정은 지금 화면에 그려진 결정 막대의 제안(data-id)에 대해 보낸다
 async function decide(result) {
-  const bar = document.querySelector(".decide");
+  const bar = document.querySelector(".decide[data-id]");
   if (!bar || bar.dataset.busy) return;
   const id = bar.dataset.id;
   const rv = $("reviewer"), cm = $("comment"), errEl = $("decide-err");
@@ -618,6 +623,110 @@ async function decide(result) {
   if (b) { b.focus(); b.scrollIntoView({ block: "nearest" }); }
 }
 
+// 묶어 결정: 묶음의 대기 제안을 차례로 반영해 가며 검사한 결과를 보이고, 통과한 것만 한 번에 승인하거나 모두 반려한다
+async function showGroup(g) {
+  if (ctrl) ctrl.abort();
+  ctrl = new AbortController();
+  const signal = ctrl.signal;
+  current = null; shown = null; currentGroup = g;
+  if (map) { map.remove(); map = null; }
+  markSelected();
+  saveURL();
+  const d = $("detail");
+  d.innerHTML = '<div class="empty">앞 제안을 반영해 가며 차례로 검사하는 중...</div>';
+  let v;
+  try {
+    v = await fetchJSON("/api/groups/check?group=" + enc(g), { signal });
+  } catch (err) {
+    if (err.name === "AbortError" || currentGroup !== g) return;
+    d.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+    return;
+  }
+  if (currentGroup !== g) return;
+  const n = v.items.length, skip = n - v.passing;
+  d.innerHTML = `<div class="body">
+    <div class="head" id="dhead" tabindex="-1">
+      <div class="chips"><span class="chip src">묶어 결정</span></div>
+      <h2>${esc(v.group_label || g)}</h2>
+      <div class="small muted">대기 ${n}건을 제안 순서대로, 앞 제안을 반영한 그래프에서 다음 제안을 검사했습니다.
+        승인은 통과한 제안만 하고, 통과하지 못한 제안은 대기로 남습니다.</div>
+    </div>
+    <div class="banner ${skip ? "no" : "ok"}" role="status" style="margin-top:12px">${skip
+      ? `${v.passing}건 통과, ${skip}건은 데이터 규칙을 어겨 승인에서 빠집니다.`
+      : `${n}건 모두 데이터 규칙(SHACL)을 지킵니다.`}</div>
+    <table class="kv batch" style="margin-top:12px"><tr><th>차례</th><th>제안</th><th>검사</th></tr>
+      ${v.items.map((x, i) => `<tr><td>${i + 1}</td>
+        <td><a href="/?status=pending&id=${enc(x.id)}" data-open="${esc(x.id)}">${esc(x.summary)}</a><div class="uri">${esc(x.target)}</div></td>
+        <td>${x.conforms ? '<span class="chip approved">통과</span>'
+          : `<span class="chip rejected">어김</span> <span class="small">${x.messages.map(esc).join(", ")}</span>`}</td></tr>`).join("")}
+    </table>
+  </div>
+  <div class="decide" data-group="${esc(g)}">
+    <div class="banner no err" id="g-err" role="alert" hidden></div>
+    <div class="f-reviewer"><label for="g-reviewer">검토자</label>
+      <input id="g-reviewer" class="field" maxlength="50" autocomplete="name" aria-describedby="g-reviewer-msg">
+      <div class="hint-err" id="g-reviewer-msg" aria-live="polite"></div></div>
+    <div class="f-comment"><label for="g-comment">의견 (반려는 필수, 모든 제안에 같이 남습니다)</label>
+      <div class="reasons" role="group" aria-label="반려 사유 예시">${REASONS.map(t => `<button type="button" data-reason="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <textarea id="g-comment" class="field" rows="1" maxlength="1000" aria-describedby="g-comment-msg"></textarea>
+      <div class="hint-err" id="g-comment-msg" aria-live="polite"></div></div>
+    <div class="btns"><button type="button" class="btn ok" id="g-approve"${v.passing ? "" : " disabled"}>통과한 ${v.passing}건 승인</button>
+      <button type="button" class="btn no" id="g-reject">대기 ${n}건 모두 반려</button>
+      <span class="small muted" id="g-saving" hidden>저장하는 중...</span></div>
+  </div>`;
+  const rv = $("g-reviewer"), cm = $("g-comment");
+  try { rv.value = localStorage.getItem("reviewer") || ""; } catch (e) {}
+  rv.oninput = () => $("g-reviewer-msg").textContent = "";
+  cm.oninput = () => $("g-comment-msg").textContent = "";
+  d.querySelectorAll(".reasons [data-reason]").forEach(b => b.onclick = () => {
+    cm.value = b.dataset.reason; $("g-comment-msg").textContent = ""; cm.focus();
+  });
+  d.querySelectorAll("[data-open]").forEach(a => a.onclick = e => { e.preventDefault(); show(a.dataset.open, { user: true }); });
+  $("g-approve").onclick = () => decideGroup("approved");
+  $("g-reject").onclick = () => decideGroup("rejected");
+  if (narrow()) $("dhead").scrollIntoView({ block: "start" });
+}
+
+async function decideGroup(result) {
+  const bar = document.querySelector(".decide[data-group]");
+  if (!bar || bar.dataset.busy) return;
+  const g = bar.dataset.group;
+  const rv = $("g-reviewer"), cm = $("g-comment"), errEl = $("g-err");
+  errEl.hidden = true; $("g-reviewer-msg").textContent = ""; $("g-comment-msg").textContent = "";
+  const reviewer = rv.value.trim();
+  if (!reviewer) { $("g-reviewer-msg").textContent = "검토자 이름을 쓰세요"; rv.focus(); return; }
+  const comment = cm.value;
+  if (result === "rejected" && !comment.trim()) { $("g-comment-msg").textContent = "반려 사유를 쓰세요"; cm.focus(); return; }
+  try { localStorage.setItem("reviewer", reviewer); } catch (e) {}
+  const canApprove = !$("g-approve").disabled;
+  const busy = on => {
+    if (on) bar.dataset.busy = "1"; else delete bar.dataset.busy;
+    $("g-approve").disabled = on || !canApprove;
+    $("g-reject").disabled = on;
+    $("g-saving").hidden = !on;
+  };
+  busy(true);
+  let res;
+  try {
+    res = await fetchJSON("/api/groups/decision", { json: { group: g, result, reviewer, comment } });
+  } catch (err) {
+    if (!bar.isConnected) return;
+    busy(false);
+    errEl.textContent = err.message; errEl.hidden = false;
+    return;
+  }
+  try { all = await fetchJSON("/api/proposals"); } catch (e) { /* 목록은 다음에 다시 받는다 */ }
+  updateTabs();
+  renderList();
+  const done = res.decided.length, left = res.skipped.length;
+  toast(`${done}건을 ${result === "approved" ? "승인" : "반려"}했습니다` + (left ? `, 규칙을 어긴 ${left}건은 대기로 남겼습니다` : "")
+    + (result === "approved" ? `, <a href="/map">지도에서 확인</a>` : ""));
+  if (currentGroup !== g) return;
+  currentGroup = null;
+  if (left) { show(res.skipped[0].id); return; }  // 남은 제안을 바로 볼 수 있게 연다
+  pickAfterChange();
+}
+
 // j, k: 목록에서 다음, 이전 제안을 연다
 function move(delta) {
   if (!view.length) return;
@@ -660,6 +769,8 @@ $("f-source").onchange = e => { sourceF = e.target.value; renderList(); saveURL(
 $("f-sort").onchange = e => { sort = e.target.value; renderList(); saveURL(); };
 $("list").onclick = e => {
   if (e.target.closest("#retry-list")) { start(); return; }
+  const gb = e.target.closest(".gbtn");
+  if (gb) { showGroup(gb.dataset.group); return; }
   const b = e.target.closest(".item");
   if (b) show(b.dataset.id, { user: true });
 };

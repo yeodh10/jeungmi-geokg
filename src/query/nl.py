@@ -6,12 +6,15 @@
 - 코드가 실행 전에 확인한다: 읽기 쿼리(SELECT, ASK)만 허용, 결과 수 제한(MAX_ROWS보다 많이 달라고 해도 줄인다).
 - 거리 조건은 pyoxigraph에 geof:buffer가 없어서 LLM이 {{NEAR:객체URI:미터}} 자리표시를 쓰면 코드가 원 모양 WKT로 바꾼다.
 - 쿼리가 실패하면 오류 내용을 붙여 한 번 더 고쳐 쓰게 한다.
+- 쿼리는 QUERY_SECONDS 안에 끝나야 한다. pyoxigraph는 도는 쿼리를 멈출 수 없어서, 시간을 넘긴 쿼리는 뒤에서 끝까지 돌게 두고
+  그동안 오는 질의는 QueryBusy로 받지 않는다 (무거운 쿼리가 쌓여 서버가 느려지지 않게).
 """
 from __future__ import annotations
 
 import itertools
 import re
 import sys
+import threading
 from pathlib import Path
 
 import geopandas as gpd
@@ -27,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 QUERIES = ROOT / "src" / "graph" / "queries"
 ONTOLOGY = ROOT / "src" / "graph" / "ontology.ttl"
 MAX_ROWS = 500
+QUERY_SECONDS = 20
 FORBIDDEN = re.compile(r"\b(INSERT|DELETE|LOAD|CLEAR|DROP|CREATE|ADD|MOVE|COPY|SERVICE|WITH)\b", re.I)
 NEAR = re.compile(r"\{\{NEAR:(\S+?):(\d+(?:\.\d+)?)\}\}")
 WKT = re.compile(r"^(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)")
@@ -44,6 +48,17 @@ PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX dcterms: <http://purl.org/dc/terms/>
 """
+
+
+class QueryTimeout(Exception):
+    """쿼리가 제한 시간을 넘겼다. 그 쿼리가 뒤에서 아직 돌고 있으니 ask()도 다시 쓰게 하지 않고 바로 올린다."""
+
+
+class QueryBusy(Exception):
+    """앞서 시간을 넘긴 쿼리가 아직 돌고 있다."""
+
+
+_running = threading.BoundedSemaphore(1)  # 쿼리는 한 번에 하나만 돈다. 시간을 넘긴 쿼리가 끝나야 풀린다
 
 
 class SparqlDraft(BaseModel):
@@ -129,9 +144,33 @@ def geometry_vars(names: list[str], rows: list[list]) -> list[str]:
     return [n for i, n in enumerate(names) if any(isinstance(r[i], str) and WKT.match(r[i]) for r in rows)]
 
 
-def run_sparql(store, sparql: str) -> dict:
+def run_sparql(store, sparql: str, seconds: float | None = None) -> dict:
+    query = PREFIXES + fill_near(check(sparql, MAX_ROWS + 1), store)
+    seconds = QUERY_SECONDS if seconds is None else seconds
+    if not _running.acquire(timeout=min(seconds, 2)):
+        raise QueryBusy("앞서 오래 걸린 쿼리가 아직 돌고 있다")
+    box = {}
+
+    def work():
+        try:
+            box["result"] = _execute(store, query)
+        except BaseException as e:  # 오류는 부른 쪽에서 다시 올린다
+            box["error"] = e
+        finally:
+            _running.release()
+    t = threading.Thread(target=work, name="nl-query", daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise QueryTimeout(f"쿼리가 {seconds:g}초 안에 끝나지 않았다. 조건을 좁히거나 더 단순하게 써야 한다")
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
+
+
+def _execute(store, query: str) -> dict:
     # 하나 더 읽어 보고 MAX_ROWS를 넘어 잘렸는지 안다
-    res = store.query(PREFIXES + fill_near(check(sparql, MAX_ROWS + 1), store))
+    res = store.query(query)
     if isinstance(res, bool) or res.__class__.__name__ == "QueryBoolean":
         return {"boolean": bool(res), "vars": [], "rows": [], "truncated": False, "geometry_vars": []}
     names = [v.value for v in res.variables]

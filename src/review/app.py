@@ -5,16 +5,19 @@
 제안을 승인하면 그래프에 바로 반영되고, 반려하면 기록만 남는다.
 승인으로 그래프가 바뀔 때마다 그래프 판 번호(state["version"])가 하나 오른다. 레이어 캐시와 ETag가 이 번호를 쓴다.
 판 번호는 서버를 켤 때마다 0부터 다시 세므로, ETag에는 서버를 켠 때의 값(state["boot"])도 넣는다.
+서버를 켜면 그래프를 뒤에서 미리 불러 둔다 (JGK_PRELOAD=0이면 첫 요청 때 불러온다).
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import threading
 import time
 import unicodedata
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -44,7 +47,27 @@ MAX_TRIPLES = 2000   # /api/feature 가 주는 나가는 트리플 수
 MAX_INBOUND = 30     # /api/feature 가 속성마다 주는 들어오는 객체 수
 
 log = logging.getLogger(__name__)
-app = FastAPI(title="증미역 GeoKG 변경 제안 검토")
+
+
+def preload() -> None:
+    t0 = time.perf_counter()
+    try:
+        g = store()
+        system_prompt()
+    except Exception:  # 미리 불러오기에 실패해도 서버는 뜨고, 첫 요청이 다시 불러 보며 오류를 낸다
+        log.exception("그래프를 미리 불러오지 못했다")
+        return
+    log.info("그래프를 미리 불러왔다: 트리플 %d개, %.1f초", len(g), time.perf_counter() - t0)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    if os.environ.get("JGK_PRELOAD", "1") != "0":
+        threading.Thread(target=preload, name="graph-preload", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="증미역 GeoKG 변경 제안 검토", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
 proposals = ProposalStore()
@@ -252,12 +275,94 @@ def decide(pid: str, body: DecisionIn):
             raise HTTPException(404, "없는 제안")
         except ValueError as e:
             raise HTTPException(409, str(e))
-        if p.status == "approved":  # 다시 불러오지 않고 지금 그래프에 바로 얹는다
-            store().update(p.sparql_update())
-            state["version"] += 1
-            layer_cache.clear()
-            system_cache.clear()
+        if p.status == "approved":
+            apply_approved([p])
     return p.model_dump()
+
+
+def apply_approved(ps) -> None:
+    """승인된 제안을 다시 불러오지 않고 지금 그래프에 바로 얹는다. lock 안에서 부른다."""
+    g = store()
+    for p in ps:
+        g.update(p.sparql_update())
+    state["version"] += 1
+    layer_cache.clear()
+    system_cache.clear()
+
+
+def group_pending(group: str) -> list:
+    """묶음 안에서 대기 중인 제안, 제안 파일 순서대로."""
+    return [p for p in proposals.load() if p.status == "pending" and group_of(p)[0] == group]
+
+
+def batch_plan(ps, decision: Decision | None = None) -> tuple[list, list[dict]]:
+    """앞 제안을 반영한 그래프에서 다음 제안을 검사한다. 통과한 제안만 다음 검사의 바탕에 얹는다.
+
+    decision을 주면 그 결정(검토자 이름 포함)을 넣은 SPARQL로 반영해 본다. 통과한 제안과 제안마다의 결과를 돌려준다.
+    """
+    from src.graph.validate import check_proposal
+    trial = ox.Store()
+    trial.bulk_extend(store().quads_for_pattern(None, None, None, None))
+    ok, rows = [], []
+    for p in ps:
+        conforms, results = check_proposal(trial, p)
+        messages = sorted({r["message"] for r in results})
+        if conforms:
+            q = p if decision is None else p.model_copy(update={"status": "approved", "decision": decision})
+            try:
+                trial.update(q.sparql_update())
+                ok.append(p)
+            except (SyntaxError, OSError, RuntimeError, ValueError) as e:
+                conforms, messages = False, [f"제안을 그래프에 반영하지 못했다: {e}"]
+        rows.append({"id": p.id, "summary": p.summary, "target": p.target, "action": p.action,
+                     "conforms": conforms, "messages": messages})
+    return ok, rows
+
+
+class GroupDecisionIn(DecisionIn):
+    group: str
+
+
+@app.get("/api/groups/check")
+def check_group(group: str):
+    """묶음의 대기 제안을 차례로 반영해 가며 SHACL로 검사한다. 묶어 승인하기 전에 화면이 보여 준다."""
+    with lock:
+        ps = group_pending(group)
+        if not ps:
+            raise HTTPException(404, "대기 중인 제안이 없는 묶음")
+        ok, rows = batch_plan(ps)
+    return {"group": group, "group_label": group_of(ps[0])[1], "items": rows, "passing": len(ok)}
+
+
+@app.post("/api/groups/decision")
+def decide_group(body: GroupDecisionIn):
+    """묶음의 대기 제안을 한 번에 결정한다. 승인은 차례 검사를 통과한 제안만 하고, 나머지는 대기로 남긴다."""
+    problem = body.problem()
+    if problem:
+        raise HTTPException(400, problem)
+    with lock:
+        ps = group_pending(body.group)
+        if not ps:
+            raise HTTPException(404, "대기 중인 제안이 없는 묶음")
+        skipped = []
+        if body.result == "approved":
+            decision = Decision(result="approved", reviewer=body.reviewer, at=now(), comment=body.comment)
+            ps, rows = batch_plan(ps, decision)
+            skipped = [r for r in rows if not r["conforms"]]
+            if not ps:
+                raise HTTPException(409, "데이터 규칙을 통과한 제안이 없어 승인하지 않았다")
+        done = proposals.decide_many([p.id for p in ps], body.result, body.reviewer, body.comment)
+        if body.result == "approved":
+            apply_approved(done)
+    return {"group": body.group, "result": body.result, "decided": [p.id for p in done], "skipped": skipped}
+
+
+@app.get("/api/status")
+def status():
+    """그래프를 다 불러왔는지, 지금 그래프 판 번호와 대기 제안 수."""
+    g = state["store"]
+    return {"graph_loaded": g is not None, "triples": len(g) if g is not None else None,
+            "version": state["version"], "pending": sum(p.status == "pending" for p in proposals.load())}
 
 
 @lru_cache(maxsize=1)
@@ -454,7 +559,7 @@ def ask_question(body: AskIn):
     import anthropic
 
     from src.llm.client import LLMRefused, MissingAPIKey
-    from src.query.nl import ask
+    from src.query.nl import QueryBusy, QueryTimeout, ask
     if not body.question.strip():
         raise HTTPException(400, "질문이 비었다")
     try:
@@ -463,6 +568,10 @@ def ask_question(body: AskIn):
         raise HTTPException(503, "Claude API를 쓸 수 없다 (.env의 ANTHROPIC_API_KEY 확인)")
     except LLMRefused:
         raise HTTPException(422, "질문을 처리하지 못했다 (모델이 거절)")
+    except QueryTimeout as e:
+        raise HTTPException(504, str(e))
+    except QueryBusy:
+        raise HTTPException(503, "앞서 오래 걸린 쿼리가 아직 돌고 있다. 잠시 뒤에 다시 물어 주세요")
     except anthropic.APIError as e:
         raise HTTPException(502, f"Claude API 오류: {e}")
     except ValueError as e:

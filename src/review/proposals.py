@@ -210,14 +210,26 @@ class ProposalStore:
         return len(fresh)
 
     def decide(self, pid: str, result: str, reviewer: str, comment: str = "") -> Proposal:
+        return self.decide_many([pid], result, reviewer, comment)[0]
+
+    def decide_many(self, pids: list[str], result: str, reviewer: str, comment: str = "") -> list[Proposal]:
+        """여러 제안을 같은 결정으로 한 번에 저장한다. 하나라도 결정할 수 없으면 아무것도 바꾸지 않는다.
+
+        그래프를 다시 불러올 때 승인 시각이 같으면 파일 순서대로 반영하므로, pids도 파일 순서로 다룬다.
+        """
         with _lock:
             proposals = self.load()
-            p = next((p for p in proposals if p.id == pid), None)
-            if p is None:
-                raise KeyError(pid)
-            if p.status != "pending":
-                raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다")
-            p.status = result
-            p.decision = Decision(result=result, reviewer=reviewer, at=now(), comment=comment)
+            by_id = {p.id: p for p in proposals}
+            for pid in pids:
+                p = by_id.get(pid)
+                if p is None:
+                    raise KeyError(pid)
+                if p.status != "pending":
+                    raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다" + (f" ({pid})" if len(pids) > 1 else ""))
+            at = now()
+            chosen = [p for p in proposals if p.id in set(pids)]
+            for p in chosen:
+                p.status = result
+                p.decision = Decision(result=result, reviewer=reviewer, at=at, comment=comment)
             self.save(proposals)
-        return p
+        return chosen
