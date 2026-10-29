@@ -38,24 +38,24 @@
 
 ```mermaid
 flowchart LR
-  subgraph 원천["공공데이터 (data/raw, 커밋 안 함)"]
+  subgraph SRC["공공데이터 (data/raw, 커밋 안 함)"]
     A1[GIS건물통합정보]
     A2[도로명주소 내비게이션용DB]
     A3[건축물대장 총괄표제부]
     A4[행정표준코드 기관코드]
     A5[민원행정기관 전자지도]
   end
-  원천 --> B[범위 자르기<br>증미역 1km]
+  SRC --> B[범위 자르기<br>증미역 1km]
   B --> C[객체 쪼개기, URI 붙이기]
   C --> D[(원천 그래프<br>GeoSPARQL 1.1)]
-  subgraph 제안["변경 제안 (한 형식)"]
+  subgraph PROP["변경 제안 (한 형식)"]
     P1[자료 비교<br>자동 갱신]
     P2[고시공고 글<br>LLM 추출]
     P3[고시 첨부표<br>코드로 읽기]
     P4[규칙 후보]
   end
-  N[새 자료, 고시공고] --> 제안
-  제안 --> S{SHACL 검사}
+  N[새 자료, 고시공고] --> PROP
+  PROP --> S{SHACL 검사}
   S --> R[사람 검토 화면]
   R -- 승인 --> U[SPARQL UPDATE<br>+ PROV-O 기록]
   U --> D
