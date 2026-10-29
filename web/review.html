@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>변경 제안 검토</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --accent: #2457d6; --ok: #1a7f4b; --no: #b42318; --pending: #b54708; --map-bg: #eef1f5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+  h2, .meta, li { overflow-wrap: anywhere; }
+  .filters { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filters button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+  .filters button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { padding: 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+  ul.list li.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; color: #fff; margin-right: 6px; }
+  .pending { background: var(--pending); } .approved { background: var(--ok); } .rejected { background: var(--no); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-all; }
+  #map { height: 340px; border-radius: 6px; border: 1px solid var(--line); margin: 12px 0; }
+  h2 { font-size: 16px; margin: 0 0 6px; }
+  h3 { font-size: 14px; margin: 16px 0 6px; }
+  ul.evidence { margin: 0; padding-left: 18px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { border-top: 1px solid var(--line); padding: 4px; vertical-align: top; word-break: break-all; }
+  .decide { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .decide input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; }
+  .decide input.comment { flex: 1; min-width: 160px; }
+  .btn { border: 0; border-radius: 6px; padding: 8px 14px; color: #fff; cursor: pointer; font-size: 14px; }
+  .btn.ok { background: var(--ok); } .btn.no { background: var(--no); }
+  .legend { font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin: 0 4px 0 10px; border-radius: 2px; }
+  .empty { color: var(--muted); font-size: 14px; }
+  pre { background: var(--bg); padding: 8px; border-radius: 6px; font-size: 12px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>변경 제안 검토</h1>
+  <p>기계가 낸 제안을 사람이 확인합니다. 승인한 제안만 지식 그래프에 반영되고, 반려한 제안도 기록으로 남습니다.</p>
+</header>
+<main>
+  <section class="panel">
+    <div class="filters" id="filters">
+      <button data-s="pending" class="on">대기</button>
+      <button data-s="approved">승인</button>
+      <button data-s="rejected">반려</button>
+      <button data-s="">전체</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </section>
+  <section class="panel" id="detail"><p class="empty">왼쪽에서 제안을 고르세요.</p></section>
+</main>
+<script>
+const LABEL = { pending: "대기", approved: "승인", rejected: "반려" };
+let filter = "pending", current = null, map = null;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const short = u => String(u).replace("https://yeodh10.github.io/jeungmi-geokg/id/", "id:")
+  .replace("https://yeodh10.github.io/jeungmi-geokg/def#", "jgk:")
+  .replace("http://www.opengis.net/ont/geosparql#", "geo:")
+  .replace("http://www.w3.org/2000/01/rdf-schema#", "rdfs:")
+  .replace("http://www.w3.org/1999/02/22-rdf-syntax-ns#", "rdf:")
+  .replace("http://purl.org/dc/terms/", "dcterms:");
+
+async function loadList() {
+  const r = await fetch("/api/proposals" + (filter ? "?status=" + filter : ""));
+  const items = await r.json();
+  const ul = document.getElementById("list");
+  ul.innerHTML = items.length ? "" : '<li class="empty">제안이 없습니다.</li>';
+  for (const p of items) {
+    const li = document.createElement("li");
+    li.className = p.id === current ? "sel" : "";
+    li.innerHTML = `<span class="badge ${p.status}">${LABEL[p.status]}</span>${esc(p.summary)}
+      <div class="meta">${esc(p.source_kind)}, ${esc(p.created_at)}</div>`;
+    li.onclick = () => show(p.id);
+    ul.appendChild(li);
+  }
+}
+
+async function show(id) {
+  current = id;
+  loadList();
+  const p = await (await fetch("/api/proposals/" + encodeURIComponent(id))).json();
+  const inGraph = await (await fetch("/api/feature?uri=" + encodeURIComponent(p.target))).json();
+  const d = document.getElementById("detail");
+  d.innerHTML = `
+    <h2><span class="badge ${p.status}">${LABEL[p.status]}</span>${esc(p.summary)}</h2>
+    <div class="meta">대상 ${esc(p.target)}<br>지금 그래프에 ${inGraph.in_graph ? "있음 (트리플 " + inGraph.triples.length + "개)" : "없음"}</div>
+    <div id="map"></div>
+    <div class="legend"><i style="background:#c3cad5"></i>주변 건물<i style="background:#f79009"></i>이어질 건물<i style="background:#d92d20"></i>제안 대상</div>
+    <h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul>
+    <h3>그래프에 넣을 내용 (${p.changes.length}개)</h3>
+    <table>${p.changes.map(c => `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(short(c.s))}</td><td>${esc(short(c.p))}</td><td>${esc(c.o.kind === "uri" ? short(c.o.value) : c.o.value)}</td></tr>`).join("")}</table>
+    ${p.status === "pending" ? `
+      <div class="decide">
+        <input id="reviewer" placeholder="검토자 이름">
+        <input id="comment" class="comment" placeholder="의견 (선택)">
+        <button class="btn ok" onclick="decide('approved')">승인</button>
+        <button class="btn no" onclick="decide('rejected')">반려</button>
+      </div>` : `<h3>결정</h3><p class="meta">${esc(p.decision.reviewer)}, ${esc(p.decision.at)}${p.decision.comment ? ", " + esc(p.decision.comment) : ""}</p>`}
+    <h3>승인하면 실행할 SPARQL</h3><pre>${esc(p.sparql_update)}</pre>`;
+  drawMap(id);
+}
+
+async function drawMap(id) {
+  const r = await fetch(`/api/proposals/${encodeURIComponent(id)}/context`);
+  if (!r.ok) return;
+  const gj = await r.json();
+  if (map) map.remove();
+  map = new maplibregl.Map({
+    container: "map",
+    style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": getComputedStyle(document.documentElement).getPropertyValue("--map-bg").trim() } }] },
+  });
+  map.on("load", () => {
+    map.addSource("ctx", { type: "geojson", data: gj });
+    map.addLayer({ id: "bld", type: "fill", source: "ctx", filter: ["==", ["geometry-type"], "Polygon"],
+      paint: { "fill-color": ["match", ["get", "role"], "linked", "#f79009", "#c3cad5"], "fill-outline-color": "#7a8394" } });
+    map.addLayer({ id: "pt", type: "circle", source: "ctx", filter: ["==", ["get", "role"], "target"],
+      paint: { "circle-radius": 7, "circle-color": "#d92d20", "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+    const b = new maplibregl.LngLatBounds();
+    gj.features.forEach(f => (f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates.flat(1)).forEach(c => b.extend(c)));
+    map.resize();
+    if (!b.isEmpty()) map.fitBounds(b, { padding: 20, duration: 0 });
+    map.on("click", "bld", e => new maplibregl.Popup().setLngLat(e.lngLat)
+      .setHTML(`${esc(e.features[0].properties.label || "(이름 없음)")}<br><small>${esc(short(e.features[0].properties.uri))}</small>`).addTo(map));
+  });
+}
+
+async function decide(result) {
+  const reviewer = document.getElementById("reviewer").value.trim();
+  if (!reviewer) { alert("검토자 이름을 적어 주세요."); return; }
+  const comment = document.getElementById("comment").value;
+  const r = await fetch(`/api/proposals/${encodeURIComponent(current)}/decision`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result, reviewer, comment }) });
+  if (!r.ok) { alert((await r.json()).detail); return; }
+  show(current);
+}
+
+document.getElementById("filters").onclick = e => {
+  if (!e.target.dataset || e.target.dataset.s === undefined) return;
+  filter = e.target.dataset.s;
+  document.querySelectorAll("#filters button").forEach(b => b.classList.toggle("on", b === e.target));
+  loadList();
+};
+loadList();
+</script>
+</body>
+</html>

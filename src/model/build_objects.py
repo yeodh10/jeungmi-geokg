@@ -130,6 +130,20 @@ def parse_road_address(addr: str) -> tuple[str, str, str]:
     return under, main, sub or "0"
 
 
+def housing_buildings(office, addr_index: pd.Series, bld_geom: pd.Series) -> list[str]:
+    """민원행정기관 한 곳이 들어 있는 건물의 건물관리번호 목록.
+
+    도로명주소가 같은 건물을 찾고, 한 주소에 건물이 여럿이면(단지) 시설 위치를 품은 건물만 남긴다.
+    품은 건물이 없으면 그 주소의 건물을 모두 돌려준다.
+    """
+    under, main_no, sub_no = parse_road_address(office["도로명주소"])
+    road_code = str(office["시군구코드"]).zfill(5) + str(office["도로명코드"]).zfill(7)
+    key = (road_code, under, main_no, sub_no)
+    mgts = addr_index.loc[[key]].tolist() if key in addr_index.index else []
+    inside = [m for m in mgts if bld_geom[m].contains(office.geometry)]
+    return inside or mgts
+
+
 def main() -> None:
     cfg = load_cfg()
     metric = cfg["crs"]["metric"]
@@ -262,7 +276,7 @@ def main() -> None:
     # 8. 공공시설: 행정표준코드 기관코드로 URI를 붙이고, 도로명주소가 같은 건물에 housedIn으로 잇는다
     offices = gpd.read_file(AREA_GPKG, layer="public_office")
     agencies = load_agencies()
-    addr_index = centers.set_index(ADDRESS_KEY)["bldg_mgt_no"]
+    addr_index = centers.set_index(ADDRESS_KEY)["bldg_mgt_no"].sort_index()
     bld_geom = by_mgt["geometry"]  # 건물관리번호 -> 모양 (EPSG:4326, 포함 여부만 보므로 좌표계는 그대로 둔다)
     facilities, facility_links, facility_review = [], [], []
     for _, o in offices.iterrows():
@@ -275,13 +289,7 @@ def main() -> None:
             continue
         a = cand.iloc[0]
         u = uri.public_facility(a["기관코드"])
-        under, main_no, sub_no = parse_road_address(o["도로명주소"])
-        road_code = str(o["시군구코드"]).zfill(5) + str(o["도로명코드"]).zfill(7)
-        key = (road_code, under, main_no, sub_no)
-        mgts = addr_index.loc[[key]].tolist() if key in addr_index.index else []
-        # 한 주소에 건물이 여럿이면(단지) 시설 위치를 품은 건물만 남긴다. 없으면 주소의 건물 전체를 둔다
-        inside = [m for m in mgts if bld_geom[m].contains(o.geometry)]
-        mgts = inside or mgts
+        mgts = housing_buildings(o, addr_index, bld_geom)
         facilities.append({
             "uri": u, "agency_code": a["기관코드"], "label": o["기관명"], "agency_name": a["전체기관명"],
             "facility_type": f"{o['유형']}/{o['상세분류']}", "match_rule": rule,

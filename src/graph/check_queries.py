@@ -9,14 +9,13 @@ import time
 from pathlib import Path
 
 import geopandas as gpd
-import pyoxigraph as ox
 import yaml
 from shapely.geometry import Point
 
+from src.graph.store import load_store
+
 ROOT = Path(__file__).resolve().parents[2]
 QUERIES = Path(__file__).resolve().parent / "queries"
-TTL = ROOT / "data" / "processed" / "jeungmi_geokg.ttl"
-ONTOLOGY = Path(__file__).resolve().parent / "ontology.ttl"
 OUT = ROOT / "data" / "processed" / "query_check.md"
 SHOW_ROWS = 10
 
@@ -33,13 +32,6 @@ def term(v) -> str:
     if v is None:
         return ""
     return v.value if hasattr(v, "value") else str(v)
-
-
-def load_store() -> ox.Store:
-    store = ox.Store()
-    for path in (ONTOLOGY, TTL):
-        store.load(path=str(path), format=ox.RdfFormat.TURTLE)
-    return store
 
 
 def main() -> None:

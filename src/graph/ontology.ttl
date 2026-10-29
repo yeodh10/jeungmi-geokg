@@ -4,6 +4,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 
 # 증미역 공간 지식 그래프 어휘
 # 모든 객체는 geo:Feature, 모양은 geo:Geometry로 따로 둔다.
@@ -76,6 +77,15 @@ jgk:totalFloorArea a owl:DatatypeProperty ; rdfs:label "연면적(㎡)"@ko ; rdf
 jgk:households a owl:DatatypeProperty ; rdfs:label "세대수"@ko ; rdfs:range xsd:integer .
 jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물수"@ko ; rdfs:range xsd:integer .
 jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; rdfs:range xsd:string .
+
+# 변경 제안 (사람이 승인한 것만 그래프에 들어온다)
+
+jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
+jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
+jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko .
+jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice)"@ko .
+jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "승인한 사람"@ko .
+jgk:decidedAt a owl:DatatypeProperty ; rdfs:label "승인 시각"@ko ; rdfs:range xsd:dateTime .
 
 # 출처
 
