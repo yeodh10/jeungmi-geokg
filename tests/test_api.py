@@ -288,6 +288,68 @@ def check_group_decision(c, tmp: Path, review_app) -> None:
         p.status == "pending" for p in ps.load()), st
 
 
+def check_correction(c, tmp: Path, review_app) -> None:
+    """결정 정정: 앞의 결정은 기록에 남고, 승인을 거두면 그래프를 다시 만들고, 뒤 승인이 기대면 막는다."""
+    from src.graph.store import load_store
+    from src.review.proposals import ProposalStore
+
+    ps = ProposalStore(tmp)
+    post = lambda pid, **b: c.post(f"/api/proposals/{pid}/correction", json={"reviewer": "정정 검토자", **b})
+    status_of = lambda u: [x["s"].value for x in review_app.store().query(f"SELECT ?s WHERE {{ <{u}> <{JGK}status> ?s }}")]
+
+    pending = next(p for p in ps.load() if p.status == "pending")
+    r = post(pending.id, to="approved", reason="x")
+    assert r.status_code == 409 and r.json()["detail"] == "아직 결정하지 않은 제안이다", r.text
+    x = next(p for p in ps.load() if p.status == "approved" and p.decision.reviewer == "묶음 검토자")
+    assert post(x.id, to="pending").json()["detail"] == "정정 사유가 필요하다"
+    assert post(x.id, to="approved", reason="x").status_code == 409  # 이미 승인된 제안
+
+    # 반려를 승인으로: SHACL을 어기면 막는다 (같은 건물을 다시 사용으로 두는 시험 제안)
+    r = post("table-test-again", to="approved", reason="다시 보니 맞음")
+    assert r.status_code == 409 and "데이터 규칙" in r.json()["detail"], r.text
+
+    # 승인 거두기: 대상이 원래 상태로 돌아가고, 앞의 결정은 정정 기록에 남는다
+    assert status_of(x.target) == [JGK + "Retired"]
+    version = review_app.state["version"]
+    r = post(x.id, to="pending", reason="폐지 대상 건물을 잘못 찾음")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "pending" and body["decision"] is None and len(body["corrections"]) == 1, body
+    cor = body["corrections"][0]
+    assert (cor["from_status"], cor["to_status"], cor["replaced"]["reviewer"]) == ("approved", "pending", "묶음 검토자"), cor
+    assert review_app.state["version"] == version + 1 and status_of(x.target) == [JGK + "Active"]
+    assert not bool(review_app.store().query(f"ASK {{ <{x.uri}> ?p ?o }}"))  # 거둔 제안의 노드도 그래프에서 빠진다
+    assert all(h["id"] != x.id for h in c.get("/api/feature", params={"uri": x.target}).json()["history"])
+    row = next(p for p in c.get("/api/proposals").json() if p["id"] == x.id)
+    assert row["corrections"] == 1 and row["status"] == "pending"
+
+    # 다시 승인하고, 같은 건물을 바꾸는 제안을 뒤에 승인하면 앞 제안의 승인은 거둘 수 없다
+    assert c.post(f"/api/proposals/{x.id}/decision", json={"result": "approved", "reviewer": "정정 검토자"}).status_code == 200
+    label = x.changes[0].model_copy(update={"op": "add", "p": "http://www.w3.org/2000/01/rdf-schema#label",
+                                            "o": x.changes[0].o.model_copy(update={"kind": "literal", "value": "시험 이름", "lang": "ko"})})
+    z = x.model_copy(update={"id": "test-label-z", "summary": "시험: 이름 붙이기", "action": "update", "status": "pending",
+                             "decision": None, "corrections": [], "changes": [label]})
+    assert ps.add_new([z]) == 1
+    assert c.post("/api/proposals/test-label-z/decision", json={"result": "approved", "reviewer": "정정 검토자"}).status_code == 200
+    r = post(x.id, to="rejected", reason="잘못 찾음")
+    assert r.status_code == 409 and "test-label-z" in r.json()["detail"], r.text
+
+    # 뒤의 제안부터 반려로 정정하면 앞 제안도 거둘 수 있다. 반려를 다시 승인으로 정정하면 그래프에 바로 얹는다
+    assert post("test-label-z", to="rejected", reason="이름 근거 없음").status_code == 200
+    assert post(x.id, to="rejected", reason="잘못 찾음").status_code == 200
+    assert status_of(x.target) == [JGK + "Active"]
+    r = post("test-label-z", to="approved", reason="근거 확인함")
+    assert r.status_code == 200 and len(r.json()["corrections"]) == 2, r.text
+    labels = [x["l"].value for x in review_app.store().query(
+        f"SELECT ?l WHERE {{ <{x.target}> <http://www.w3.org/2000/01/rdf-schema#label> ?l }}")]
+    assert "시험 이름" in labels, labels
+
+    # 정정을 거친 기록으로 다시 만든 그래프도 지금 그래프와 같다
+    live = {str(q) for q in review_app.store().quads_for_pattern(None, None, None, None)}
+    fresh = {str(q) for q in load_store(ps).quads_for_pattern(None, None, None, None)}
+    assert live == fresh, (len(live - fresh), len(fresh - live))
+
+
 def check_errors(review_app) -> None:
     """처리 못 한 예외는 500과 detail 한 문장으로 준다."""
     from fastapi.testclient import TestClient
@@ -330,6 +392,7 @@ def run() -> None:
     check_approval_and_layers(c, tmp, review_app)
     check_map_api(c, review_app)
     check_group_decision(c, tmp, review_app)
+    check_correction(c, tmp, review_app)
     check_errors(review_app)
     review_app.state["store"] = None
     shutil.rmtree(tmp.parent, ignore_errors=True)

@@ -32,6 +32,11 @@
   .list .ghead .gsum { display: block; font-weight: 400; color: var(--muted); }
   .list .ghead .gbtn { margin-top: 5px; padding: 2px 10px; font-size: 12px; color: var(--accent); border-color: #c9d8f7; }
   table.batch td:first-child { width: 36px; color: var(--muted); }
+  .correct { margin-top: 12px; }
+  .correct summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .correct .row { display: flex; gap: 8px 12px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
+  .correct label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+  .correct .f-reviewer { width: 150px; } .correct .f-to { width: 170px; } .correct .f-reason { flex: 1; min-width: 220px; }
   table.batch td:last-child { width: 40%; }
   .list-toggle { display: none; margin: 0 12px 8px; }
   .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
@@ -239,7 +244,7 @@ function itemHTML(p) {
     <span><span class="chip ${p.action}">${ACTION[p.action] || esc(p.action)}</span> <span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
       ${p.status !== "pending" ? `<span class="chip ${p.status}">${STATUS[p.status]}</span>` : ""}</span>
     <span class="t">${esc(p.target_name || p.summary)}</span><span class="small muted">${esc(p.summary)}</span>
-    ${d ? `<span class="small dec">${STATUS[d.result || p.status]}, ${esc(d.reviewer)}, ${esc(when(d.at))}</span>` : ""}
+    ${d ? `<span class="small dec">${STATUS[d.result || p.status]}, ${esc(d.reviewer)}, ${esc(when(d.at))}${p.corrections ? ", 정정됨" : ""}</span>` : ""}
     ${why ? `<span class="small muted why">사유: ${esc(why)}</span>` : ""}</button>`;
 }
 
@@ -354,13 +359,73 @@ function diffTables(p) {
 }
 
 function decisionHTML(p) {
-  if (!p.decision) return "";
   const d = p.decision, puri = proposalUri(p);
-  return `<h3>결정</h3><table class="kv decision"><tr><th>결과</th><th>검토자</th><th>시각</th><th>의견</th></tr>
+  return (d ? `<h3>결정</h3><table class="kv decision"><tr><th>결과</th><th>검토자</th><th>시각</th><th>의견</th></tr>
     <tr><td><span class="chip ${p.status}">${STATUS[p.status]}</span></td><td>${esc(d.reviewer)}</td><td>${esc(when(d.at, true))}</td>
       <td>${d.comment ? esc(d.comment) : '<span class="muted">없음</span>'}</td></tr></table>
     ${p.status === "approved" ? `<div class="small applied">제안 노드 <a href="/map?focus=${enc(puri)}">${esc(puri)}</a></div>
-      <div class="small applied" id="applied">그래프 반영을 확인하는 중...</div>` : ""}`;
+      <div class="small applied" id="applied">그래프 반영을 확인하는 중...</div>` : ""}` : "")
+    + correctionsHTML(p) + (d ? correctFormHTML(p) : "");
+}
+
+// 정정 이력: 앞의 결정은 지우지 않고, 언제 누가 무엇을 무엇으로 바로잡았는지 쌓아 둔다 (최근 것이 위)
+function correctionsHTML(p) {
+  const cs = p.corrections || [];
+  if (!cs.length) return "";
+  const st = s => `<span class="chip ${s}">${STATUS[s]}</span>`;
+  return `<h3>정정 이력</h3><table class="kv decision"><tr><th>바뀜</th><th>정정한 사람</th><th>시각</th><th>사유</th><th>앞의 결정</th></tr>
+    ${cs.slice().reverse().map(c => `<tr><td>${st(c.from_status)} → ${st(c.to_status)}</td><td>${esc(c.reviewer)}</td>
+      <td>${esc(when(c.at, true))}</td><td>${esc(c.reason)}</td>
+      <td class="small">${c.replaced ? `${esc(c.replaced.reviewer)}, ${esc(when(c.replaced.at, true))}${c.replaced.comment ? `, ${esc(c.replaced.comment)}` : ""}` : '<span class="muted">없음</span>'}</td></tr>`).join("")}</table>`;
+}
+
+const CORRECT_TO = {
+  approved: { pending: "대기로 되돌리기 (승인 거두기)", rejected: "반려로 바꾸기 (승인 거두기)" },
+  rejected: { pending: "대기로 되돌리기", approved: "승인으로 바꾸기" },
+};
+function correctFormHTML(p) {
+  const opts = CORRECT_TO[p.status];
+  if (!opts) return "";
+  return `<details class="correct" id="correct"><summary>결정 정정하기</summary>
+    <div class="small muted" style="margin-top:6px">앞의 결정은 지우지 않고 정정 기록으로 남습니다.${p.status === "approved"
+      ? " 승인을 거두면 이 제안의 변경을 뺀 그래프를 다시 만듭니다. 뒤에 승인된 제안이 같은 객체를 바꿨으면 그쪽부터 정정해야 합니다." : ""}</div>
+    <div class="banner no" id="correct-err" role="alert" hidden style="margin-top:8px"></div>
+    <div class="row">
+      <div class="f-to"><label for="correct-to">바꿀 상태</label><select id="correct-to" class="field">
+        ${Object.entries(opts).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div class="f-reviewer"><label for="correct-reviewer">정정한 사람</label><input id="correct-reviewer" class="field" maxlength="50" autocomplete="name"></div>
+      <div class="f-reason"><label for="correct-reason">정정 사유 (필수)</label><input id="correct-reason" class="field" maxlength="1000"></div>
+      <button type="button" class="btn" id="correct-go">정정 기록 남기기</button>
+    </div></details>`;
+}
+
+function wireCorrect(p) {
+  const box = $("correct");
+  if (!box) return;
+  try { $("correct-reviewer").value = localStorage.getItem("reviewer") || ""; } catch (e) {}
+  $("correct-go").onclick = async () => {
+    const err = $("correct-err"), btn = $("correct-go");
+    err.hidden = true;
+    const to = $("correct-to").value, reviewer = $("correct-reviewer").value.trim(), reason = $("correct-reason").value;
+    if (!reviewer) { err.textContent = "정정한 사람 이름을 쓰세요"; err.hidden = false; $("correct-reviewer").focus(); return; }
+    if (!reason.trim()) { err.textContent = "정정 사유를 쓰세요"; err.hidden = false; $("correct-reason").focus(); return; }
+    try { localStorage.setItem("reviewer", reviewer); } catch (e) {}
+    btn.disabled = true;
+    try {
+      await fetchJSON(`/api/proposals/${enc(p.id)}/correction`, { json: { to, reviewer, reason } });
+    } catch (e) {
+      btn.disabled = false;
+      err.textContent = e.message; err.hidden = false;
+      return;
+    }
+    try { all = await fetchJSON("/api/proposals"); } catch (e) { /* 다음에 다시 받는다 */ }
+    updateTabs();
+    toast(`정정했습니다: ${STATUS[p.status]} → ${STATUS[to]}`);
+    // 정정한 제안이 든 탭으로 옮겨 그 제안을 다시 연다
+    if (filter !== "all" && filter !== to) { filter = to; sort = DEFAULT_SORT[to]; $("f-sort").value = sort; updateTabs(); }
+    renderList();
+    show(p.id);
+  };
 }
 
 function decideHTML(p) {
@@ -433,6 +498,7 @@ async function show(id, opts = {}) {
   if (opts.user && narrow()) $("dhead").scrollIntoView({ block: "start" });
   drawMap(p, signal);
   if (p.status === "approved") checkApplied(p, signal);
+  wireCorrect(p);
   if (!decided) validate(id, signal);
 }
 

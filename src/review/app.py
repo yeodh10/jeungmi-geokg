@@ -3,6 +3,7 @@
 실행: uvicorn src.review.app:app --port 8000
   검토 화면 http://localhost:8000 , 지도 화면 http://localhost:8000/map
 제안을 승인하면 그래프에 바로 반영되고, 반려하면 기록만 남는다.
+결정은 정정할 수 있다. 승인을 거두면 그래프를 원천 그래프와 남은 승인 기록으로 다시 만든다.
 승인으로 그래프가 바뀔 때마다 그래프 판 번호(state["version"])가 하나 오른다. 레이어 캐시와 ETag가 이 번호를 쓴다.
 판 번호는 서버를 켤 때마다 0부터 다시 세므로, ETag에는 서버를 켠 때의 값(state["boot"])도 넣는다.
 서버를 켜면 그래프를 뒤에서 미리 불러 둔다 (JGK_PRELOAD=0이면 첫 요청 때 불러온다).
@@ -222,7 +223,8 @@ def list_proposals(status: Literal["pending", "approved", "rejected"] | None = N
                 "source_kind": p.source_kind, "target": p.target, "created_at": p.created_at,
                 "target_name": name(p), "target_type": p.target_type,
                 "decision": d.model_dump() if d else None, "decided_at": d.at if d else None,
-                "reviewer": d.reviewer if d else None, "group": group, "group_label": group_label}
+                "reviewer": d.reviewer if d else None, "group": group, "group_label": group_label,
+                "corrections": len(p.corrections)}
     return [row(p) for p in items]
 
 
@@ -355,6 +357,74 @@ def decide_group(body: GroupDecisionIn):
         if body.result == "approved":
             apply_approved(done)
     return {"group": body.group, "result": body.result, "decided": [p.id for p in done], "skipped": skipped}
+
+
+class CorrectionIn(BaseModel):
+    to: Literal["pending", "approved", "rejected"]
+    reviewer: str
+    reason: str = ""
+
+    @field_validator("reviewer")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    def problem(self) -> str | None:
+        p = DecisionIn(result="rejected", reviewer=self.reviewer, comment=self.reason).problem()
+        return "정정 사유가 필요하다" if p == "반려 사유가 필요하다" else p
+
+
+def subjects(p) -> set[str]:
+    return {p.target} | {c.s for c in p.changes}
+
+
+def approved_after(p) -> list:
+    """p보다 뒤에 승인되어 p가 바꾼 객체를 다시 바꾼 제안. 그래프를 불러올 때와 같은 순서로 본다."""
+    order = sorted((q for q in proposals.load() if q.status == "approved"), key=lambda q: q.decision.at if q.decision else "")
+    later = order[next(i for i, q in enumerate(order) if q.id == p.id) + 1:]
+    mine = subjects(p)
+    return [q for q in later if subjects(q) & mine]
+
+
+@app.post("/api/proposals/{pid}/correction")
+def correct(pid: str, body: CorrectionIn):
+    """결정을 정정한다. 앞의 결정은 지우지 않고 정정 기록으로 남는다.
+
+    승인을 거둘 때: 뒤에 승인된 제안이 같은 객체를 바꿨으면 그쪽을 먼저 정정해야 한다. 거두고 나면 그래프를 다시 만든다.
+    반려를 승인으로 바꿀 때: 보통 승인처럼 SHACL 검사를 통과해야 하고, 지금 그래프에 바로 얹는다.
+    """
+    problem = body.problem()
+    if problem:
+        raise HTTPException(400, problem)
+    with lock:
+        p = proposals.get(pid)
+        if p is None:
+            raise HTTPException(404, "없는 제안")
+        if p.status == "approved" and body.to != "approved":
+            later = approved_after(p)
+            if later:
+                raise HTTPException(409, "뒤에 승인된 제안이 같은 객체를 바꿨다. 그 제안부터 정정해야 한다: "
+                                    + ", ".join(q.id for q in later))
+        if body.to == "approved" and p.status == "rejected":
+            check = validate_proposal(pid)
+            if not check["conforms"]:
+                raise HTTPException(409, "데이터 규칙을 어겨 승인할 수 없다: "
+                                    + "; ".join(sorted({r["message"] for r in check["results"]})))
+        try:
+            was = p.status
+            p = proposals.correct(pid, body.to, body.reviewer, body.reason)
+        except KeyError:
+            raise HTTPException(404, "없는 제안")
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+        if was == "approved":  # 거둔 변경만 되돌리는 대신, 원천 그래프와 남은 승인 기록으로 다시 만든다
+            state["store"] = load_store(proposals)
+            state["version"] += 1
+            layer_cache.clear()
+            system_cache.clear()
+        elif p.status == "approved":
+            apply_approved([p])
+    return p.model_dump()
 
 
 @app.get("/api/status")

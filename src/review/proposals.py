@@ -2,6 +2,7 @@
 
 제안은 어디서 왔든(규칙 후보, 데이터 갱신 비교, LLM 문서 추출) 같은 형식을 쓴다.
 사람이 승인한 제안만 그래프에 반영된다. 반려한 제안도 지우지 않고 기록으로 남긴다.
+결정이 틀렸으면 지우지 않고 정정한다. 정정은 corrections에 앞의 결정과 함께 새 기록으로 쌓인다.
 
 저장 위치: data/processed/review/proposals.json (환경변수 JGK_PROPOSALS로 바꿀 수 있다)
 """
@@ -99,6 +100,16 @@ class Decision(BaseModel):
     comment: str = ""
 
 
+class Correction(BaseModel):
+    """결정 정정 한 건. replaced는 정정으로 바뀌기 전의 결정이다."""
+    from_status: Literal["approved", "rejected"]
+    to_status: Literal["pending", "approved", "rejected"]
+    reviewer: str
+    at: str
+    reason: str
+    replaced: Decision | None = None
+
+
 class Proposal(BaseModel):
     id: str
     created_at: str
@@ -113,6 +124,7 @@ class Proposal(BaseModel):
     location: tuple[float, float] | None = None  # 경도, 위도 (검토 화면 지도용)
     status: Literal["pending", "approved", "rejected"] = "pending"
     decision: Decision | None = None
+    corrections: list[Correction] = Field(default_factory=list)
 
     @field_validator("target")
     @classmethod
@@ -233,3 +245,25 @@ class ProposalStore:
                 p.decision = Decision(result=result, reviewer=reviewer, at=at, comment=comment)
             self.save(proposals)
         return chosen
+
+    def correct(self, pid: str, to_status: str, reviewer: str, reason: str) -> Proposal:
+        """결정된 제안을 다른 상태로 바로잡는다. 앞의 결정은 지우지 않고 정정 기록에 넣는다.
+
+        대기로 되돌리면 결정이 없어지고, 승인이나 반려로 바꾸면 정정 사유를 의견으로 한 새 결정이 된다.
+        """
+        with _lock:
+            proposals = self.load()
+            p = next((p for p in proposals if p.id == pid), None)
+            if p is None:
+                raise KeyError(pid)
+            if p.status == "pending":
+                raise ValueError("아직 결정하지 않은 제안이다")
+            if p.status == to_status:
+                raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다")
+            at = now()
+            p.corrections.append(Correction(from_status=p.status, to_status=to_status, reviewer=reviewer,
+                                            at=at, reason=reason, replaced=p.decision))
+            p.status = to_status
+            p.decision = None if to_status == "pending" else Decision(result=to_status, reviewer=reviewer, at=at, comment=reason)
+            self.save(proposals)
+        return p
