@@ -5,6 +5,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 # 증미역 공간 지식 그래프 어휘
 # 모든 객체는 geo:Feature, 모양은 geo:Geometry로 따로 둔다.
@@ -28,6 +29,30 @@ jgk:Road a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로"@ko ;
 jgk:LegalDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "법정동"@ko .
 jgk:BasicZone a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "기초구역"@ko ;
     rdfs:comment "국가기초구역. 번호 5자리는 우편번호와 같다."@ko .
+
+# 국가기본도(수치지도) 지형지물 분류
+# 수치지도 작성 작업규칙(국토교통부령) 제9조 제2항의 대분류 8개. 세분류는 국토지리정보원장이 정한다(같은 조 제3항).
+# 이 어휘의 객체 종류가 어느 대분류에 드는지 jgk:basemapClass로 적는다. 대분류가 분명하지 않은 종류(출입구, 필지, 역, 공공시설, 기초구역)는 적지 않는다.
+
+jgk:basemap-classes a skos:ConceptScheme ;
+    rdfs:label "수치지도 지형지물 분류체계 (수치지도 작성 작업규칙 제9조)"@ko ;
+    dcterms:source <https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=171727> .
+jgk:basemap-A a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "A" ; skos:prefLabel "교통"@ko .
+jgk:basemap-B a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "B" ; skos:prefLabel "건물"@ko .
+jgk:basemap-C a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "C" ; skos:prefLabel "시설"@ko .
+jgk:basemap-D a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "D" ; skos:prefLabel "식생"@ko .
+jgk:basemap-E a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "E" ; skos:prefLabel "수계"@ko .
+jgk:basemap-F a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "F" ; skos:prefLabel "지형"@ko .
+jgk:basemap-G a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "G" ; skos:prefLabel "경계"@ko .
+jgk:basemap-H a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "H" ; skos:prefLabel "주기"@ko .
+
+jgk:basemapClass a owl:AnnotationProperty ; rdfs:label "국가기본도 지형지물 대분류"@ko ;
+    rdfs:comment "객체 종류(owl:Class)가 수치지도 지형지물 분류체계의 어느 대분류에 드는지."@ko .
+jgk:Building jgk:basemapClass jgk:basemap-B .
+jgk:Road jgk:basemapClass jgk:basemap-A .
+jgk:RoadSegment jgk:basemapClass jgk:basemap-A .
+jgk:AdminDong jgk:basemapClass jgk:basemap-G .
+jgk:LegalDong jgk:basemapClass jgk:basemap-G .
 
 # 객체 사이 관계
 
