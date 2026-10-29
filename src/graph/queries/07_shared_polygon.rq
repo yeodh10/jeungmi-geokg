@@ -1,0 +1,10 @@
+# 같은 GIS 폴리곤을 모양으로 나눠 쓰는 건물 (한 폴리곤에 건물관리번호가 여러 개)
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?gisId (COUNT(?b) AS ?buildings) (GROUP_CONCAT(?addr; separator=" | ") AS ?addresses) WHERE {
+  ?b a jgk:Building ; jgk:status jgk:Active ; geo:hasGeometry ?g ; jgk:roadAddress ?addr .
+  ?g jgk:sourceGisBuildingId ?gisId .
+} GROUP BY ?gisId HAVING (COUNT(?b) > 1) ORDER BY DESC(?buildings)

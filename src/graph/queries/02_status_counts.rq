@@ -1,0 +1,11 @@
+# 종류와 상태별 개수
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?class ?status (COUNT(?f) AS ?count) WHERE {
+  ?f a ?class ; jgk:status ?s .
+  ?s rdfs:label ?status .
+  FILTER(STRSTARTS(STR(?class), STR(jgk:)))
+} GROUP BY ?class ?status ORDER BY ?class ?status

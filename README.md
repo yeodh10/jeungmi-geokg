@@ -54,6 +54,27 @@ cp .env.example .env                                      # 키 값을 채운다
 
 결과는 `data/processed/jeungmi_area.gpkg`(EPSG:4326)와 `data/processed/clip_report.json`에 생깁니다.
 
+객체 쪼개기, 그래프 만들기, SPARQL 확인:
+
+```bash
+.venv/Scripts/python -m src.model.build_objects
+.venv/Scripts/python -m src.graph.build_graph
+.venv/Scripts/python -m src.graph.check_queries
+```
+
+`data/processed/jeungmi_geokg.ttl`(그래프)과 `data/processed/query_check.md`(쿼리 결과)가 생깁니다. 예시 쿼리는 `src/graph/queries/`에 있습니다.
+
+## 지금 그래프에 들어 있는 것 (2026-10-29)
+
+| 객체 | 개수 | 비고 |
+|---|---|---|
+| 건물 | 2,790 | 주소 연결 2,162 (폴리곤 1,838, 점 324), 주소 미연결 628 |
+| 건물 출입구 | 2,180 | 주출입구 2,161, 보조출입구 19 |
+| 필지 | 1,760 | 모양 없이 PNU만, 63개에 단지 정보 |
+| 행정동 | 8 | 모양 없이 행정동코드만 |
+
+트리플 81,634개. 공간 관계는 SPARQL에서 `geof:sfTouches`, `geof:sfIntersects` 같은 GeoSPARQL 위상 함수로 그때그때 계산합니다.
+
 ## 기술 스택
 
 Python 3.12, geopandas, shapely, pyproj, pyogrio, rdflib, pyoxigraph, Claude API, FastAPI, MapLibre GL JS. 저장 좌표계는 EPSG:4326, 거리 계산은 EPSG:5186입니다. 기본값에서 바꾼 것은 [docs/decisions.md](docs/decisions.md)에 적습니다.
@@ -93,25 +114,21 @@ docs/            설계 문서, 결정 기록
 - [ ] 민원행정기관, 전자지도 이용 조건 확인
 - [ ] 필지 경계(연속지적도) 붙이기 (나중에)
 - [x] 다른 컴퓨터에서 원본을 다시 풀 수 있게 `src/ingest/unpack.py` 추가 (10/28)
-- [ ] 2주차: 객체 쪼개기, URI 부여, 그래프 구축 (진행 중, 아래 "이어서 할 일")
+- [x] 2주차: 건물, 출입구, 필지, 행정동 객체와 URI, 그래프 구축, SPARQL 확인 (10/29)
+- [ ] 공공시설, 역 객체 (URI 규칙 확정 뒤)
+- [ ] 도로 구간, 행정동 경계, facesRoad 관계 (전자지도 받은 뒤)
 
-## 이어서 할 일 (2026-10-28 퇴근 시점)
+## 이어서 할 일
 
 다른 컴퓨터에서 이어 할 때:
 
 1. `git clone` 후 위 "실행" 순서대로 가상환경을 만든다.
 2. 원본 압축 파일 5개(`data/raw/_archives/`, 약 570MB)를 옮겨 와 같은 자리에 둔다.
-3. `unpack`, `clip_area`를 차례로 실행하면 `data/processed/jeungmi_area.gpkg`가 다시 생긴다.
+3. "실행"의 명령을 위에서부터 차례로 실행하면 `data/processed/`가 모두 다시 생긴다.
 
-2주차 작업 상태:
+남은 일:
 
-- 끝남: 어휘 정의 `src/graph/ontology.ttl`, URI 함수 `src/model/uri.py`
-- 다음: `src/model/build_objects.py`로 건물, 출입구, 필지, 행정동 객체를 만든다. 규칙은 docs/uri-policy.md.
-  - 건물관리번호 건물: 중심점을 포함하는 GIS 폴리곤을 모양으로, 없으면 중심점을 점 모양으로
-  - 주소 미연결 건물: GIS 폴리곤 628개, `building-gis/{A1}`
-  - A1 중복은 A0를 뺀 속성과 모양이 같으면 하나로 합친다 (A0까지 비교하면 안 합쳐진다)
-  - 필지 PNU: GIS A2, 없으면 내비 지번의 대표지번(jibun_seq 0)으로 만든다. 산여부 0은 1, 1은 2
-  - 보조출입구 19개는 주소(도로명코드, 지하여부, 본번, 부번)가 같은 건물 6 ~ 25개에 모두 잇는다
-  - 행정동은 내비 행정동코드로 잇는다. 주소 미연결 건물은 행정동 경계(전자지도)가 와야 이을 수 있다
-- 그다음: `src/graph/build_graph.py`로 Turtle을 만들고, pyoxigraph에 올려 SPARQL로 확인한다.
-- 공공시설, 역 URI 규칙은 아직 초안이라 정한 뒤 넣는다.
+- 공공시설, 역 URI 규칙을 정하고(docs/uri-policy.md 예외 규칙) 객체로 넣는다.
+- 전자지도가 오면: 도로 구간 객체, 출입구 `facesRoad`, 행정동 경계 모양을 넣는다. 그러면 주소 미연결 건물 628개도 `geof:sfWithin`으로 행정동에 이을 수 있다.
+- 3주차: 강서구청 고시공고에서 변경 제안 뽑기, 자연어 질문을 SPARQL로 바꾸기. `src/graph/queries/`의 예시 쿼리를 프롬프트 예시로 쓴다.
+- 거리 조건(역에서 몇 m 안)은 pyoxigraph에 `geof:distance`, `geof:buffer`가 없어서 파이썬에서 원을 만들어 `geof:sfIntersects`에 넣는다(`04_near_station_by_use.rq` 참고).

@@ -1,0 +1,13 @@
+# 증미역 중심 반경 200m 원에 걸치는 건물을 용도별로 센다.
+# 원은 파이썬에서 만들어 {{AREA_WKT}} 자리에 넣는다 (pyoxigraph에 geof:buffer가 없다).
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?use (COUNT(?b) AS ?count) WHERE {
+  ?b a jgk:Building ; geo:hasGeometry/geo:asWKT ?wkt .
+  OPTIONAL { ?b jgk:useName ?u }
+  BIND(COALESCE(?u, "(용도 없음)") AS ?use)
+  FILTER(geof:sfIntersects(?wkt, "{{AREA_WKT}}"^^geo:wktLiteral))
+} GROUP BY ?use ORDER BY DESC(?count)

@@ -1,0 +1,14 @@
+# 같은 필지 위에서 서로 맞닿은 건물 쌍 (GeoSPARQL 위상 함수 sfTouches)
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?parcel ?a ?aLabel ?b ?bLabel WHERE {
+  ?a a jgk:Building ; jgk:locatedOn ?parcel ; geo:hasGeometry/geo:asWKT ?wa .
+  ?b a jgk:Building ; jgk:locatedOn ?parcel ; geo:hasGeometry/geo:asWKT ?wb .
+  FILTER(STR(?a) < STR(?b))
+  FILTER(geof:sfTouches(?wa, ?wb))
+  OPTIONAL { ?a rdfs:label ?aLabel }
+  OPTIONAL { ?b rdfs:label ?bLabel }
+} ORDER BY ?parcel

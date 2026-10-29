@@ -1,0 +1,13 @@
+# 증미역 역사 건물과 출입구, 행정동, 필지
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?building ?label ?address ?dong ?parcel ?entrance ?entranceWkt WHERE {
+  ?building a jgk:Building ; rdfs:label ?label ; jgk:roadAddress ?address .
+  FILTER(CONTAINS(?label, "증미역"))
+  OPTIONAL { ?building jgk:within/rdfs:label ?dong }
+  OPTIONAL { ?building jgk:locatedOn ?parcel }
+  OPTIONAL { ?building jgk:hasEntrance ?entrance . ?entrance geo:hasGeometry/geo:asWKT ?entranceWkt }
+}

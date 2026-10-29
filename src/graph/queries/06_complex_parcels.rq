@@ -1,0 +1,13 @@
+# 단지 정보(총괄표제부)가 있는 필지와 그 위의 건물 수
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?parcel ?use ?households ?mainBuildings (COUNT(?b) AS ?buildingsInGraph) WHERE {
+  ?parcel a jgk:Parcel ; jgk:siteArea ?area .
+  OPTIONAL { ?parcel jgk:complexMainUse ?use }
+  OPTIONAL { ?parcel jgk:households ?households }
+  OPTIONAL { ?parcel jgk:mainBuildingCount ?mainBuildings }
+  OPTIONAL { ?b jgk:locatedOn ?parcel }
+} GROUP BY ?parcel ?use ?households ?mainBuildings ORDER BY DESC(?households)

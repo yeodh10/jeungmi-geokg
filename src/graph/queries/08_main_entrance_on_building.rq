@@ -1,0 +1,12 @@
+# 품질 점검: 주출입구 점이 자기 건물 폴리곤과 닿거나 안에 있는가
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?onBuilding (COUNT(?e) AS ?count) WHERE {
+  ?b a jgk:Building ; jgk:hasEntrance ?e ; geo:hasGeometry/geo:asWKT ?wb .
+  ?e jgk:entranceType "주출입구" ; geo:hasGeometry/geo:asWKT ?we .
+  FILTER(CONTAINS(STR(?wb), "POLYGON"))
+  BIND(geof:sfIntersects(?we, ?wb) AS ?onBuilding)
+} GROUP BY ?onBuilding
