@@ -1,157 +1,135 @@
 # 증미역 공간 지식 그래프 (Jeungmi GeoKG)
 
-서울 9호선 증미역 반경 약 1km 안의 건물, 출입구, 도로, 필지, 공공시설을 "의미 있는 객체"로 쪼개고, 객체마다 바뀌지 않는 고유 주소(URI)를 붙인 뒤, 객체끼리의 관계를 지식 그래프로 엮는 프로토타입입니다.
+서울 9호선 증미역 반경 1km 안의 건물, 출입구, 필지, 공공시설, 역, 행정동을 "의미 있는 객체"로 쪼개고, 객체마다 나라에서 쓰는 관리번호로 바뀌지 않는 주소(URI)를 붙여 GeoSPARQL 1.1 지식 그래프로 엮은 프로토타입입니다.
 
-국토교통부 "국가기본도 대전환" 방향(객체 원자화, 영구 식별자, 자동 갱신, AI 제안 후 사람 승인)을 작은 지역에서 실제로 돌아가게 만들어 보는 것이 목표입니다.
+국토교통부 "국가기본도 대전환" 방향인 **객체 원자화, 영구 식별자, 자동 갱신, AI 제안 후 사람 승인**을 작은 지역에서 처음부터 끝까지 실제 공공데이터로 돌려 보는 것이 목표입니다.
 
-## 만들 것
+| 지도 화면 | 변경 제안 검토 화면 |
+|---|---|
+| ![지도 화면: 그래프의 건물을 상태별 색으로 보여 주고, 고른 객체의 속성과 연결을 왼쪽에 보여 준다](docs/images/map.jpg) | ![검토 화면: 강서구 도로명주소 폐지 고시로 만든 건물 폐지 제안을 지금과 바뀐 뒤로 보여 준다](docs/images/review.jpg) |
 
-1. 공공 데이터를 받아 대상 범위만 잘라내는 수집 단계
-2. 객체 쪼개기와 URI 부여
-3. GeoSPARQL 1.1 기준의 지식 그래프 구축과 조회
-4. 문서(구청 고시공고 등)를 넣으면 LLM이 객체와 변경 내용을 뽑아 "변경 제안"을 만드는 단계
-5. 변경 제안을 사람이 승인 또는 반려하는 검토 화면
-6. 자연어 질문을 그래프 조회로 바꿔 지도에 보여주는 질의 기능
+## 국가기본도 대전환 방향과 이 프로젝트
 
-## 대상 범위
+| 방향 | 이 프로젝트에서 한 것 | 어디에 |
+|---|---|---|
+| 객체 원자화 | 원천 자료 5종을 건물, 출입구, 필지, 공공시설, 역, 행정동 객체로 쪼갰습니다. 모든 객체는 GeoSPARQL Feature이고 모양(Geometry)은 따로 둡니다. | `src/model/`, `src/graph/ontology.ttl` |
+| 영구 식별자 | 새 번호를 만들지 않고 건물관리번호, PNU, 행정동코드, 행정표준코드 기관코드를 그대로 URI에 씁니다. 객체가 사라져도 URI는 남기고 상태만 폐지로 바꿉니다. 11,710개 URI를 실제로 열리는 페이지로 만들었습니다. | [docs/uri-policy.md](docs/uri-policy.md), `src/graph/publish.py` |
+| 자동 갱신 | 새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 비교해 신규, 변경, 폐지, 주소 연결 제안을 만듭니다. | `src/review/diff_proposals.py` |
+| AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
 
-- 중심: 증미역 역사 건물 중심점 (경도 126.861247, 위도 37.557719)
-- 반경: 1km
-- 중심 좌표의 출처와 원본 값은 [config/area.yaml](config/area.yaml)에 있습니다.
+실제 사례: 강서구 **도로명주소 폐지 고시(제2026-140호, 2026-10-28)** 의 첨부 폐지조서 12줄 중 범위 안 4곳을 그래프의 건물 5개와 맞춰, 건물과 출입구를 폐지하는 제안 5건을 만들었습니다(위 오른쪽 화면).
 
-## 객체 모델 (초안)
+## 숫자로 보기 (2026-10-29)
 
-객체 종류: Building(건물), BuildingEntrance(건물 출입구), RoadSegment(도로 구간), Parcel(필지), PublicFacility(공공시설), Station(역), AdminDong(행정동)
+| 항목 | 값 |
+|---|---|
+| 건물 | 2,790 (건물관리번호로 식별 2,162, 주소 미연결 628) |
+| 건물 출입구 | 2,180 (주출입구 2,161, 보조출입구 19) |
+| 필지 | 1,760 (PNU, 63곳에 단지 정보) |
+| 공공시설 | 23 (행정표준코드 기관코드, 26곳 중 3곳은 사람 검토로) |
+| 행정동, 역 | 8, 1 |
+| 트리플 | 84,040 (어휘 포함) |
+| SHACL 검사 | 원천 자료 문제 1건만 남음 (대지면적 0인 필지) |
+| URI 페이지 | 11,710쪽, 내부 연결 60,674개 모두 열림 |
+| 전체 다시 만들기 | `python -m src.pipeline` 한 번, 약 2분 40초 |
+| 테스트 | 6종 (검토, 자동 갱신, 고시공고 LLM, 자연어 질의, SHACL, 폐지조서) |
 
-관계:
+## 구조
 
-- Building `hasEntrance` BuildingEntrance
-- BuildingEntrance `facesRoad` RoadSegment
-- Building `locatedOn` Parcel
-- 모든 객체 `within` AdminDong
-- 공간 관계(접함, 포함, 겹침)는 GeoSPARQL의 위상 관계 함수로 계산합니다.
+```mermaid
+flowchart LR
+  subgraph 원천["공공데이터 (data/raw, 커밋 안 함)"]
+    A1[GIS건물통합정보]
+    A2[도로명주소 내비게이션용DB]
+    A3[건축물대장 총괄표제부]
+    A4[행정표준코드 기관코드]
+    A5[민원행정기관 전자지도]
+  end
+  원천 --> B[범위 자르기<br>증미역 1km]
+  B --> C[객체 쪼개기, URI 붙이기]
+  C --> D[(원천 그래프<br>GeoSPARQL 1.1)]
+  subgraph 제안["변경 제안 (한 형식)"]
+    P1[자료 비교<br>자동 갱신]
+    P2[고시공고 글<br>LLM 추출]
+    P3[고시 첨부표<br>코드로 읽기]
+    P4[규칙 후보]
+  end
+  N[새 자료, 고시공고] --> 제안
+  제안 --> S{SHACL 검사}
+  S --> R[사람 검토 화면]
+  R -- 승인 --> U[SPARQL UPDATE<br>+ PROV-O 기록]
+  U --> D
+  D --> M[지도 화면, 자연어 질의]
+  D --> W[URI 페이지<br>GitHub Pages]
+```
 
-모든 객체는 GeoSPARQL의 Feature로 두고, 모양은 Geometry로 따로 분리합니다. URI 규칙은 [docs/uri-policy.md](docs/uri-policy.md)에 있습니다.
+- 원천 그래프는 원본에서 언제든 다시 만들 수 있게 두고, 사람이 승인한 변경만 그 위에 승인 순서대로 얹습니다.
+- 공간 관계(맞닿음, 포함, 겹침)는 미리 계산하지 않고 SPARQL에서 `geof:sfTouches`, `geof:sfIntersects` 같은 GeoSPARQL 위상 함수로 계산합니다.
+- LLM은 바뀌는 내용을 뽑거나 질문을 SPARQL로 바꾸는 데만 쓰고, URI를 정하는 일은 맡기지 않습니다. 영구 식별자를 지어낼 수 없게 하기 위해서입니다.
 
 ## 데이터
 
-원본 데이터는 저장소에 올리지 않습니다. 출처, 이용 조건, 받는 방법은 [docs/data-sources.md](docs/data-sources.md)에 있습니다.
+| 자료 | 제공 | 이용 조건 | 쓰임 |
+|---|---|---|---|
+| GIS건물통합정보 (서울) | 국토교통부, 브이월드 | 이용허락범위 제한 없음 | 건물 모양, 대장 속성, PNU |
+| 도로명주소 내비게이션용DB | 행정안전부 | 이용허락범위 제한 없음 | 건물관리번호, 출입구, 행정동, 역 |
+| 건축물대장 총괄표제부 | 서울열린데이터광장 | 공공누리 1유형 | 필지의 단지 정보 |
+| 행정표준코드 기관코드 | 행정안전부 | 이용허락범위 제한 없음 | 공공시설 URI |
+| 민원행정기관 전자지도 | 행정안전부 | 확인 중 (공개 페이지에서 뺌) | 공공시설 위치 |
+| 강서구청 고시공고 | 강서구청 | 저작권법 제7조 (고시, 공고) | 변경 제안의 근거 |
+
+원본은 저장소에 올리지 않습니다. 받는 방법, 좌표계 확인, 이용 조건 근거는 [docs/data-sources.md](docs/data-sources.md)에 있습니다. 범위 중심은 내비게이션용DB의 증미역 역사 건물 중심점(경도 126.861247, 위도 37.557719)이고 출처는 [config/area.yaml](config/area.yaml)에 있습니다.
 
 ## 실행
 
-아래 명령은 프로젝트 폴더에서 Git Bash 기준으로 적었습니다. Windows PowerShell에서는 `.venv/Scripts/python`을 `.\.venv\Scripts\python.exe`로 바꿔 씁니다 (PowerShell은 `.\`로 시작해야 현재 폴더의 실행 파일로 봅니다).
+명령은 프로젝트 폴더에서 Git Bash 기준입니다. Windows PowerShell에서는 `.venv/Scripts/python`을 `.\.venv\Scripts\python.exe`로 바꿔 씁니다.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt   # macOS, Linux는 .venv/bin/python
-cp .env.example .env                                      # 키 값을 채운다
+.venv/Scripts/python -m pip install -r requirements.txt
+cp .env.example .env                                   # ANTHROPIC_API_KEY 등 키 값
 ```
 
-원본 압축 파일을 `data/raw/_archives/`에 넣고 풀기, 범위 자르기 (7-Zip이 없으면 먼저 `pip install py7zr`):
+원본 압축 파일을 `data/raw/_archives/`에 넣고 전체를 다시 만듭니다 (7-Zip이 없으면 `pip install py7zr`).
 
 ```bash
-.venv/Scripts/python -m src.ingest.unpack
-.venv/Scripts/python -m src.ingest.clip_area
+.venv/Scripts/python -m src.pipeline --unpack
 ```
 
-결과는 `data/processed/jeungmi_area.gpkg`(EPSG:4326)와 `data/processed/clip_report.json`에 생깁니다.
+범위 자르기, 객체와 URI, 그래프, 예시 쿼리(`data/processed/query_check.md`), SHACL 검사(`validation_report.md`), URI 페이지(`site/`)가 차례로 만들어집니다.
 
-객체 쪼개기, 그래프 만들기, SPARQL 확인:
-
-```bash
-.venv/Scripts/python -m src.model.build_objects
-.venv/Scripts/python -m src.graph.build_graph
-.venv/Scripts/python -m src.graph.check_queries
-```
-
-`data/processed/jeungmi_geokg.ttl`(그래프)과 `data/processed/query_check.md`(쿼리 결과)가 생깁니다. 예시 쿼리는 `src/graph/queries/`에 있습니다.
-
-변경 제안 만들기와 검토 화면:
+화면:
 
 ```bash
-.venv/Scripts/python -m src.review.make_proposals
 .venv/Scripts/python -m uvicorn src.review.app:app --port 8000
-.venv/Scripts/python -m tests.test_review
 ```
 
-두 번째 명령 뒤 브라우저에서 http://localhost:8000 을 열면 검토 화면이, http://localhost:8000/map 을 열면 지도 화면이 나옵니다. 지도 화면은 그래프(원천 + 승인된 변경)에서 건물, 출입구, 공공시설, 역을 꺼내 그리고, 객체를 누르면 어휘의 한국어 이름으로 속성과 연결된 객체를 보여 줍니다. 세 번째는 승인과 반려 흐름을 화면 없이 확인합니다(제안 파일의 임시 복사본으로 돌아서 실제 기록은 바뀌지 않습니다).
+http://localhost:8000 은 변경 제안 검토, http://localhost:8000/map 은 지도와 자연어 질의입니다.
 
-데이터 규칙 검사 (SHACL):
-
-```bash
-.venv/Scripts/python -m src.graph.validate
-.venv/Scripts/python -m tests.test_shacl
-```
-
-`src/graph/shapes.ttl`에 객체 종류마다 규칙을 적었습니다. 상태 값, 출처, 기본 모양, 건물 식별 번호(건물관리번호 25자리와 GIS 번호 28자리 중 정확히 하나), PNU 형식, 기관코드 7자리, 폐지하면 폐지 확인일, 출입구는 건물과 이어질 것 등입니다. 전체 검사 결과는 `data/processed/validation_report.md`에 남습니다. 검토 화면은 제안을 승인하기 전에 반영 결과를 이 규칙으로 검사하고, 어기면 승인을 막습니다.
-
-URI를 실제로 열리는 페이지로 만들기:
-
-```bash
-.venv/Scripts/python -m src.graph.publish
-```
-
-`data/processed/site/`에 객체마다 `index.html`(한국어 이름표로 본 속성과 연결)과 `index.ttl`(그 URI가 주어인 트리플), 어휘 페이지(`def/`)가 생깁니다. 이 폴더를 GitHub Pages에 올리면 `https://yeodh10.github.io/jeungmi-geokg/id/...` URI가 그대로 열립니다. 이용 조건을 확인 중인 출처(`config/area.yaml`의 `publish.hold_sources`)에서 온 객체는 페이지도 연결도 만들지 않습니다.
-
-## 변경 제안과 사람 승인
-
-```
-원천 데이터 -> 객체, URI -> 원천 그래프 (언제든 다시 만들 수 있음)
-                                  +
-제안 (규칙 후보, 데이터 갱신 비교, LLM 문서 추출) -> 검토 화면 -> 승인한 것만 SPARQL UPDATE로 반영
-```
-
-- 제안은 출처와 상관없이 같은 형식입니다. 대상 URI, 근거, 그래프에 넣고 뺄 트리플, 위치를 담습니다.
-- 승인하면 제안 자체도 그래프에 기록됩니다. 바뀐 객체는 `prov:wasInfluencedBy`로 제안을 가리키고, 제안에는 승인한 사람과 시각이 남습니다.
-- 반려한 제안은 그래프에 들어가지 않지만 제안 기록에는 남습니다.
-- 지금 들어 있는 제안 (모두 대기 중):
-  - 공공시설 기관코드 후보 1건 (서울강서고용복지플러스센터 -> 서울강서고용센터 1494880)
-  - 도로명주소 폐지 고시(강서구 고시 제2026-140호)에 따른 건물 폐지 5건
-
-### 고시공고에서 제안 만들기 (LLM)
-
-```bash
-.venv/Scripts/python -m src.llm.notice data/raw/notices/<고시공고>.txt
-.venv/Scripts/python -m tests.test_notice            # API 키 없이 가짜 클라이언트로 흐름 확인
-```
-
-- LLM(`claude-opus-5-5`, 구조화 출력)은 문서에서 바뀌는 내용만 뽑습니다. 변경 종류, 대상의 주소나 이름, 새 값, 원문 문장입니다.
-- 뽑힌 주소, 지번, 이름을 그래프 객체에 맞추는 일은 코드가 정해진 순서(이름, 도로명주소, 지번)로 합니다. LLM이 URI를 정하지 않습니다.
-- 객체를 정확히 하나로 찾은 폐지, 용도 변경, 이름 변경, 주소 변경만 제안이 됩니다. 후보가 여럿이거나 신축처럼 모양이 필요한 것은 `data/processed/review/notices/`의 보고서에만 남습니다.
-- 안전 분류기가 거절하면 서버가 다른 모델로 다시 돌리도록 `fallbacks: "default"`를 켰습니다.
-
-### 도로명주소 폐지조서에서 제안 만들기 (표)
+제안 만들기:
 
 ```bash
 .venv/Scripts/python -m src.review.address_retirement data/raw/notices/attachments/20261028_폐지조서.xlsx --notice data/raw/notices/20261028_도로명주소_폐지_고시.txt
-.venv/Scripts/python -m tests.test_address_retirement
-```
-
-고시의 첨부가 표(엑셀)이면 LLM 없이 코드가 바로 읽습니다. 강서구 고시 제2026-140호(2026-10-28)의 폐지조서 12줄 중 4곳이 범위 안 건물 5개와 맞아, 건물과 출입구를 폐지하는 제안 5건이 검토 대기 중입니다. 도로명주소로 찾은 건물과 지번으로 찾은 건물이 똑같을 때만 제안합니다.
-
-### 자연어 질의 (LLM)
-
-```bash
-.venv/Scripts/python -m src.query.nl "증미역 300m 안에 있는 학교는?"
-.venv/Scripts/python -m tests.test_nl                # 가짜 클라이언트로 흐름 확인
-```
-
-지도 화면의 "질문하기" 칸에서도 쓸 수 있습니다. 결과는 지도에 빨간색으로 표시되고, 실행한 SPARQL이 함께 보입니다.
-
-- LLM은 어휘(ontology.ttl), 그래프의 주요 이름과 값, 예시 쿼리(`src/graph/queries/`)를 보고 SPARQL 하나를 씁니다.
-- 실행 전에 코드가 읽기 쿼리(SELECT, ASK)만 통과시키고 결과 수를 500행으로 제한합니다.
-- 거리 조건은 LLM이 `{{NEAR:<객체 URI>:<미터>}}`를 쓰면 코드가 그 객체 둘레의 원(EPSG:5186에서 계산)으로 바꿉니다.
-- 쿼리가 실패하면 오류 내용을 붙여 한 번 더 쓰게 합니다.
-
-### 자동 갱신 (새 자료가 오면)
-
-```bash
-.venv/Scripts/python -m src.ingest.unpack            # 새 압축 파일을 _archives에 넣은 뒤 다른 폴더로 풀어도 된다
+.venv/Scripts/python -m src.llm.notice data/raw/notices/<고시공고>.txt          # Claude API 키 필요
 .venv/Scripts/python -m src.review.diff_proposals --raw <새 원본 폴더> --label 202610
-.venv/Scripts/python -m tests.test_diff              # 시험용 다음 자료로 비교 흐름 확인
+.venv/Scripts/python -m src.review.make_proposals                               # 공공시설 기관코드 후보
 ```
 
-새 자료로 그래프를 통째로 바꾸지 않습니다. 새 자료를 따로 객체로 만든 뒤 지금 그래프와 객체마다 비교해 제안을 만듭니다.
+테스트 (LLM 부분은 가짜 클라이언트로 돌아서 키가 없어도 됩니다. 제안 기록은 임시 복사본만 씁니다):
+
+```bash
+for t in test_review test_diff test_notice test_nl test_shacl test_address_retirement; do .venv/Scripts/python -m tests.$t; done
+```
+
+## 주요 기능
+
+### 변경 제안과 사람 승인
+
+- 제안은 출처(`rule-candidate`, `data-diff`, `llm-notice`, `notice-table`)와 상관없이 같은 형식입니다. 대상 URI, 근거, 넣고 뺄 트리플, 위치를 담습니다.
+- 검토 화면은 바뀌는 내용을 객체별로 "지금 → 바뀐 뒤"로 보여 주고, 반영 결과를 SHACL로 미리 검사해 규칙을 어기면 승인을 막습니다.
+- 승인하면 바뀐 객체가 `prov:wasInfluencedBy`로 제안을 가리키고, 제안에는 승인한 사람과 시각이 남습니다. 반려한 제안도 기록에 남습니다.
+
+### 자동 갱신
 
 | 제안 | 언제 | 승인하면 |
 |---|---|---|
@@ -160,84 +138,60 @@ URI를 실제로 열리는 페이지로 만들기:
 | retire | 새 자료에서 사라진 객체 | 지우지 않고 상태를 폐지로, 폐지 확인일 기록 (URI 유지) |
 | link | 주소 미연결 건물이 새 건물관리번호 건물의 모양으로 쓰임 | 상태를 주소 연결됨으로, `owl:sameAs`로 새 URI와 연결 |
 
-## 지금 그래프에 들어 있는 것 (2026-10-29)
+### 고시공고에서 제안 만들기
 
-| 객체 | 개수 | 비고 |
-|---|---|---|
-| 건물 | 2,790 | 주소 연결 2,162 (폴리곤 1,838, 점 324), 주소 미연결 628 |
-| 건물 출입구 | 2,180 | 주출입구 2,161, 보조출입구 19 |
-| 필지 | 1,760 | 모양 없이 PNU만, 63개에 단지 정보 |
-| 행정동 | 8 | 모양 없이 행정동코드만 |
-| 역 | 1 | 증미역, 역사 건물과 `housedIn`으로 연결 |
-| 공공시설 | 23 | 행정표준코드 기관코드로 식별, 22곳이 건물과 연결. 3곳은 검토 목록 |
+- 글로 된 본문은 LLM(`claude-opus-5-5`, 구조화 출력)이 변경 종류, 대상의 주소나 이름, 새 값, 원문 문장을 뽑습니다. 안전 분류기가 거절하면 서버가 다른 모델로 다시 돌립니다(`fallbacks: "default"`).
+- 첨부가 표(엑셀)면 LLM 없이 코드가 읽습니다.
+- 객체 찾기는 코드가 이름, 도로명주소, 지번 순서로 합니다. 정확히 하나로 찾은 것만 제안이 되고, 후보가 여럿이면 보고서에만 남습니다.
 
-트리플 81,996개. 공간 관계는 SPARQL에서 `geof:sfTouches`, `geof:sfIntersects` 같은 GeoSPARQL 위상 함수로 그때그때 계산합니다.
+### 자연어 질의
+
+- LLM이 어휘, 그래프의 주요 이름과 값, 예시 쿼리(`src/graph/queries/`)를 보고 SPARQL을 씁니다.
+- 실행 전에 코드가 읽기 쿼리(SELECT, ASK)만 통과시키고 500행으로 제한합니다. 실패하면 오류를 붙여 한 번 더 쓰게 합니다.
+- pyoxigraph에 거리 함수가 없어서, "역에서 300m 안" 같은 조건은 LLM이 `{{NEAR:<URI>:<미터>}}`를 쓰면 코드가 원 모양(EPSG:5186에서 계산)으로 바꿉니다.
+
+### 데이터 규칙 (SHACL)
+
+`src/graph/shapes.ttl`: 상태 값, 출처, 기본 모양, 건물 식별 번호(건물관리번호 25자리와 GIS 번호 28자리 중 정확히 하나), PNU 형식, 기관코드 7자리, 폐지하면 폐지 확인일, 출입구는 건물과 이어질 것 등. 첫 검사에서 필지 1,697개에 출처가 빠진 것을 찾아 고쳤습니다.
 
 ## 기술 스택
 
-Python 3.12, geopandas, shapely, pyproj, pyogrio, rdflib, pyoxigraph, Claude API, FastAPI, MapLibre GL JS. 저장 좌표계는 EPSG:4326, 거리 계산은 EPSG:5186입니다. 기본값에서 바꾼 것은 [docs/decisions.md](docs/decisions.md)에 적습니다.
+Python 3.12, geopandas, shapely, pyproj, pyogrio, rdflib, pyoxigraph (SPARQL, GeoSPARQL 위상 함수), pyshacl, Claude API, FastAPI, MapLibre GL JS, OpenStreetMap 배경지도. 저장 좌표계는 EPSG:4326, 거리 계산은 EPSG:5186입니다. 기본값에서 바꾸거나 새로 정한 것은 [docs/decisions.md](docs/decisions.md)에 날짜와 이유를 적었습니다.
 
 ## 폴더 구조
 
 ```
-config/          대상 범위, 설정
+config/          대상 범위, 역, 공개 보류 출처
 data/raw/        원본 데이터 (커밋 안 함)
-data/processed/  잘라내고 정리한 데이터
-src/ingest/      데이터 수집
-src/model/       객체 쪼개기, URI 부여
-src/graph/       그래프 생성, 조회
-src/llm/         문서에서 변경 제안 추출
-src/review/      사람 검토 화면
+data/processed/  잘라낸 자료, 객체, 그래프, 검사 결과, 제안 기록 (커밋 안 함)
+src/ingest/      압축 풀기, 범위 자르기
+src/model/       객체 쪼개기, URI
+src/graph/       어휘, 그래프, 예시 쿼리, SHACL, URI 페이지
+src/llm/         Claude API 호출, 고시공고 추출
+src/review/      변경 제안, 자동 갱신 비교, 폐지조서, 검토 API
 src/query/       자연어 질의
-web/             지도 화면
-docs/            설계 문서, 결정 기록
+web/             검토 화면, 지도 화면
+tests/           흐름 테스트
+docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
 ```
 
-## 일정과 진행 상황
+## 진행 상황과 남은 일
 
 | 기간 | 할 일 | 상태 |
 |---|---|---|
-| 10/28 ~ 11/3 | 데이터 받기, 범위 자르기, 이용 조건 기록 | 진행 중 |
-| 11/4 ~ 11/10 | 객체 쪼개기, URI 부여, 그래프 구축, SPARQL 조회 확인 | |
-| 11/11 ~ 11/17 | LLM 변경 제안, 자연어 질의 | |
-| 11/18 ~ 11/24 | 검토 화면, 지도 화면, 배포, README와 시연 영상 | |
-
-- [x] 저장소 생성
-- [x] GIS건물통합정보, 건축물대장 총괄표제부 받기 (10/28)
-- [x] 내비게이션용DB, 민원행정기관 전자지도 받기 (10/28)
-- [x] 증미역 중심 좌표 확인, 반경 1km 자르기 (10/28)
-- [x] GIS건물통합정보, 내비게이션용DB 이용 조건 기록 (10/28)
-- [x] 건물, 필지 URI 규칙 확정 (10/28)
-- [ ] 도로명주소 전자지도 받기 (승인 대기)
-- [ ] 민원행정기관, 전자지도 이용 조건 확인
-- [ ] 필지 경계(연속지적도) 붙이기 (나중에)
-- [x] 다른 컴퓨터에서 원본을 다시 풀 수 있게 `src/ingest/unpack.py` 추가 (10/28)
-- [x] 2주차: 건물, 출입구, 필지, 행정동 객체와 URI, 그래프 구축, SPARQL 확인 (10/29)
-- [x] 역 객체 (증미역, 10/29)
-- [x] 공공시설 객체 23곳 (행정표준코드 기관코드, 10/29)
-- [x] 변경 제안 형식, 승인 반영 장치, 검토 화면 (10/29, 원래 4주차 일을 당김)
-- [x] 데이터 갱신 비교로 제안 만들기 (10/29, 시험용 다음 자료로 확인)
-- [x] 지도 화면: 그래프 전체, 상태별 색, 객체 속성과 연결 따라가기, 이름과 주소 찾기 (10/29)
-- [ ] 새 기준일 실제 자료로 자동 갱신 돌려 보기 (내비게이션용DB 10월분 또는 새 GIS건물통합정보)
-- [x] 고시공고에서 LLM으로 제안 만들기 (10/29, 가짜 클라이언트로 확인)
-- [x] 자연어 질의와 지도 표시 (10/29, 가짜 클라이언트로 확인)
-- [ ] 실제 API 키로 고시공고, 자연어 질의 돌려 보기 (API 키 받은 뒤)
-- [x] URI 정적 페이지 만들기 (10/29, 11,710쪽, 내부 연결 60,674개 모두 열림)
-- [x] SHACL 데이터 규칙과 승인 전 검사 (10/29, 전체 그래프에서 원천 자료 문제 1건만 남음)
-- [ ] GitHub Pages로 배포 (공개 전 확인)
-- [ ] 도로 구간, 행정동 경계, facesRoad 관계 (전자지도 받은 뒤)
-
-## 이어서 할 일
-
-다른 컴퓨터에서 이어 할 때:
-
-1. `git clone` 후 위 "실행" 순서대로 가상환경을 만든다.
-2. 원본 압축 파일 5개(`data/raw/_archives/`, 약 570MB)를 옮겨 와 같은 자리에 둔다.
-3. "실행"의 명령을 위에서부터 차례로 실행하면 `data/processed/`가 모두 다시 생긴다.
+| 10/28 ~ 11/3 | 데이터 받기, 범위 자르기, 이용 조건 기록 | 전자지도만 승인 대기 |
+| 11/4 ~ 11/10 | 객체 쪼개기, URI, 그래프, SPARQL | 끝 (10/29) |
+| 11/11 ~ 11/17 | LLM 변경 제안, 자연어 질의 | 끝 (가짜 클라이언트로 확인, 실제 키로 돌리기 남음) |
+| 11/18 ~ 11/24 | 검토 화면, 지도 화면, 배포, README와 시연 영상 | 화면과 README 끝, 배포와 영상 남음 |
 
 남은 일:
 
-- 공공시설 검토 목록 3곳 중 고용센터 1곳은 제안으로 올라가 있다. 우편취급국 2곳은 기관코드가 없어 공공시설로 넣지 않는다.
-- 전자지도가 오면: 도로 구간 객체, 출입구 `facesRoad`, 행정동 경계 모양을 넣는다. 그러면 주소 미연결 건물 628개도 `geof:sfWithin`으로 행정동에 이을 수 있다.
-- 3주차: 강서구청 고시공고에서 변경 제안 뽑기, 자연어 질문을 SPARQL로 바꾸기. `src/graph/queries/`의 예시 쿼리를 프롬프트 예시로 쓴다.
-- 거리 조건(역에서 몇 m 안)은 pyoxigraph에 `geof:distance`, `geof:buffer`가 없어서 파이썬에서 원을 만들어 `geof:sfIntersects`에 넣는다(`04_near_station_by_use.rq` 참고).
+- [ ] 실제 Claude API 키로 고시공고(등촌1구역 관리처분계획 변경인가)와 자연어 질의 돌려 보기
+- [ ] GitHub Pages로 URI 페이지 배포 (공개 전 확인)
+- [ ] 도로명주소 전자지도가 오면 도로 구간, 출입구의 `facesRoad`, 행정동 경계 넣기. 주소 미연결 건물 628개도 `geof:sfWithin`으로 행정동에 잇기
+- [ ] 민원행정기관, 전자지도 이용 조건 확인
+- [ ] 새 기준일 자료(내비게이션용DB 10월분 등)로 자동 갱신 실제로 돌려 보기
+- [ ] 필지 경계(연속지적도) 붙이기
+- [ ] 시연 영상 ([docs/demo.md](docs/demo.md) 순서대로)
+
+다른 컴퓨터에서 이어 할 때는 `git clone`, 가상환경 만들기, 원본 압축 파일 6개(`data/raw/_archives/`, 약 590MB)와 고시공고 폴더(`data/raw/notices/`)를 같은 자리에 두고 `python -m src.pipeline --unpack`을 실행하면 됩니다.
