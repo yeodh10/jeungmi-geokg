@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import re
 import shutil
 import subprocess
 import zipfile
@@ -25,6 +26,8 @@ PLAN = [
     ("서울시 건축물대장 총괄표제부.csv", "seoul_building_register", None),
     ("*기관코드 전체자료.zip", "agency_code", ["*유형분류 의미추가*.txt"]),
     ("도로명주소전자지도_서울특별시*.zip", "juso_emap", None),
+    # 국토정보플랫폼 수치지형도 Ver2.0 (도엽 하나에 압축 하나). {sheet}는 파일 이름의 도엽코드 8자리
+    ("(B010)수치지도_*.zip", "ngii_digital_map/{sheet}", None),
     # 도로명주소 한글(주소DB)은 보류 중이라 풀지 않는다 (docs/decisions.md)
 ]
 
@@ -90,17 +93,21 @@ def main() -> None:
         if not found:
             print(f"[없음] {pattern} -> _archives에 넣어 주세요 (docs/data-sources.md)")
             continue
-        src = found[-1]  # 같은 자료가 여러 개면 이름순 마지막(가장 최근 기준일)
-        dest = args.raw_dir / folder
-        dest.mkdir(parents=True, exist_ok=True)
-        if src.suffix == ".zip":
-            done = unpack_zip(src, dest, files)
-        elif src.suffix == ".7z":
-            done = unpack_7z(src, dest, files)
+        if "{sheet}" in folder:  # 도엽마다 압축이 따로 있으면 모두 도엽 폴더로 푼다
+            jobs = [(src, folder.format(sheet=re.search(r"_(\d{8})_", src.name).group(1))) for src in found]
         else:
-            shutil.copy2(src, dest / src.name)
-            done = [src.name]
-        print(f"[완료] {src.name} -> {folder}/ ({len(done)}개 파일)")
+            jobs = [(found[-1], folder)]  # 같은 자료가 여러 개면 이름순 마지막(가장 최근 기준일)
+        for src, sub in jobs:
+            dest = args.raw_dir / sub
+            dest.mkdir(parents=True, exist_ok=True)
+            if src.suffix == ".zip":
+                done = unpack_zip(src, dest, files)
+            elif src.suffix == ".7z":
+                done = unpack_7z(src, dest, files)
+            else:
+                shutil.copy2(src, dest / src.name)
+                done = [src.name]
+            print(f"[완료] {src.name} -> {sub}/ ({len(done)}개 파일)")
 
 
 if __name__ == "__main__":

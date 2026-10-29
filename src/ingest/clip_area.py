@@ -46,6 +46,8 @@ NAVI_CRS = "EPSG:5179"  # 레이아웃 문서: GRS80 UTM-K
 # 증미역 건물 폴리곤 중심이 내비게이션용DB 건물중심점과 1mm 안에서 같아 EPSG:5179로 읽는다 (docs/data-sources.md)
 EMAP_CRS = "EPSG:5179"
 # 전자지도에서 쓰는 레이어 (파일 이름, 저장할 레이어 이름)
+# 국토정보플랫폼 수치지형도 Ver2.0의 .prj는 Korea_2000_Central_Belt_2010 (EPSG:5186과 같은 값)
+NGII_CRS = "EPSG:5186"
 EMAP_LAYERS = [("TL_SPRD_MANAGE", "emap_road_segment"), ("TL_SCCO_EMD", "emap_legal_dong"),
                ("TL_KODIS_BAS", "emap_basic_zone")]
 
@@ -137,6 +139,18 @@ def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
             layers[name] = clip(g.set_crs(EMAP_CRS, allow_override=True), area, metric, rule_poly)
     else:
         print("[없음] data/raw/juso_emap -> 도로 구간, 법정동, 기초구역 없이 진행")
+
+    # 8. 국가기본도(수치지형도 Ver2.0, 1:5,000): 받은 도엽마다 건물(N3A_B0010000)과 도곽(N3A_H0010000)
+    ngii_dir = raw / "ngii_digital_map"
+    sheets = sorted(d for d in ngii_dir.iterdir() if d.is_dir()) if ngii_dir.exists() else []
+    if sheets:
+        read = lambda d, n: gpd.read_file(d / f"{n}.shp", engine="pyogrio").set_crs(NGII_CRS, allow_override=True)
+        bld = pd.concat([read(d, "N3A_B0010000") for d in sheets], ignore_index=True)
+        layers["ngii_building"] = clip(gpd.GeoDataFrame(bld, crs=NGII_CRS), area, metric, rule_poly)
+        # 도곽: 받은 도엽이 범위의 어디까지 덮는지. 비교는 도곽 안에서만 한다
+        layers["ngii_sheet"] = gpd.GeoDataFrame(pd.concat([read(d, "N3A_H0010000") for d in sheets], ignore_index=True), crs=NGII_CRS)
+    else:
+        print("[없음] data/raw/ngii_digital_map -> 국가기본도 없이 진행")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     if out_gpkg.exists():

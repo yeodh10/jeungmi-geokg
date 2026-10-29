@@ -36,6 +36,10 @@ MOUNTAIN_TO_LAND = {"0": "1", "1": "2"}
 ADDRESS_KEY = ["road_code", "underground", "bldg_main_no", "bldg_sub_no"]
 # 도로명주소 전자지도 도로위계구분 (ROA_CLS_SE). 서울 도로구간 6.7만 개의 도로명 끝말과 맞춰 보고 정했다 (docs/data-sources.md)
 ROAD_CLASS = {"1": "고속도로", "2": "대로", "3": "로", "4": "길"}
+# 국가기본도 건물과 우리 건물을 잇는 기준: 서로 가장 많이 겹치는 짝이고 IoU(겹친 넓이 / 합친 넓이)가 이 값 이상
+BASEMAP_IOU_LINK = 0.5
+# 이보다 낮지만 이 값 이상 겹치면 사람이 볼 목록에 남긴다
+BASEMAP_IOU_REVIEW = 0.2
 # 출입구를 도로 구간에 잇는 거리 한계 (같은 도로명의 가장 가까운 구간까지, EPSG:5186 미터). 넘으면 사람이 볼 목록에 남긴다
 FACE_ROAD_MAX_M = 60
 
@@ -148,6 +152,75 @@ def housing_buildings(office, addr_index: pd.Series, bld_geom: pd.Series) -> lis
     mgts = addr_index.loc[[key]].tolist() if key in addr_index.index else []
     inside = [m for m in mgts if bld_geom[m].contains(office.geometry)]
     return inside or mgts
+
+
+def make_basemap_objects(area_gpkg: Path, buildings, metric: str, storage: str) -> dict:
+    """국가기본도(수치지형도 Ver2.0) 건물을 객체로 만들고, 우리 건물(GIS건물통합정보 모양)과 모양으로 맞춘다.
+
+    - 국가기본도 건물 URI는 UFID(34자리)를 그대로 쓴다.
+    - 받은 도엽의 도곽 안에 있는 건물끼리만 견준다. 도곽 밖은 비교하지 않는다(도엽을 더 받으면 넓어진다).
+    - 서로 가장 많이 겹치는 짝이고 IoU가 BASEMAP_IOU_LINK 이상이면 잇는다. 그보다 낮지만 BASEMAP_IOU_REVIEW 이상이면 사람이 볼 목록에 남긴다.
+    - 짝이 없는 건물은 양쪽 모두 목록으로 남긴다 (국가기본도에만 있는 건물, 우리 그래프에만 있는 건물).
+    """
+    have = set(pyogrio.list_layers(area_gpkg)[:, 0])
+    cols = ["uri", "ufid", "sheet_code", "kind", "use", "floors", "name", "match_iou", "geometry"]
+    empty = {"basemap_building": gpd.GeoDataFrame(columns=cols, geometry="geometry", crs=storage),
+             "building_basemap": pd.DataFrame(columns=["building_uri", "basemap_uri", "iou"]),
+             "review_basemap_match": pd.DataFrame(columns=["building_uri", "basemap_uri", "iou"]),
+             "basemap_unmatched": pd.DataFrame(columns=["side", "uri", "kind", "use"]), "report": {}}
+    if "ngii_building" not in have:
+        return empty
+    nb = gpd.read_file(area_gpkg, layer="ngii_building").to_crs(metric)
+    sheet = gpd.read_file(area_gpkg, layer="ngii_sheet").to_crs(metric).union_all()
+    nb["uri"] = nb["UFID"].map(uri.basemap_feature)
+    assert nb["uri"].is_unique
+
+    ours = buildings[buildings.geometry.geom_type.isin(["Polygon", "MultiPolygon"])].to_crs(metric)
+    ours = ours[ours.within(sheet)][["uri", "kind", "use_name", "geometry"]].reset_index(drop=True)
+    theirs = nb[nb.within(sheet)][["uri", "종류", "용도", "geometry"]].reset_index(drop=True)
+    pieces = gpd.overlay(ours[["uri", "geometry"]].rename(columns={"uri": "building_uri"}),
+                         theirs[["uri", "geometry"]].rename(columns={"uri": "basemap_uri"}),
+                         how="intersection", keep_geom_type=True)
+    area_of = lambda df: dict(zip(df["uri"], df.area))
+    a_ours, a_theirs = area_of(ours), area_of(theirs)
+    pieces["inter"] = pieces.area
+    pieces = pieces.groupby(["building_uri", "basemap_uri"], as_index=False)["inter"].sum()
+    pieces["iou"] = pieces["inter"] / (pieces["building_uri"].map(a_ours) + pieces["basemap_uri"].map(a_theirs) - pieces["inter"])
+    by_iou = pieces.sort_values("iou", ascending=False)
+    best_ours = by_iou.drop_duplicates("building_uri").set_index("building_uri")["basemap_uri"]
+    best_theirs = by_iou.drop_duplicates("basemap_uri").set_index("basemap_uri")["building_uri"]
+    mutual = by_iou[by_iou["building_uri"].map(best_ours).eq(by_iou["basemap_uri"])
+                    & by_iou["basemap_uri"].map(best_theirs).eq(by_iou["building_uri"])]
+    links = mutual[mutual["iou"] >= BASEMAP_IOU_LINK][["building_uri", "basemap_uri", "iou"]].round({"iou": 3})
+    review = by_iou[(by_iou["iou"] >= BASEMAP_IOU_REVIEW) & ~by_iou["building_uri"].isin(links["building_uri"])
+                    & ~by_iou["basemap_uri"].isin(links["basemap_uri"])]
+    review = review.drop_duplicates("building_uri")[["building_uri", "basemap_uri", "iou"]].round({"iou": 3})
+
+    touched_ours = set(links["building_uri"]) | set(review["building_uri"])
+    touched_theirs = set(links["basemap_uri"]) | set(review["basemap_uri"])
+    unmatched = pd.concat([
+        pd.DataFrame({"side": "graph", "uri": ours.loc[~ours["uri"].isin(touched_ours), "uri"],
+                      "kind": ours.loc[~ours["uri"].isin(touched_ours), "kind"],
+                      "use": ours.loc[~ours["uri"].isin(touched_ours), "use_name"]}),
+        pd.DataFrame({"side": "basemap", "uri": theirs.loc[~theirs["uri"].isin(touched_theirs), "uri"],
+                      "kind": theirs.loc[~theirs["uri"].isin(touched_theirs), "종류"],
+                      "use": theirs.loc[~theirs["uri"].isin(touched_theirs), "용도"]}),
+    ], ignore_index=True)
+
+    iou_of = dict(zip(links["basemap_uri"], links["iou"]))
+    out = gpd.GeoDataFrame({
+        "uri": nb["uri"], "ufid": nb["UFID"], "sheet_code": nb["UFID"].str[5:13],
+        "kind": nb["종류"], "use": nb["용도"], "floors": nb["층수"].astype("Int64"), "name": nb["명칭"],
+        "match_iou": nb["uri"].map(iou_of), "geometry": nb.geometry,
+    }, geometry="geometry", crs=metric).to_crs(storage)
+    report = {"basemap_buildings": len(out), "compared_in_sheet": {"graph": len(ours), "basemap": len(theirs)},
+              "linked": len(links), "for_review": len(review),
+              "only_in_graph": int((unmatched["side"] == "graph").sum()),
+              "only_in_basemap": int((unmatched["side"] == "basemap").sum()),
+              "only_in_basemap_by_kind": unmatched.loc[unmatched["side"] == "basemap", "kind"].value_counts().to_dict(),
+              "iou_median": round(float(links["iou"].median()), 3) if len(links) else None}
+    return {"basemap_building": out, "building_basemap": links, "review_basemap_match": review,
+            "basemap_unmatched": unmatched, "report": report}
 
 
 def make_emap_objects(area_gpkg: Path, centers, buildings, entrances, parcels, metric: str, storage: str) -> dict:
@@ -406,6 +479,8 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
 
     # 9. 도로명주소 전자지도: 도로, 도로 구간, 법정동, 기초구역
     emap = make_emap_objects(area_gpkg, centers, buildings, entrances, parcels, metric, storage)
+    # 10. 국가기본도 건물과 우리 건물 맞추기
+    basemap = make_basemap_objects(area_gpkg, buildings, metric, storage)
 
     # 저장
     if out_gpkg.exists():
@@ -425,6 +500,10 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     for name in ("road_segment", "legal_dong", "basic_zone"):
         if len(emap[name]):
             emap[name].to_file(out_gpkg, layer=name, driver="GPKG", engine="pyogrio")
+    if len(basemap["basemap_building"]):
+        basemap["basemap_building"].to_file(out_gpkg, layer="basemap_building", driver="GPKG", engine="pyogrio")
+    for name in ("building_basemap", "review_basemap_match", "basemap_unmatched"):
+        basemap[name].to_csv(proc / f"{name}.csv", index=False, encoding="utf-8")
 
     geom_kind = buildings.geometry.geom_type
     report = {
@@ -449,6 +528,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
         "road": {"total": len(emap["road"]), "segments": len(emap["road_segment"]),
                  "entrances_facing_road": len(emap["entrance_road"]),
                  "entrances_for_review": len(emap["review_entrance_road"])},
+        "basemap": basemap["report"],
         "legal_dong": len(emap["legal_dong"]),
         "basic_zone": len(emap["basic_zone"]),
         "station": len(stations),

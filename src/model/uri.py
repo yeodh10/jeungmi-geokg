@@ -66,5 +66,11 @@ def basic_zone(zone_no: str) -> str:
     return f"{BASE}/basic-zone/{zone_no}"
 
 
+def basemap_feature(ufid: str) -> str:
+    """국가기본도(수치지형도) 지형지물의 유일식별자(UFID) 34자리."""
+    assert len(ufid) == 34 and ufid.isalnum(), ufid
+    return f"{BASE}/basemap/{ufid}"
+
+
 def geometry(feature_uri: str) -> str:
     return f"{feature_uri}/geometry"

@@ -32,6 +32,7 @@ publish:
   hold_sources:
     - dataset-public-office   # 민원행정기관 전자지도: 이용 조건 확인 중
     - dataset-juso-emap       # 도로명주소 전자지도: 이용 조건 확인 중 (도로 구간 전체, 법정동과 기초구역의 모양)
+    - dataset-ngii-digital-map  # 국토지리정보원 수치지형도: 이용 조건 확인 중 (국가기본도 건물 전체)
 
 # 범위에 걸치기만 해도 포함할지(intersects), 완전히 안에 있어야 하는지(within)
 clip_rule:

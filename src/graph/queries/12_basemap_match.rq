@@ -1,0 +1,9 @@
+# 국가기본도(수치지형도) 건물과 이어진 우리 건물: 상태별 개수와 겹침 정도(IoU) 평균
+# 우리 건물 모양은 GIS건물통합정보, 국가기본도 건물은 국토지리정보원 수치지형도 Ver2.0. 서로 가장 많이 겹치고 IoU 0.5 이상인 짝만 잇는다
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?status (COUNT(?b) AS ?buildings) (COUNT(?m) AS ?linked) (ROUND(SUM(IF(BOUND(?iou), ?iou, 0)) / COUNT(?m) * 1000) / 1000 AS ?meanIoU) WHERE {
+  ?b a jgk:Building ; jgk:status/rdfs:label ?status .
+  OPTIONAL { ?b jgk:basemapFeature ?m . ?m jgk:matchIoU ?iou }
+} GROUP BY ?status

@@ -48,6 +48,23 @@ jgk:basemap-H a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation
 
 jgk:basemapClass a owl:AnnotationProperty ; rdfs:label "국가기본도 지형지물 대분류"@ko ;
     rdfs:comment "객체 종류(owl:Class)가 수치지도 지형지물 분류체계의 어느 대분류에 드는지."@ko .
+jgk:basemap-B0010000 a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:broader jgk:basemap-B ;
+    skos:notation "B0010000" ; skos:prefLabel "건물"@ko ;
+    skos:scopeNote "수치지형도 Ver2.0 레이어 N3A_B0010000. 속성 '종류' 값(아파트, 일반주택, 주택외건물, 무벽건물 등)으로 건물 레이어임을 확인했다."@ko .
+
+jgk:BaseMapFeature a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "국가기본도 지형지물"@ko ;
+    rdfs:comment "국토지리정보원 수치지형도(국가기본도)의 지형지물 하나. 번호는 유일식별자(UFID)다."@ko .
+jgk:ufid a owl:DatatypeProperty ; rdfs:label "유일식별자(UFID)"@ko ; rdfs:range xsd:string .
+jgk:sheetCode a owl:DatatypeProperty ; rdfs:label "도엽코드"@ko ; rdfs:range xsd:string .
+jgk:featureCode a owl:ObjectProperty ; rdfs:label "지형지물 분류"@ko ; rdfs:domain jgk:BaseMapFeature ; rdfs:range skos:Concept .
+jgk:basemapKind a owl:DatatypeProperty ; rdfs:label "국가기본도 건물 종류"@ko ; rdfs:range xsd:string .
+jgk:basemapUse a owl:DatatypeProperty ; rdfs:label "국가기본도 건물 용도"@ko ; rdfs:range xsd:string .
+jgk:basemapFloors a owl:DatatypeProperty ; rdfs:label "국가기본도 층수"@ko ; rdfs:range xsd:integer .
+jgk:basemapFeature a owl:ObjectProperty ; rdfs:label "국가기본도의 같은 지형지물"@ko ;
+    rdfs:comment "모양이 서로 가장 많이 겹치고 IoU가 0.5 이상인 짝. 겹친 정도는 국가기본도 쪽 jgk:matchIoU에 적는다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:BaseMapFeature .
+jgk:matchIoU a owl:DatatypeProperty ; rdfs:label "모양 겹침 정도(IoU)"@ko ; rdfs:range xsd:decimal .
+
 jgk:Building jgk:basemapClass jgk:basemap-B .
 jgk:Road jgk:basemapClass jgk:basemap-A .
 jgk:RoadSegment jgk:basemapClass jgk:basemap-A .
@@ -158,6 +175,10 @@ jgk:dataset-juso-emap a jgk:Dataset ;
     dcterms:title "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     rdfs:label "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     dcterms:source <https://business.juso.go.kr> .
+jgk:dataset-ngii-digital-map a jgk:Dataset ;
+    dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
+    rdfs:label "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
+    dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;
     rdfs:label "행정안전부 행정표준코드 기관코드"@ko ;

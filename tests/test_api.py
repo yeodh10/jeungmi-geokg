@@ -240,6 +240,13 @@ SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:Building ; jgk:within ?d . ?
     dong = next(f for f in c.get("/api/layers/legaldong").json()["features"] if f["properties"]["label"] == "등촌동")
     d = c.get("/api/feature", params={"uri": dong["properties"]["uri"]}).json()
     assert d["public"] is True and c.get("/api/feature", params={"uri": dong["properties"]["uri"] + "/geometry"}).json()["public"] is False
+    # 국가기본도 건물: UFID로 URI를 붙이고 공개를 보류한다. 이어진 우리 건물은 서로 가장 많이 겹치는 짝(IoU 0.5 이상)이다
+    bm = c.get("/api/layers/basemap").json()["features"]
+    assert bm and all(len(f["properties"]["uri"].rsplit("/", 1)[1]) == 34 for f in bm)
+    q = f"SELECT ?b ?m ?i WHERE {{ ?b <{JGK}basemapFeature> ?m . ?m <{JGK}matchIoU> ?i }}"
+    pairs = [(x["b"].value, x["m"].value, float(x["i"].value)) for x in g.query(q)]
+    assert pairs and min(i for *_, i in pairs) >= 0.5 and len({m for _, m, _ in pairs}) == len(pairs)
+    assert c.get("/api/feature", params={"uri": pairs[0][1]}).json()["public"] is False
     # 증미역 출입구는 같은 도로명(양천로)의 도로 구간에 면한다
     q = f"""SELECT ?n WHERE {{ <{STATION}> <{JGK}housedIn>/<{JGK}hasEntrance>/<{JGK}facesRoad>/<{JGK}segmentOf> ?r .
       ?r <http://www.w3.org/2000/01/rdf-schema#label> ?n }}"""
