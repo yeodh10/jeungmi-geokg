@@ -43,5 +43,28 @@ def public_facility(agency_code: str) -> str:
     return f"{BASE}/public-facility/{agency_code}"
 
 
+def road(road_code: str) -> str:
+    """도로명코드 12자리 (시군구코드 5 + 도로명번호 7)."""
+    assert len(road_code) == 12 and road_code.isdigit(), road_code
+    return f"{BASE}/road/{road_code}"
+
+
+def road_segment(sigungu_code: str, segment_no) -> str:
+    """도로구간 일련번호는 시군구 안에서만 겹치지 않아서 시군구코드를 앞에 붙인다 (보조출입구와 같은 꼴)."""
+    assert len(sigungu_code) == 5 and str(segment_no).isdigit(), (sigungu_code, segment_no)
+    return f"{BASE}/road-segment/{sigungu_code}-{int(segment_no)}"
+
+
+def legal_dong(legal_dong_code: str) -> str:
+    assert len(legal_dong_code) == 10 and legal_dong_code.isdigit(), legal_dong_code
+    return f"{BASE}/legal-dong/{legal_dong_code}"
+
+
+def basic_zone(zone_no: str) -> str:
+    """국가기초구역번호 5자리 (우편번호와 같은 값)."""
+    assert len(zone_no) == 5 and zone_no.isdigit(), zone_no
+    return f"{BASE}/basic-zone/{zone_no}"
+
+
 def geometry(feature_uri: str) -> str:
     return f"{feature_uri}/geometry"

@@ -232,6 +232,19 @@ SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a {cls} ; geo:hasDefaultGeometry/g
 SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:Building ; jgk:within ?d . ?d a jgk:AdminDong }}""")))["n"].value
     assert sum(1 for f in bld if f["properties"]["dong"]) == int(in_dong) > 0, in_dong
 
+    # 도로명주소 전자지도: 이용 조건 확인 전이라 도로 구간은 통째로, 법정동은 모양만 공개를 보류한다
+    seg = c.get("/api/layers/road").json()["features"]
+    assert seg and all(f["geometry"]["type"] in ("LineString", "MultiLineString") for f in seg)
+    one = c.get("/api/feature", params={"uri": seg[0]["properties"]["uri"]}).json()
+    assert one["public"] is False, one["public"]
+    dong = next(f for f in c.get("/api/layers/legaldong").json()["features"] if f["properties"]["label"] == "등촌동")
+    d = c.get("/api/feature", params={"uri": dong["properties"]["uri"]}).json()
+    assert d["public"] is True and c.get("/api/feature", params={"uri": dong["properties"]["uri"] + "/geometry"}).json()["public"] is False
+    # 증미역 출입구는 같은 도로명(양천로)의 도로 구간에 면한다
+    q = f"""SELECT ?n WHERE {{ <{STATION}> <{JGK}housedIn>/<{JGK}hasEntrance>/<{JGK}facesRoad>/<{JGK}segmentOf> ?r .
+      ?r <http://www.w3.org/2000/01/rdf-schema#label> ?n }}"""
+    assert [x["n"].value for x in g.query(q)] == ["양천로"]
+
     r = c.get("/api/layers/building", headers={"Accept-Encoding": "gzip"})
     assert r.headers.get("content-encoding") == "gzip", r.headers
     assert c.get("/api/layers/nothing").status_code == 404

@@ -30,6 +30,8 @@ DATASET_NAVI = JGK["dataset-navi-db"]
 DATASET_REGISTER = JGK["dataset-building-register"]
 DATASET_PUBLIC_OFFICE = JGK["dataset-public-office"]
 DATASET_AGENCY_CODE = JGK["dataset-agency-code"]
+DATASET_EMAP = JGK["dataset-juso-emap"]
+SOURCE_OF = {"navi": DATASET_NAVI, "emap": DATASET_EMAP, "gis": DATASET_GIS, "register": DATASET_REGISTER}
 
 
 def present(v) -> bool:
@@ -47,7 +49,8 @@ def add_feature(g: Graph, s: URIRef, cls, status: str) -> None:
     g.add((s, JGK.status, STATUS[status]))
 
 
-def add_geometry(g: Graph, s: URIRef, geom, source_gis_id=None) -> None:
+def add_geometry(g: Graph, s: URIRef, geom, source_gis_id=None, source=None) -> None:
+    """source를 주면 모양 노드에 출처를 단다. 객체와 모양의 출처가 다를 때 쓴다 (공개 보류도 모양만 걸린다)."""
     # 좌표를 경도, 위도 순서로 쓰고 CRS를 적지 않으면 GeoSPARQL 기본값인 CRS84로 읽힌다
     gu = URIRef(uri.geometry(str(s)))
     g.add((s, GEO.hasGeometry, gu))
@@ -55,6 +58,62 @@ def add_geometry(g: Graph, s: URIRef, geom, source_gis_id=None) -> None:
     g.add((gu, RDF.type, GEO.Geometry))
     g.add((gu, GEO.asWKT, Literal(shapely.to_wkt(geom, rounding_precision=7), datatype=GEO.wktLiteral)))
     add(g, gu, JGK.sourceGisBuildingId, source_gis_id)
+    if source is not None:
+        g.add((gu, DCTERMS.source, source))
+
+
+def read_optional(proc: Path, name: str):
+    """전자지도가 없을 때 만들어지지 않는 결과는 빈 표로 읽는다."""
+    import pyogrio
+    gpkg = proc / "objects.gpkg"
+    if name in set(pyogrio.list_layers(gpkg)[:, 0]):
+        return gpd.read_file(gpkg, layer=name)
+    return gpd.GeoDataFrame({"uri": []}, geometry=[])
+
+
+def add_emap(g: Graph, proc: Path) -> None:
+    """도로, 도로 구간, 법정동, 기초구역과 그 연결."""
+    for r in pd.read_csv(proc / "road.csv", dtype=str, keep_default_na=False).itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.Road, "Active")
+        add(g, s, JGK.roadCode, r.road_code)
+        add(g, s, RDFS.label, r.name, lang="ko")
+        g.add((s, DCTERMS.source, SOURCE_OF[r.source]))
+    for r in read_optional(proc, "road_segment").itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.RoadSegment, "Active")
+        add(g, s, JGK.roadSegmentNo, f"{r.sigungu_code}-{r.segment_no}")
+        add(g, s, RDFS.label, r.name, lang="ko")
+        add(g, s, JGK.roadClass, r.road_class)
+        add(g, s, JGK.roadWidth, r.width_m, XSD.decimal)
+        add(g, s, JGK.roadLength, r.length_m, XSD.decimal)
+        g.add((s, JGK.segmentOf, URIRef(r.road_uri)))
+        g.add((s, DCTERMS.source, DATASET_EMAP))
+        add_geometry(g, s, r.geometry)
+    for layer, cls, code_prop, code_col in (("legal_dong", JGK.LegalDong, JGK.legalDongCode, "legal_dong_code"),
+                                            ("basic_zone", JGK.BasicZone, JGK.basicZoneNo, "zone_no")):
+        for r in read_optional(proc, layer).itertuples():
+            s = URIRef(r.uri)
+            add_feature(g, s, cls, "Active")
+            add(g, s, code_prop, getattr(r, code_col))
+            add(g, s, RDFS.label, r.name if layer == "legal_dong" else f"기초구역 {r.zone_no}", lang="ko")
+            if r.source in SOURCE_OF:
+                g.add((s, DCTERMS.source, SOURCE_OF[r.source]))
+            else:  # 번호만 PNU에서 얻은 법정동
+                g.add((s, DCTERMS.source, DATASET_GIS))
+            if r.geometry is not None:
+                add_geometry(g, s, r.geometry, source=SOURCE_OF[r.geometry_source])
+    for r in pd.read_csv(proc / "entrance_road.csv", dtype=str).itertuples():
+        g.add((URIRef(r.entrance_uri), JGK.facesRoad, URIRef(r.segment_uri)))
+    for r in pd.read_csv(proc / "building_zone.csv", dtype=str, keep_default_na=False).itertuples():
+        b = URIRef(r.building_uri)
+        g.add((b, JGK.inLegalDong, URIRef(r.legal_dong_uri)))
+        if r.zone_uri:
+            g.add((b, JGK.inBasicZone, URIRef(r.zone_uri)))
+        if r.road_uri:
+            g.add((b, JGK.addressRoad, URIRef(r.road_uri)))
+    for r in pd.read_csv(proc / "parcel_legal_dong.csv", dtype=str).itertuples():
+        g.add((URIRef(r.parcel_uri), JGK.inLegalDong, URIRef(r.legal_dong_uri)))
 
 
 def build(proc: Path = PROC) -> Graph:
@@ -156,6 +215,7 @@ def build(proc: Path = PROC) -> Graph:
         add_geometry(g, s, r.geometry)
     for r in facility_links.itertuples():
         g.add((URIRef(r.facility_uri), JGK.housedIn, URIRef(r.building_uri)))
+    add_emap(g, proc)
     return g
 
 

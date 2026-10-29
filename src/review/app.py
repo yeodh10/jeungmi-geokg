@@ -529,6 +529,7 @@ def feature(uri: str):
 LAYER_QUERY = {
     "building": "jgk:Building", "entrance": "jgk:BuildingEntrance",
     "facility": "jgk:PublicFacility", "station": "jgk:Station",
+    "road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong",
 }
 LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "baddr")
 layer_cache: dict = {}  # (레이어, 그래프 판 번호) -> 응답 본문(bytes)

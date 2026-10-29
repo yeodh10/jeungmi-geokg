@@ -92,6 +92,8 @@
       <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
       <label class="layer"><input type="checkbox" data-l="facility"><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
       <label class="layer"><input type="checkbox" data-l="station"><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
+      <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
+      <label class="layer" title="도로명주소 전자지도의 법정동 경계"><input type="checkbox" data-l="legaldong"><i class="sw area" style="border-color:var(--legaldong)"></i>법정동 경계<span class="n" id="n-legaldong"></span></label>
       <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
       <label class="layer"><input type="checkbox" data-l="osm"><i class="sw" style="background:#d9dde3"></i>배경지도 (OpenStreetMap)</label>
       <div class="layer"><i class="sw answer" style="margin-left:21px"></i>질문 답<span class="n" id="n-answer"></span><button type="button" class="btn ghost mini" id="clear-answer" disabled>답 지우기</button></div>
@@ -118,9 +120,9 @@ const KEY_LABEL = { proposalAction: "제안 종류", sourceKind: "제안 출처"
 const KEY_VALUE = { proposalAction: v => ACTION[v] || v, sourceKind: v => SOURCE[v] || v };
 const station = BASE + "station/1150010200106660040000001";
 
-const KINDS = ["building", "entrance", "facility", "station"];
-const KIND_KO = { building: "건물", entrance: "출입구", facility: "공공시설", station: "역", area: "범위 원" };
-const KIND_RANK = { station: 0, facility: 1, building: 2, entrance: 3 };  // 찾기에서 점수가 같을 때 앞에 둘 순서
+const KINDS = ["building", "entrance", "facility", "station", "road", "legaldong"];
+const KIND_KO = { building: "건물", entrance: "출입구", facility: "공공시설", station: "역", road: "도로 구간", legaldong: "법정동", area: "범위 원" };
+const KIND_RANK = { station: 0, facility: 1, building: 2, legaldong: 3, road: 4, entrance: 5 };  // 찾기에서 점수가 같을 때 앞에 둘 순서
 const STATUSES = [
   { name: "사용", color: "--active", tip: "사용: 도로명주소 건물관리번호가 있는, 지금 쓰이는 건물" },
   { name: "주소 미연결", color: "--unlinked", tip: "주소 미연결: 도로명주소에 없는 GIS 건물" },
@@ -130,11 +132,11 @@ const STATUSES = [
 const GEOM_RE = /^(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)/;
 // 레이어 목록의 이름 -> 지도 레이어 id
 const LAYER_IDS = { building: ["building", "building-pt", "building-retired"], entrance: ["entrance"], facility: ["facility"],
-  station: ["station"], area: ["area-line"], osm: ["osm"] };
+  station: ["station"], road: ["road"], legaldong: ["legaldong-line"], area: ["area-line"], osm: ["osm"] };
 // 아래에서 위로 그리는 순서. 늦게 받은 레이어도 beforeId로 이 자리에 끼운다
-const ORDER = ["building", "building-pt", "building-retired", "area-line", "entrance", "facility", "station",
+const ORDER = ["legaldong-line", "road", "building", "building-pt", "building-retired", "area-line", "entrance", "facility", "station",
   "sel-line", "sel-pt", "answer-fill", "answer-line", "answer-pt"];
-const CLICKABLE = ["station", "facility", "entrance", "building-pt", "building", "answer-pt", "answer-fill"];
+const CLICKABLE = ["station", "facility", "entrance", "building-pt", "building", "road", "answer-pt", "answer-fill"];
 const $ = id => document.getElementById(id);
 const narrow = () => matchMedia("(max-width: 860px)").matches;
 const emptyFC = () => ({ type: "FeatureCollection", features: [] });
@@ -144,7 +146,8 @@ const josa = w => { const c = String(w).charCodeAt(String(w).length - 1) - 0xAC0
 const qs = new URLSearchParams(location.search);
 const list = v => (v || "").split(",").map(s => s.trim()).filter(Boolean);
 let st = new Set(qs.has("st") ? list(qs.get("st")).filter(s => STATUSES.some(x => x.name === s)) : STATUSES.map(x => x.name));
-const off = new Set(qs.has("off") ? list(qs.get("off")).filter(k => k in LAYER_IDS) : ["entrance"]);
+const DEFAULT_OFF = "entrance,legaldong";  // 처음에 꺼 둘 레이어
+const off = new Set(qs.has("off") ? list(qs.get("off")).filter(k => k in LAYER_IDS) : DEFAULT_OFF.split(","));
 let dongSel = qs.get("dong") || "";
 const zc = (() => {
   const z = parseFloat(qs.get("z")), c = list(qs.get("c")).map(Number);
@@ -175,7 +178,7 @@ function urlNow(focus = focusParam) {
   if (st.size !== STATUSES.length) p.set("st", STATUSES.map(x => x.name).filter(s => st.has(s)).join(","));
   if (dongSel) p.set("dong", dongSel);
   const offList = Object.keys(LAYER_IDS).filter(k => off.has(k)).join(",");
-  if (offList !== "entrance") p.set("off", offList);  // 기본(출입구만 끔)이면 적지 않는다
+  if (offList !== DEFAULT_OFF) p.set("off", offList);  // 기본(출입구, 법정동 끔)이면 적지 않는다
   return "/map?" + p.toString();
 }
 const saveQuery = () => history.replaceState(history.state, "", urlNow());
@@ -210,6 +213,10 @@ function layerSpecs(k) {
       paint: { "line-color": "#7a1a12", "line-width": 2.5 } },
   ];
   if (k === "entrance") return [{ id: "entrance", type: "circle", source: "entrance", paint: { "circle-radius": 2.5, "circle-color": css("--accent") } }];
+  if (k === "road") return [{ id: "road", type: "line", source: "road",
+    paint: { "line-color": css("--road"), "line-width": ["interpolate", ["linear"], ["zoom"], 14, 1.5, 18, 4], "line-opacity": 0.85 } }];
+  if (k === "legaldong") return [{ id: "legaldong-line", type: "line", source: "legaldong",
+    paint: { "line-color": css("--legaldong"), "line-width": 2, "line-dasharray": [4, 2] } }];
   if (k === "facility") return [{ id: "facility", type: "circle", source: "facility",
     paint: { "circle-radius": 6, "circle-color": css("--facility"), "circle-stroke-width": 2, "circle-stroke-color": "#fff" } }];
   return [{ id: "station", type: "circle", source: "station",
@@ -314,7 +321,7 @@ document.querySelectorAll("#layers input[data-l]").forEach(cb => {
   cb.checked = !off.has(l);
   cb.onchange = () => {
     if (cb.checked) off.delete(l); else off.add(l);
-    if (l === "entrance" && cb.checked) loadKind("entrance");  // 출입구는 처음 켤 때 받는다
+    if (KINDS.includes(l) && cb.checked) loadKind(l);  // 꺼 둔 레이어는 처음 켤 때 받는다
     applyVis(l);
     saveQuery();
   };
@@ -561,7 +568,8 @@ function refreshHits() {
       const p = f.properties, kind = p.kind || k;
       const s = Math.max(score(p.label, q, qt), score(p.addr, q, qt));
       if (!s) continue;
-      const key = kind === "building" ? `building|${p.label || ""}|${p.addr || ""}` : p.uri;
+      // 같은 이름, 같은 주소의 건물과 같은 도로명의 도로 구간은 한 줄로 묶는다
+      const key = kind === "building" ? `building|${p.label || ""}|${p.addr || ""}` : kind === "road" ? `road|${p.label || ""}` : p.uri;
       const g = groups.get(key);
       if (g) { g.feats.push(f); g.score = Math.max(g.score, s); }
       else groups.set(key, { kind, score: s, feats: [f] });
@@ -679,7 +687,7 @@ $("clear-answer").onclick = () => {
 // 시작: 역, 공공시설, 건물을 받는 대로 그리고 출입구는 켜 둔 경우에만 받는다
 renderStatus();
 ["station", "facility", "building"].forEach(loadKind);
-if (!off.has("entrance")) loadKind("entrance");
+["entrance", "road", "legaldong"].filter(k => !off.has(k)).forEach(loadKind);
 loadArea();
 show(focus0 || station, focus0 ? { quiet: !!zc } : { intro: true, quiet: true });
 pendingCount();

@@ -42,6 +42,12 @@ NAVI_RS_ENTRC_COLS = [
     "entrance_x", "entrance_y", "change_code",
 ]
 NAVI_CRS = "EPSG:5179"  # 레이아웃 문서: GRS80 UTM-K
+# 도로명주소 전자지도의 .prj는 'ITRF2000 TM'이지만 투영 값이 EPSG:5179와 같고,
+# 증미역 건물 폴리곤 중심이 내비게이션용DB 건물중심점과 1mm 안에서 같아 EPSG:5179로 읽는다 (docs/data-sources.md)
+EMAP_CRS = "EPSG:5179"
+# 전자지도에서 쓰는 레이어 (파일 이름, 저장할 레이어 이름)
+EMAP_LAYERS = [("TL_SPRD_MANAGE", "emap_road_segment"), ("TL_SCCO_EMD", "emap_legal_dong"),
+               ("TL_KODIS_BAS", "emap_basic_zone")]
 
 
 def load_area() -> dict:
@@ -121,6 +127,16 @@ def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
     reg = pd.read_csv(reg_csv, dtype=str, encoding="cp949", keep_default_na=False)
     reg = points_from_xy(reg, "X좌표", "Y좌표", "EPSG:5179")
     layers["building_register_summary"] = clip(reg, area, metric, rule_point)
+
+    # 7. 도로명주소 전자지도: 도로구간(선), 법정동 경계, 기초구역 (폴리곤 규칙으로 걸치면 넣는다)
+    emap_dir = raw / "juso_emap"
+    if emap_dir.exists():
+        box = tuple(gpd.GeoSeries([area], crs=metric).to_crs(EMAP_CRS).total_bounds)
+        for fname, name in EMAP_LAYERS:
+            g = gpd.read_file(emap_dir / f"{fname}.shp", encoding="cp949", bbox=box, engine="pyogrio")
+            layers[name] = clip(g.set_crs(EMAP_CRS, allow_override=True), area, metric, rule_poly)
+    else:
+        print("[없음] data/raw/juso_emap -> 도로 구간, 법정동, 기초구역 없이 진행")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     if out_gpkg.exists():

@@ -1,0 +1,11 @@
+# 품질 점검: 건물이 속한 법정동(주소의 법정동코드나 PNU)과 건물 모양이 놓인 법정동 경계가 같은가
+# 번호로 정한 소속(jgk:inLegalDong)과 모양끼리의 관계(geof:sfIntersects)를 견줘 어긋나는 곳을 찾는다
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+
+SELECT ?inside (COUNT(?b) AS ?count) WHERE {
+  ?b a jgk:Building ; jgk:inLegalDong ?d ; geo:hasDefaultGeometry/geo:asWKT ?wb .
+  ?d geo:hasDefaultGeometry/geo:asWKT ?wd .
+  BIND(geof:sfIntersects(?wb, ?wd) AS ?inside)
+} GROUP BY ?inside

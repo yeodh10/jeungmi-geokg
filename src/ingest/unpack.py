@@ -24,6 +24,7 @@ PLAN = [
      ["match_build_seoul.txt", "match_jibun_seoul.txt", "match_rs_entrc.txt", "*.pdf"]),
     ("서울시 건축물대장 총괄표제부.csv", "seoul_building_register", None),
     ("*기관코드 전체자료.zip", "agency_code", ["*유형분류 의미추가*.txt"]),
+    ("도로명주소전자지도_서울특별시*.zip", "juso_emap", None),
     # 도로명주소 한글(주소DB)은 보류 중이라 풀지 않는다 (docs/decisions.md)
 ]
 

@@ -14,14 +14,16 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
-FILES = ["objects.gpkg", "facility_building.csv", "parcel.csv", "admin_dong.csv", "building_entrance.csv"]
+FILES = ["objects.gpkg", "facility_building.csv", "parcel.csv", "admin_dong.csv", "building_entrance.csv",
+         "road.csv", "entrance_road.csv", "building_zone.csv", "parcel_legal_dong.csv"]
+EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone"]
 FAKE_MGT = "1150010200199990000000001"  # 시험용 건물관리번호 (실제 번호 아님)
 
 
 def make_next_snapshot(dst: Path) -> dict:
     for f in FILES:
         shutil.copy(PROC / f, dst / f)
-    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in ["building", "entrance", "station", "public_facility"]}
+    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in ["building", "entrance", "station", "public_facility"] + EMAP_LAYERS}
     b = layers["building"]
     busy = set(layers["station"]["building_uri"]) | set(pd.read_csv(PROC / "facility_building.csv")["building_uri"])
     addressed = b[(b["kind"] == "building") & ~b["uri"].isin(busy)]
@@ -34,6 +36,10 @@ def make_next_snapshot(dst: Path) -> dict:
     b.loc[link_i, ["kind", "status", "bldg_mgt_no", "uri"]] = ["building", "Active", FAKE_MGT,
                                                                 f"https://yeodh10.github.io/jeungmi-geokg/id/building/{FAKE_MGT}"]
     layers["building"] = b[b["uri"] != retire]
+    # 없어진 건물의 법정동, 기초구역, 도로 연결도 다음 자료에는 없다. 주소가 붙은 GIS 건물은 새 URI로 옮긴다
+    zone = pd.read_csv(dst / "building_zone.csv", dtype=str, keep_default_na=False)
+    zone = zone[zone["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
+    zone.to_csv(dst / "building_zone.csv", index=False)
     (dst / "objects.gpkg").unlink()
     for n, g in layers.items():
         g.to_file(dst / "objects.gpkg", layer=n, driver="GPKG", engine="pyogrio")

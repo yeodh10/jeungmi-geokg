@@ -1,0 +1,11 @@
+# 증미역 역사 건물의 출입구가 면한 도로 구간과 그 도로 (도로 위계, 폭, 길이)
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entrance ?type ?segment ?road ?roadName ?class ?width ?length WHERE {
+  <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> jgk:housedIn ?b .
+  ?b jgk:hasEntrance ?entrance .
+  ?entrance jgk:entranceType ?type ; jgk:facesRoad ?segment .
+  ?segment jgk:segmentOf ?road ; jgk:roadClass ?class ; jgk:roadWidth ?width ; jgk:roadLength ?length .
+  ?road rdfs:label ?roadName .
+} ORDER BY ?type

@@ -55,6 +55,8 @@ def main() -> None:
         "건물": objects["building"]["total"], "출입구": objects["entrance"]["main"] + objects["entrance"]["sub"],
         "필지": objects["parcel"]["total"], "행정동": objects["admin_dong"], "역": objects["station"],
         "공공시설": objects["public_facility"]["with_agency_code"],
+        "도로": objects["road"]["total"], "도로 구간": objects["road"]["segments"],
+        "법정동": objects["legal_dong"], "기초구역": objects["basic_zone"],
     }
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))

@@ -1,9 +1,10 @@
-"""잘라낸 자료를 객체(건물, 출입구, 필지, 행정동)로 쪼개고 URI를 붙인다.
+"""잘라낸 자료를 객체(건물, 출입구, 필지, 행정동, 도로, 도로 구간, 법정동, 기초구역)로 쪼개고 URI를 붙인다.
 
 실행: python -m src.model.build_objects
 입력: data/processed/jeungmi_area.gpkg, data/processed/navi_jibun.csv (src.ingest.clip_area 결과)
 출력: data/processed/objects.gpkg (building, entrance 레이어, EPSG:4326)
       data/processed/parcel.csv, admin_dong.csv, building_entrance.csv
+      data/processed/road.csv, legal_dong, basic_zone, road_segment 레이어, entrance_road.csv (전자지도가 있을 때)
       data/processed/review_gis_id_conflict.csv (사람이 볼 목록), objects_report.json
 규칙: docs/uri-policy.md
 """
@@ -16,6 +17,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+import pyogrio
 import shapely
 import yaml
 
@@ -32,6 +34,10 @@ SUB_ENTRANCE_TYPE = {"01": "공용", "02": "차량용", "03": "보행자용"}
 # 내비게이션용DB 지번 산여부 -> PNU 대지구분
 MOUNTAIN_TO_LAND = {"0": "1", "1": "2"}
 ADDRESS_KEY = ["road_code", "underground", "bldg_main_no", "bldg_sub_no"]
+# 도로명주소 전자지도 도로위계구분 (ROA_CLS_SE). 서울 도로구간 6.7만 개의 도로명 끝말과 맞춰 보고 정했다 (docs/data-sources.md)
+ROAD_CLASS = {"1": "고속도로", "2": "대로", "3": "로", "4": "길"}
+# 출입구를 도로 구간에 잇는 거리 한계 (같은 도로명의 가장 가까운 구간까지, EPSG:5186 미터). 넘으면 사람이 볼 목록에 남긴다
+FACE_ROAD_MAX_M = 60
 
 
 def load_cfg() -> dict:
@@ -144,6 +150,99 @@ def housing_buildings(office, addr_index: pd.Series, bld_geom: pd.Series) -> lis
     return inside or mgts
 
 
+def make_emap_objects(area_gpkg: Path, centers, buildings, entrances, parcels, metric: str, storage: str) -> dict:
+    """도로(도로명코드), 도로 구간(도로구간 일련번호), 법정동(법정동코드), 기초구역(국가기초구역번호)과 그 연결.
+
+    번호와 이름은 내비게이션용DB에 있으면 그것을 쓰고(출처 navi), 전자지도에만 있으면 전자지도 값을 쓴다(출처 emap).
+    모양은 모두 전자지도에서 오므로 모양 쪽에 따로 출처를 단다(geometry_source).
+    전자지도가 없으면 내비게이션용DB에서 얻을 수 있는 도로, 법정동, 기초구역 번호만 만든다.
+    """
+    have = set(pyogrio.list_layers(area_gpkg)[:, 0])
+    read = lambda name: gpd.read_file(area_gpkg, layer=name) if name in have else None
+    seg_raw, ld_raw, bz_raw = read("emap_road_segment"), read("emap_legal_dong"), read("emap_basic_zone")
+    empty_geo = lambda: gpd.GeoDataFrame({"uri": []}, geometry=[], crs=storage)
+    out = {}
+
+    # 도로: 주소에 쓰인 도로명코드(내비)와 도로 구간의 도로명코드(전자지도)
+    roads = {}
+    for code, name in centers[["road_code", "road_name"]].drop_duplicates().itertuples(index=False):
+        roads[code] = {"uri": uri.road(code), "road_code": code, "name": name, "source": "navi"}
+    segs = []
+    if seg_raw is not None:
+        for r in seg_raw.itertuples():
+            code = r.SIG_CD + r.RN_CD
+            roads.setdefault(code, {"uri": uri.road(code), "road_code": code, "name": r.RN, "source": "emap"})
+            segs.append({"uri": uri.road_segment(r.SIG_CD, r.RDS_MAN_NO), "sigungu_code": r.SIG_CD,
+                         "segment_no": str(int(r.RDS_MAN_NO)), "road_uri": roads[code]["uri"], "road_code": code,
+                         "name": r.RN, "road_class": ROAD_CLASS.get(r.ROA_CLS_SE), "width_m": r.ROAD_BT,
+                         "length_m": r.ROAD_LT, "geometry": r.geometry})
+    out["road"] = pd.DataFrame(sorted(roads.values(), key=lambda x: x["road_code"]),
+                               columns=["uri", "road_code", "name", "source"])
+    out["road_segment"] = gpd.GeoDataFrame(segs, geometry="geometry", crs=storage) if segs else empty_geo()
+    assert out["road_segment"]["uri"].is_unique
+
+    # 출입구 -> 도로 구간: 출입구 주소의 도로명과 같은 도로 구간 가운데 가장 가까운 것
+    faces, review = [], []
+    if segs:
+        sm = out["road_segment"].to_crs(metric)
+        em = entrances.dropna(subset=["road_code"]).to_crs(metric)
+        by_code = {c: g for c, g in sm.groupby("road_code")}
+        for e in em.itertuples():
+            cand = by_code.get(e.road_code)
+            if cand is None:
+                review.append({"entrance_uri": e.uri, "road_code": e.road_code, "reason": "같은 도로명의 도로 구간이 범위에 없다"})
+                continue
+            d = cand.distance(e.geometry)
+            i = d.idxmin()
+            if d[i] > FACE_ROAD_MAX_M:
+                review.append({"entrance_uri": e.uri, "road_code": e.road_code,
+                               "reason": f"가장 가까운 같은 도로명 구간이 {d[i]:.0f}m 떨어져 있다"})
+                continue
+            faces.append({"entrance_uri": e.uri, "segment_uri": cand.at[i, "uri"], "distance_m": round(float(d[i]), 1)})
+    out["entrance_road"] = pd.DataFrame(faces, columns=["entrance_uri", "segment_uri", "distance_m"])
+    out["review_entrance_road"] = pd.DataFrame(review, columns=["entrance_uri", "road_code", "reason"])
+
+    # 법정동: 주소의 법정동코드(내비), 필지 PNU 앞 10자리, 전자지도 경계(EMD_CD 8자리 + 리 00, 서울에는 리가 없다)
+    names = dict(centers[["addr_emd_code", "emd"]].drop_duplicates().itertuples(index=False))
+    shapes = {} if ld_raw is None else {r.EMD_CD + "00": r for r in ld_raw.itertuples()}
+    codes = set(names) | set(parcels["pnu"].str[:10]) | set(shapes)
+    lds = []
+    for c in sorted(codes):
+        sh = shapes.get(c)
+        name = names.get(c) or (sh.EMD_KOR_NM if sh is not None else None)
+        lds.append({"uri": uri.legal_dong(c), "legal_dong_code": c, "name": name,
+                    "source": "navi" if c in names else "emap" if sh is not None else "pnu",
+                    "geometry_source": "emap" if sh is not None else None,
+                    "geometry": sh.geometry if sh is not None else None})
+    out["legal_dong"] = gpd.GeoDataFrame(lds, geometry="geometry", crs=storage)
+
+    # 기초구역: 건물 주소의 우편번호(내비, 2015년부터 기초구역번호와 같다)와 전자지도 경계
+    zips = set(centers["zip_code"]) - {""}
+    zshapes = {} if bz_raw is None else {r.BAS_ID: r for r in bz_raw.itertuples()}
+    bzs = []
+    for z in sorted(zips | set(zshapes)):
+        sh = zshapes.get(z)
+        bzs.append({"uri": uri.basic_zone(z), "zone_no": z, "source": "navi" if z in zips else "emap",
+                    "geometry_source": "emap" if sh is not None else None,
+                    "geometry": sh.geometry if sh is not None else None})
+    out["basic_zone"] = gpd.GeoDataFrame(bzs, geometry="geometry", crs=storage)
+
+    # 건물 -> 법정동, 기초구역, 주소의 도로. 주소 연결 건물은 주소 값을, 주소 미연결 건물은 PNU 앞 10자리를 쓴다
+    info = centers.set_index("bldg_mgt_no")[["addr_emd_code", "zip_code", "road_code"]]
+    rows = []
+    for b in buildings.itertuples():
+        if b.kind == "building" and b.bldg_mgt_no in info.index:
+            a = info.loc[b.bldg_mgt_no]
+            rows.append({"building_uri": b.uri, "legal_dong_uri": uri.legal_dong(a["addr_emd_code"]),
+                         "zone_uri": uri.basic_zone(a["zip_code"]) if a["zip_code"] else None,
+                         "road_uri": uri.road(a["road_code"])})
+        elif isinstance(b.pnu, str):
+            rows.append({"building_uri": b.uri, "legal_dong_uri": uri.legal_dong(b.pnu[:10]), "zone_uri": None, "road_uri": None})
+    out["building_zone"] = pd.DataFrame(rows, columns=["building_uri", "legal_dong_uri", "zone_uri", "road_uri"])
+    out["parcel_legal_dong"] = pd.DataFrame({"parcel_uri": parcels["uri"], "legal_dong_uri": parcels["pnu"].str[:10].map(uri.legal_dong)})
+    return out
+
+
 def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     """proc 폴더의 잘라낸 자료(jeungmi_area.gpkg)로 객체를 만들어 같은 폴더에 저장한다."""
     area_gpkg, out_gpkg = proc / "jeungmi_area.gpkg", proc / "objects.gpkg"
@@ -225,7 +324,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
         mgt = e["bldg_mgt_no"]
         u = uri.main_entrance(mgt)
         ents.append({"uri": u, "kind": "main", "entrance_type": "주출입구", "sub_entrance_seq": None,
-                     "adm_dong_code": dong_of[mgt], "geometry": e.geometry})
+                     "adm_dong_code": dong_of[mgt], "road_code": e["road_code"], "geometry": e.geometry})
         links.append({"building_uri": bld_uri[mgt], "entrance_uri": u})
     # 보조출입구는 같은 주소를 쓰는 건물 모두에 잇는다 (건물 6개 이상인 주소에만 있다)
     matched = sub_ent.merge(centers[ADDRESS_KEY + ["bldg_mgt_no"]], on=ADDRESS_KEY, how="left")
@@ -234,7 +333,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
         mgts = grp["bldg_mgt_no"].dropna().tolist()
         ents.append({"uri": u, "kind": "sub", "entrance_type": SUB_ENTRANCE_TYPE.get(grp["entrance_type"].iloc[0]),
                      "sub_entrance_seq": seq, "adm_dong_code": dong_of[mgts[0]] if mgts else None,
-                     "geometry": grp.geometry.iloc[0]})
+                     "road_code": grp["road_code"].iloc[0], "geometry": grp.geometry.iloc[0]})
         links += [{"building_uri": bld_uri[m], "entrance_uri": u} for m in mgts]
     entrances = gpd.GeoDataFrame(ents, geometry="geometry", crs=storage)
     links = pd.DataFrame(links).drop_duplicates()
@@ -305,6 +404,9 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     assert facilities["uri"].is_unique, "기관코드 하나가 두 시설에 붙었다"
     facility_links = pd.DataFrame(facility_links, columns=["facility_uri", "building_uri"])
 
+    # 9. 도로명주소 전자지도: 도로, 도로 구간, 법정동, 기초구역
+    emap = make_emap_objects(area_gpkg, centers, buildings, entrances, parcels, metric, storage)
+
     # 저장
     if out_gpkg.exists():
         out_gpkg.unlink()
@@ -318,6 +420,11 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     dongs.to_csv(proc / "admin_dong.csv", index=False, encoding="utf-8")
     links.to_csv(proc / "building_entrance.csv", index=False, encoding="utf-8")
     conflicts.to_csv(proc / "review_gis_id_conflict.csv", index=False, encoding="utf-8")
+    for name in ("road", "entrance_road", "building_zone", "parcel_legal_dong", "review_entrance_road"):
+        emap[name].to_csv(proc / f"{name}.csv", index=False, encoding="utf-8")
+    for name in ("road_segment", "legal_dong", "basic_zone"):
+        if len(emap[name]):
+            emap[name].to_file(out_gpkg, layer=name, driver="GPKG", engine="pyogrio")
 
     geom_kind = buildings.geometry.geom_type
     report = {
@@ -339,6 +446,11 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
                    "with_complex_info": int(parcels["site_area"].notna().sum()),
                    "register_duplicate_pnu_rows": reg_dup},
         "admin_dong": len(dongs),
+        "road": {"total": len(emap["road"]), "segments": len(emap["road_segment"]),
+                 "entrances_facing_road": len(emap["entrance_road"]),
+                 "entrances_for_review": len(emap["review_entrance_road"])},
+        "legal_dong": len(emap["legal_dong"]),
+        "basic_zone": len(emap["basic_zone"]),
         "station": len(stations),
         "public_facility": {
             "source_points": len(offices), "with_agency_code": len(facilities),
