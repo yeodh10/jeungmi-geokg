@@ -72,7 +72,9 @@ def clip(gdf: gpd.GeoDataFrame, area, metric_crs: str, rule: str) -> gpd.GeoData
     return gdf[mask.values]
 
 
-def main() -> None:
+def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
+    """raw 폴더의 원본에서 대상 범위를 잘라 out_dir에 저장한다."""
+    out_gpkg = out_dir / "jeungmi_area.gpkg"
     cfg = load_area()
     metric = cfg["crs"]["metric"]
     storage = cfg["crs"]["storage"]
@@ -85,12 +87,12 @@ def main() -> None:
     layers: dict[str, gpd.GeoDataFrame] = {}
 
     # 1. GIS건물통합정보 (브이월드, EPSG:5186 폴리곤)
-    shp = next((RAW / "vworld_gis_building").glob("AL_D010_*.shp"))
+    shp = next((raw / "vworld_gis_building").glob("AL_D010_*.shp"))
     bld = gpd.read_file(shp, encoding="cp949", bbox=bbox, engine="pyogrio")
     layers["gis_building"] = clip(bld, area, metric, rule_poly)
 
     # 2. 내비게이션용DB 건물 (건물중심점, 주출입구)
-    navi_dir = RAW / "juso_navi_db"
+    navi_dir = raw / "juso_navi_db"
     nb = read_navi_txt(navi_dir / "match_build_seoul.txt", NAVI_BUILD_COLS)
     centers = clip(points_from_xy(nb, "center_x", "center_y", NAVI_CRS), area, metric, rule_point)
     layers["navi_building_center"] = centers
@@ -110,28 +112,28 @@ def main() -> None:
     navi_jibun = nj[nj["bldg_mgt_no"].isin(centers["bldg_mgt_no"])]
 
     # 5. 민원행정기관 전자지도 (EPSG:5179 점)
-    po_shp = next((RAW / "juso_public_office").glob("*.shp"))
+    po_shp = next((raw / "juso_public_office").glob("*.shp"))
     po = gpd.read_file(po_shp, encoding="cp949", engine="pyogrio")
     layers["public_office"] = clip(po, area, metric, rule_point)
 
     # 6. 서울시 건축물대장 총괄표제부 (CSV, X/Y는 EPSG:5179로 확인됨, docs/data-sources.md)
-    reg_csv = next((RAW / "seoul_building_register").glob("*.csv"))
+    reg_csv = next((raw / "seoul_building_register").glob("*.csv"))
     reg = pd.read_csv(reg_csv, dtype=str, encoding="cp949", keep_default_na=False)
     reg = points_from_xy(reg, "X좌표", "Y좌표", "EPSG:5179")
     layers["building_register_summary"] = clip(reg, area, metric, rule_point)
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    if OUT_GPKG.exists():
-        OUT_GPKG.unlink()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if out_gpkg.exists():
+        out_gpkg.unlink()
     report = {"center": cfg["center"]["epsg4326_lonlat"], "radius_m": cfg["radius_m"], "layers": {}}
     for name, gdf in layers.items():
         out = gdf.to_crs(storage)
-        out.to_file(OUT_GPKG, layer=name, driver="GPKG", engine="pyogrio")
+        out.to_file(out_gpkg, layer=name, driver="GPKG", engine="pyogrio")
         report["layers"][name] = {"count": len(out), "source_crs": str(gdf.crs)}
-    navi_jibun.to_csv(OUT_DIR / "navi_jibun.csv", index=False, encoding="utf-8")
+    navi_jibun.to_csv(out_dir / "navi_jibun.csv", index=False, encoding="utf-8")
     report["tables"] = {"navi_jibun": len(navi_jibun)}
 
-    with open(OUT_DIR / "clip_report.json", "w", encoding="utf-8") as f:
+    with open(out_dir / "clip_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

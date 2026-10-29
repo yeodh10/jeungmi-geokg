@@ -91,9 +91,9 @@ def dedupe_gis(bld: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, pd.DataFrame, i
     return bld[~conflict.values], bld[conflict.values].drop(columns="geometry"), merged
 
 
-def load_agencies() -> pd.DataFrame:
+def load_agencies(agency_dir: Path = AGENCY_DIR) -> pd.DataFrame:
     """행정표준코드 기관코드 중 현존(존폐여부 0)인 기관만 읽는다."""
-    path = next(AGENCY_DIR.glob("*유형분류 의미추가*.txt"))
+    path = next(agency_dir.glob("*유형분류 의미추가*.txt"))
     cols = ["기관코드", "전체기관명", "최하위기관명", "존폐여부"]
     ag = pd.read_csv(path, sep="\t", dtype=str, encoding="cp949", keep_default_na=False,
                      quoting=3, usecols=cols)
@@ -144,17 +144,19 @@ def housing_buildings(office, addr_index: pd.Series, bld_geom: pd.Series) -> lis
     return inside or mgts
 
 
-def main() -> None:
+def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
+    """proc 폴더의 잘라낸 자료(jeungmi_area.gpkg)로 객체를 만들어 같은 폴더에 저장한다."""
+    area_gpkg, out_gpkg = proc / "jeungmi_area.gpkg", proc / "objects.gpkg"
     cfg = load_cfg()
     metric = cfg["crs"]["metric"]
     storage = cfg["crs"]["storage"]
 
-    gis = gpd.read_file(AREA_GPKG, layer="gis_building")
-    centers = gpd.read_file(AREA_GPKG, layer="navi_building_center")
-    main_ent = gpd.read_file(AREA_GPKG, layer="navi_building_entrance")
-    sub_ent = gpd.read_file(AREA_GPKG, layer="navi_sub_entrance")
-    register = gpd.read_file(AREA_GPKG, layer="building_register_summary")
-    jibun = pd.read_csv(PROC / "navi_jibun.csv", dtype=str, keep_default_na=False)
+    gis = gpd.read_file(area_gpkg, layer="gis_building")
+    centers = gpd.read_file(area_gpkg, layer="navi_building_center")
+    main_ent = gpd.read_file(area_gpkg, layer="navi_building_entrance")
+    sub_ent = gpd.read_file(area_gpkg, layer="navi_sub_entrance")
+    register = gpd.read_file(area_gpkg, layer="building_register_summary")
+    jibun = pd.read_csv(proc / "navi_jibun.csv", dtype=str, keep_default_na=False)
 
     gis, conflicts, merged = dedupe_gis(gis)
 
@@ -274,8 +276,8 @@ def main() -> None:
     } for s in cfg["stations"]], geometry="geometry", crs=storage)
 
     # 8. 공공시설: 행정표준코드 기관코드로 URI를 붙이고, 도로명주소가 같은 건물에 housedIn으로 잇는다
-    offices = gpd.read_file(AREA_GPKG, layer="public_office")
-    agencies = load_agencies()
+    offices = gpd.read_file(area_gpkg, layer="public_office")
+    agencies = load_agencies(agency_dir)
     addr_index = centers.set_index(ADDRESS_KEY)["bldg_mgt_no"].sort_index()
     bld_geom = by_mgt["geometry"]  # 건물관리번호 -> 모양 (EPSG:4326, 포함 여부만 보므로 좌표계는 그대로 둔다)
     facilities, facility_links, facility_review = [], [], []
@@ -301,18 +303,18 @@ def main() -> None:
     facility_links = pd.DataFrame(facility_links, columns=["facility_uri", "building_uri"])
 
     # 저장
-    if OUT_GPKG.exists():
-        OUT_GPKG.unlink()
-    buildings.to_file(OUT_GPKG, layer="building", driver="GPKG", engine="pyogrio")
-    stations.to_file(OUT_GPKG, layer="station", driver="GPKG", engine="pyogrio")
-    facilities.to_file(OUT_GPKG, layer="public_facility", driver="GPKG", engine="pyogrio")
-    facility_links.to_csv(PROC / "facility_building.csv", index=False, encoding="utf-8")
-    pd.DataFrame(facility_review).to_csv(PROC / "review_public_facility.csv", index=False, encoding="utf-8")
-    entrances.to_file(OUT_GPKG, layer="entrance", driver="GPKG", engine="pyogrio")
-    parcels.to_csv(PROC / "parcel.csv", index=False, encoding="utf-8")
-    dongs.to_csv(PROC / "admin_dong.csv", index=False, encoding="utf-8")
-    links.to_csv(PROC / "building_entrance.csv", index=False, encoding="utf-8")
-    conflicts.to_csv(PROC / "review_gis_id_conflict.csv", index=False, encoding="utf-8")
+    if out_gpkg.exists():
+        out_gpkg.unlink()
+    buildings.to_file(out_gpkg, layer="building", driver="GPKG", engine="pyogrio")
+    stations.to_file(out_gpkg, layer="station", driver="GPKG", engine="pyogrio")
+    facilities.to_file(out_gpkg, layer="public_facility", driver="GPKG", engine="pyogrio")
+    facility_links.to_csv(proc / "facility_building.csv", index=False, encoding="utf-8")
+    pd.DataFrame(facility_review).to_csv(proc / "review_public_facility.csv", index=False, encoding="utf-8")
+    entrances.to_file(out_gpkg, layer="entrance", driver="GPKG", engine="pyogrio")
+    parcels.to_csv(proc / "parcel.csv", index=False, encoding="utf-8")
+    dongs.to_csv(proc / "admin_dong.csv", index=False, encoding="utf-8")
+    links.to_csv(proc / "building_entrance.csv", index=False, encoding="utf-8")
+    conflicts.to_csv(proc / "review_gis_id_conflict.csv", index=False, encoding="utf-8")
 
     geom_kind = buildings.geometry.geom_type
     report = {
@@ -342,7 +344,7 @@ def main() -> None:
             "housed_in_building": int(facility_links["facility_uri"].nunique()),
         },
     }
-    with open(PROC / "objects_report.json", "w", encoding="utf-8") as f:
+    with open(proc / "objects_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

@@ -57,16 +57,17 @@ def add_geometry(g: Graph, s: URIRef, geom, source_gis_id=None) -> None:
     add(g, gu, JGK.sourceGisBuildingId, source_gis_id)
 
 
-def main() -> None:
-    gpkg = PROC / "objects.gpkg"
+def build(proc: Path = PROC) -> Graph:
+    """proc 폴더의 객체 파일(src.model.build_objects 결과)로 그래프를 만든다."""
+    gpkg = proc / "objects.gpkg"
     buildings = gpd.read_file(gpkg, layer="building")
     entrances = gpd.read_file(gpkg, layer="entrance")
     stations = gpd.read_file(gpkg, layer="station")
     facilities = gpd.read_file(gpkg, layer="public_facility")
-    facility_links = pd.read_csv(PROC / "facility_building.csv", dtype=str)
-    parcels = pd.read_csv(PROC / "parcel.csv", dtype=str, keep_default_na=False)
-    dongs = pd.read_csv(PROC / "admin_dong.csv", dtype=str, keep_default_na=False)
-    links = pd.read_csv(PROC / "building_entrance.csv", dtype=str)
+    facility_links = pd.read_csv(proc / "facility_building.csv", dtype=str)
+    parcels = pd.read_csv(proc / "parcel.csv", dtype=str, keep_default_na=False)
+    dongs = pd.read_csv(proc / "admin_dong.csv", dtype=str, keep_default_na=False)
+    links = pd.read_csv(proc / "building_entrance.csv", dtype=str)
 
     g = Graph()
     g.bind("jgk", JGK)
@@ -154,7 +155,11 @@ def main() -> None:
         add_geometry(g, s, r.geometry)
     for r in facility_links.itertuples():
         g.add((URIRef(r.facility_uri), JGK.housedIn, URIRef(r.building_uri)))
+    return g
 
+
+def main() -> None:
+    g = build()
     g.serialize(OUT_TTL, format="turtle", encoding="utf-8")
     print(f"triples: {len(g)} -> {OUT_TTL.relative_to(ROOT)}")
 

@@ -47,6 +47,7 @@ jgk:Active a jgk:Status ; rdfs:label "사용"@ko .
 jgk:AddressUnlinked a jgk:Status ; rdfs:label "주소 미연결"@ko .
 jgk:AddressLinked a jgk:Status ; rdfs:label "주소 연결됨"@ko .
 jgk:Retired a jgk:Status ; rdfs:label "폐지"@ko .
+jgk:retiredOn a owl:DatatypeProperty ; rdfs:label "폐지 확인일"@ko ; rdfs:range xsd:date .
 
 # 공식 번호
 
