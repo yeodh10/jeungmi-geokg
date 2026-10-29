@@ -2,9 +2,12 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#useName> "문화/관광/레저시설" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로61길 101" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010400> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#inBasicZone> <https://yeodh10.github.io/jeungmi-geokg/id/basic-zone/07531> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "3"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#buildingMgtNo> "1150010400114930000009420" .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <https://yeodh10.github.io/jeungmi-geokg/def#addressRoad> <https://yeodh10.github.io/jeungmi-geokg/id/road/115004145416> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420/geometry> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420/geometry> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114930000009420> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .

@@ -4,11 +4,14 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 양천구 목동중앙북로7나길 38-1" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#locatedOn> <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1147010200106040012> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1147010200> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#inBasicZone> <https://yeodh10.github.io/jeungmi-geokg/id/basic-zone/07946> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#hasEntrance> <https://yeodh10.github.io/jeungmi-geokg/id/entrance/1147010200106040012017934-main> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "2"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#buildingMgtNo> "1147010200106040012017934" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#approvalDate> "1989-08-02"^^<http://www.w3.org/2001/XMLSchema#date> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <https://yeodh10.github.io/jeungmi-geokg/def#addressRoad> <https://yeodh10.github.io/jeungmi-geokg/id/road/114704142197> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934/geometry> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934/geometry> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106040012017934> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .

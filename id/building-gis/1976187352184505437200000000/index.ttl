@@ -1,5 +1,6 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#AddressUnlinked> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#locatedOn> <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106380010> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010200> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#gisBuildingId> "1976187352184505437200000000" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "0"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1976187352184505437200000000> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "0"^^<http://www.w3.org/2001/XMLSchema#integer> .

@@ -3,6 +3,7 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#siteArea> "1121.49"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#pnu> "1150010100102420014" .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#mainBuildingCount> "2"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010100> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#households> "0"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <https://yeodh10.github.io/jeungmi-geokg/def#complexMainUse> "제2종근린생활시설" .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102420014> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-gis-building> .

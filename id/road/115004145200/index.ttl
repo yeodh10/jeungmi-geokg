@@ -1,0 +1,6 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <https://yeodh10.github.io/jeungmi-geokg/def#roadCode> "115004145200" .
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <http://www.w3.org/2000/01/rdf-schema#label> "공항대로57길"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Road> .
+<https://yeodh10.github.io/jeungmi-geokg/id/road/115004145200> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

@@ -23,6 +23,11 @@ jgk:Parcel a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "필지"@ko ;
 jgk:PublicFacility a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "공공시설"@ko .
 jgk:Station a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "역"@ko .
 jgk:AdminDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "행정동"@ko .
+jgk:Road a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로"@ko ;
+    rdfs:comment "도로명 하나. 번호는 도로명코드(시군구코드 5자리 + 도로명번호 7자리)다. 모양은 도로 구간이 가진다."@ko .
+jgk:LegalDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "법정동"@ko .
+jgk:BasicZone a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "기초구역"@ko ;
+    rdfs:comment "국가기초구역. 번호 5자리는 우편번호와 같다."@ko .
 
 # 객체 사이 관계
 
@@ -35,6 +40,17 @@ jgk:locatedOn a owl:ObjectProperty ; rdfs:label "필지 위에 있다"@ko ;
 jgk:housedIn a owl:ObjectProperty ; rdfs:label "건물 안에 있다"@ko ;
     rdfs:comment "역, 공공시설이 들어 있는 건물을 가리킨다."@ko ;
     rdfs:range jgk:Building .
+jgk:segmentOf a owl:ObjectProperty ; rdfs:label "도로의 구간이다"@ko ;
+    rdfs:domain jgk:RoadSegment ; rdfs:range jgk:Road .
+jgk:addressRoad a owl:ObjectProperty ; rdfs:label "도로명주소의 도로"@ko ;
+    rdfs:comment "건물 도로명주소에 쓰인 도로명. 실제로 면한 도로 구간은 출입구의 facesRoad로 따로 잇는다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:Road .
+jgk:inLegalDong a owl:ObjectProperty ; rdfs:label "법정동에 속한다"@ko ;
+    rdfs:comment "주소의 법정동코드나 PNU 앞 10자리로 정한 소속이다."@ko ;
+    rdfs:domain geo:Feature ; rdfs:range jgk:LegalDong .
+jgk:inBasicZone a owl:ObjectProperty ; rdfs:label "기초구역에 속한다"@ko ;
+    rdfs:comment "건물 주소의 우편번호로 정한 소속이다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:BasicZone .
 jgk:within a owl:ObjectProperty ; rdfs:label "행정동에 속한다"@ko ;
     rdfs:comment "원천 데이터의 행정동코드로 정한 소속이다. 모양끼리의 포함 관계는 geof:sfWithin으로 따로 계산한다."@ko ;
     rdfs:domain geo:Feature ; rdfs:range jgk:AdminDong .
@@ -59,6 +75,13 @@ jgk:lineName a owl:DatatypeProperty ; rdfs:label "노선"@ko ; rdfs:domain jgk:S
 jgk:agencyCode a owl:DatatypeProperty ; rdfs:label "행정표준코드 기관코드"@ko ; rdfs:range xsd:string .
 jgk:agencyName a owl:DatatypeProperty ; rdfs:label "행정표준코드 전체기관명"@ko ; rdfs:range xsd:string .
 jgk:facilityType a owl:DatatypeProperty ; rdfs:label "시설 유형"@ko ; rdfs:range xsd:string .
+jgk:roadCode a owl:DatatypeProperty ; rdfs:label "도로명코드"@ko ; rdfs:range xsd:string .
+jgk:roadSegmentNo a owl:DatatypeProperty ; rdfs:label "도로구간 일련번호"@ko ; rdfs:range xsd:string .
+jgk:roadClass a owl:DatatypeProperty ; rdfs:label "도로 위계(고속도로, 대로, 로, 길)"@ko ; rdfs:range xsd:string .
+jgk:roadWidth a owl:DatatypeProperty ; rdfs:label "도로 폭(m)"@ko ; rdfs:range xsd:decimal .
+jgk:roadLength a owl:DatatypeProperty ; rdfs:label "도로 구간 길이(m)"@ko ; rdfs:range xsd:decimal .
+jgk:legalDongCode a owl:DatatypeProperty ; rdfs:label "법정동코드"@ko ; rdfs:range xsd:string .
+jgk:basicZoneNo a owl:DatatypeProperty ; rdfs:label "기초구역번호"@ko ; rdfs:range xsd:string .
 jgk:subEntranceSeq a owl:DatatypeProperty ; rdfs:label "보조출입구 일련번호"@ko ; rdfs:range xsd:string .
 
 # 건물 속성
@@ -105,6 +128,10 @@ jgk:dataset-navi-db a jgk:Dataset ;
 jgk:dataset-public-office a jgk:Dataset ;
     dcterms:title "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
     rdfs:label "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
+    dcterms:source <https://business.juso.go.kr> .
+jgk:dataset-juso-emap a jgk:Dataset ;
+    dcterms:title "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
+    rdfs:label "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     dcterms:source <https://business.juso.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;

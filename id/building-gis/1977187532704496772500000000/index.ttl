@@ -2,6 +2,7 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#structureName> "벽돌구조" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#AddressUnlinked> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#locatedOn> <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200103660087> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010200> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#gisBuildingId> "1977187532704496772500000000" .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1977187532704496772500000000> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "2"^^<http://www.w3.org/2001/XMLSchema#integer> .

@@ -2,6 +2,7 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#pnu> "1150010200106300003" .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#mainBuildingCount> "2"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010200> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#households> "110"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <https://yeodh10.github.io/jeungmi-geokg/def#complexMainUse> "공동주택" .
 <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200106300003> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-navi-db> .
