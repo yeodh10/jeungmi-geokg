@@ -1,0 +1,103 @@
+# 고시공고 추출 평가 정답 (사람이 단 것, 2026-10-29)
+# mgt: 강서구청 누리집 고시공고 번호(mgtNo). 원문은 python -m src.eval.collect_notices로 받는다 (커밋하지 않는다)
+# is_spatial: 공간 객체(건물, 도로, 주소, 공공시설, 하천, 숲길, 구역)가 생기거나 바뀌거나 없어지는 문서인가.
+#             계획 인가, 조합 설립처럼 아직 객체가 바뀌지 않는 문서와 판단이 애매한 문서는 null(재지 않음)로 둔다
+# targets: 본문에 적힌 대상(지번, 이름). 모델이 뽑은 대상 가운데 하나가 이 글자를 담고 있으면 맞다 (띄어쓰기 무시)
+# change_types: 뽑은 변경 종류가 모두 이 안에 있어야 맞다
+# effective_date: 본문에 효력 날짜가 적혀 있을 때만 적는다
+# 첨부 파일에만 있는 내용(폐지조서 목록 등)은 본문에 없으므로 정답에 넣지 않는다
+
+# 공간 객체가 바뀌는 문서
+- mgt: 52809
+  title: 동원주택가로주택정비사업 공사완료 고시
+  is_spatial: true
+  targets: [내발산동 712-5]
+  change_types: [building_new, other]
+- mgt: 55402
+  title: 화곡1주택재건축정비사업 공사완료(도로,어린이공원) 고시
+  is_spatial: true
+  targets: [화곡동 1027-50]
+  change_types: [building_new, other]
+- mgt: 55545
+  title: 경남주택가로주택정비사업 공사완료 고시
+  is_spatial: true
+  targets: [내발산동 716-20]
+  change_types: [building_new, other]
+- mgt: 55560
+  title: 까치산경로당 시설물 폐쇄 고시
+  is_spatial: true
+  targets: [화곡동 359-126]
+  change_types: [facility_closed, other]
+  effective_date: "2023-10-04"
+- mgt: 67442
+  title: 긴등마을 주택재건축정비사업 준공인가 고시
+  is_spatial: true
+  targets: [소로3-1]
+  change_types: [building_new, other]
+- mgt: 68668
+  title: 도로명주소 폐지 고시
+  is_spatial: true
+  # 폐지 목록은 첨부 폐지조서에만 있어 본문에서 뽑을 대상이 없다. 처음엔 변경 종류 정답을 달았다가,
+  # 모델이 대상을 지어내지 않고 비운 것을 보고 위 원칙(첨부에만 있는 내용은 넣지 않음)에 맞춰 뺐다 (2026-10-29)
+- mgt: 56743
+  title: 소하천의 지정에 관한 고시
+  is_spatial: true
+  targets: [오곡동 712-2]
+  change_types: [other]
+- mgt: 60222
+  title: 한강변 명품숲 둘레길 숲길 지정 고시
+  is_spatial: true
+  change_types: [other]
+  effective_date: "2024-10-23"
+- mgt: 49199
+  title: 서울특별시 강서구 산사태취약지역 지정 및 해제 고시
+  is_spatial: true
+  targets: [개화동 산48, 개화동 산81-13]
+  change_types: [other]
+  effective_date: "2022-02-16"
+
+# 판단이 애매한 문서 (공간 판단은 재지 않음)
+- mgt: 67692
+  title: 긴등마을 주택재건축정비사업 이전고시
+  is_spatial: null
+- mgt: 68626
+  title: 제3종시설물의 해제 고시(화곡중앙시장)
+  is_spatial: null
+- mgt: 54324
+  title: 도시계획시설(도로) 결정 실효 및 지형도면 고시
+  is_spatial: null
+- mgt: 68677
+  title: 등촌1구역 주택재건축정비사업 관리처분계획(변경)인가 고시
+  is_spatial: null
+
+# 공간 객체와 상관없는 문서
+- mgt: 67959
+  title: 서울특별시 강서구 통합신청사 부설주차장 주차요금 결정 고시
+  is_spatial: false
+- mgt: 68709
+  title: 전국 사회연대경제 지방정부협의회 규약 변경 고시
+  is_spatial: false
+- mgt: 55772
+  title: 2024년도 서울특별시 강서구 생활임금 고시
+  is_spatial: false
+- mgt: 60252
+  title: 2025년도 서울특별시 강서구 생활임금 고시
+  is_spatial: false
+- mgt: 64496
+  title: 2026년도 서울특별시 강서구 생활임금 고시
+  is_spatial: false
+- mgt: 68708
+  title: 2027년도 서울특별시 강서구 생활임금 고시
+  is_spatial: false
+- mgt: 54162
+  title: 2023년 개발제한구역을 제외한 개별공시지가의 지목별 평균치 고시
+  is_spatial: false
+- mgt: 59206
+  title: 2024년 개발제한구역을 제외한 개별공시지가의 지목별 평균치 고시
+  is_spatial: false
+- mgt: 63884
+  title: 2025년 개발제한구역을 제외한 개별공시지가의 지목별 평균치 고시
+  is_spatial: false
+- mgt: 67430
+  title: 2026년 개발제한구역을 제외한 개별공시지가의 지목별 평균치 고시
+  is_spatial: false

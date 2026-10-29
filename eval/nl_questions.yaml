@@ -1,0 +1,137 @@
+# 자연어 질의 평가 문제
+# 정답(gold)은 사람이 쓴 SPARQL을 지금 그래프에 돌려 정한다 (python -m src.eval.nl_eval이 매번 다시 계산한다).
+# kind:
+#   count    정답은 숫자 하나. 모델 결과의 어느 칸이 그 숫자이거나, 모델이 고른 객체 URI 수가 그 숫자면 맞다
+#   entities 정답은 객체 URI 집합. 모델 결과에 나온 우리 URI 집합과 같으면 맞다 (정밀도, 재현율도 적는다)
+#   values   정답은 값(이름 등) 집합. 정답 값이 모델 결과에 모두 나오고, 결과 행이 정답의 3배를 넘지 않으면 맞다
+#   boolean  ASK. 참거짓이 같으면 맞다
+# 시스템 프롬프트에 예시로 넣는 쿼리(src/graph/queries)와 거의 같은 질문은 넣지 않았다.
+
+- id: q01
+  question: 증미역 역사 건물의 도로명주소는?
+  kind: values
+  gold: |
+    SELECT ?a WHERE { <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> jgk:housedIn ?b . ?b jgk:roadAddress ?a }
+- id: q02
+  question: 범위 안 공공시설 가운데 학교는 몇 곳이야?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE { ?f a jgk:PublicFacility ; jgk:facilityType ?t . FILTER(STRSTARTS(?t, "학교/")) }
+- id: q03
+  question: 법정동이 등촌동인 주소 미연결 건물은 몇 개?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:status jgk:AddressUnlinked ; jgk:inLegalDong ?d . ?d rdfs:label "등촌동"@ko }
+- id: q04
+  question: 법정동 가양동에 있는 공동주택 건물 수는?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:useName "공동주택" ; jgk:inLegalDong ?d . ?d rdfs:label "가양동"@ko }
+- id: q05
+  question: 증미역에서 200m 안에 있는 공공시설을 보여줘
+  kind: entities
+  gold: |
+    SELECT DISTINCT ?f WHERE { ?f a jgk:PublicFacility ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:200}})) }
+- id: q06
+  question: 강서소방서가 들어 있는 건물은 지상 몇 층이야?
+  kind: values
+  gold: |
+    SELECT ?n WHERE { ?f a jgk:PublicFacility ; rdfs:label "강서소방서"@ko ; jgk:housedIn ?b . ?b jgk:floorsAbove ?n }
+- id: q07
+  question: 지상 20층 이상인 건물은 몇 개야?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:floorsAbove ?f . FILTER(?f >= 20) }
+- id: q08
+  question: 사용승인일이 1990년 1월 1일보다 이른 건물은 몇 개?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:approvalDate ?d . FILTER(?d < "1990-01-01"^^<http://www.w3.org/2001/XMLSchema#date>) }
+- id: q09
+  question: 양천로에 면한 출입구를 가진 건물은 몇 개?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:hasEntrance ?e . ?e jgk:facesRoad/jgk:segmentOf ?r . ?r rdfs:label "양천로"@ko }
+- id: q10
+  question: 폭이 30m 이상인 도로 구간이 속한 도로 이름을 알려줘
+  kind: values
+  gold: |
+    SELECT DISTINCT ?name WHERE { ?s a jgk:RoadSegment ; jgk:roadWidth ?w ; jgk:segmentOf ?r . ?r rdfs:label ?name . FILTER(?w >= 30) }
+- id: q11
+  question: 국가기본도 건물과 이어진 우리 건물은 몇 개야?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b jgk:basemapFeature ?m }
+- id: q12
+  question: 증미역 역사 건물이 속한 기초구역 번호는?
+  kind: values
+  gold: |
+    SELECT ?z WHERE { <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> jgk:housedIn ?b . ?b jgk:inBasicZone ?bz . ?bz jgk:basicZoneNo ?z }
+- id: q13
+  question: 건물이 가장 많은 행정동은 어디야?
+  kind: values
+  gold: |
+    SELECT ?name WHERE { ?d a jgk:AdminDong ; rdfs:label ?name . { SELECT ?d (COUNT(?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:within ?d } GROUP BY ?d } } ORDER BY DESC(?n) LIMIT 1
+- id: q14
+  question: 보조출입구는 모두 몇 개야?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?e) AS ?n) WHERE { ?e a jgk:BuildingEntrance ; jgk:entranceType ?t . FILTER(?t != "주출입구") }
+- id: q15
+  question: 출입구를 두 개 이상 가진 건물은 몇 개?
+  kind: count
+  gold: |
+    SELECT (COUNT(?b) AS ?n) WHERE { { SELECT ?b (COUNT(DISTINCT ?e) AS ?k) WHERE { ?b a jgk:Building ; jgk:hasEntrance ?e } GROUP BY ?b } FILTER(?k >= 2) }
+- id: q16
+  question: 법정동이 염창동인 주소 미연결 건물 수는?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:status jgk:AddressUnlinked ; jgk:inLegalDong ?d . ?d rdfs:label "염창동"@ko }
+- id: q17
+  question: 범위 안 경찰서나 지구대 이름을 알려줘
+  kind: values
+  gold: |
+    SELECT ?name WHERE { ?f a jgk:PublicFacility ; jgk:facilityType ?t ; rdfs:label ?name . FILTER(STRSTARTS(?t, "경찰서/")) }
+- id: q18
+  question: 등촌119안전센터에서 300m 안에 있는 학교 이름은?
+  kind: values
+  gold: |
+    SELECT ?name WHERE { ?f a jgk:PublicFacility ; jgk:facilityType ?t ; rdfs:label ?name ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(STRSTARTS(?t, "학교/")) FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/public-facility/6113432:300}})) }
+- id: q19
+  question: 이름에 '아파트'가 들어간 건물은 몇 개야?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; rdfs:label ?l . FILTER(CONTAINS(STR(?l), "아파트")) }
+- id: q20
+  question: 공동주택이면서 지상 15층 이상인 건물은 몇 개?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:useName "공동주택" ; jgk:floorsAbove ?f . FILTER(?f >= 15) }
+- id: q21
+  question: 폐지된 건물이 하나라도 있어?
+  kind: boolean
+  gold: |
+    ASK { ?b a jgk:Building ; jgk:status jgk:Retired }
+- id: q22
+  question: 행정동 염창동에 속한 공공시설 이름을 알려줘
+  kind: values
+  gold: |
+    SELECT ?name WHERE { ?f a jgk:PublicFacility ; rdfs:label ?name ; jgk:within ?d . ?d rdfs:label "염창동"@ko }
+- id: q23
+  question: 도로 위계가 대로인 도로 이름은?
+  kind: values
+  gold: |
+    SELECT DISTINCT ?name WHERE { ?s a jgk:RoadSegment ; jgk:roadClass "대로" ; jgk:segmentOf ?r . ?r rdfs:label ?name }
+- id: q24
+  question: 공공시설이 들어 있는 건물 가운데 주소 미연결 상태인 건물이 있어?
+  kind: boolean
+  gold: |
+    ASK { ?f a jgk:PublicFacility ; jgk:housedIn ?b . ?b jgk:status jgk:AddressUnlinked }
+- id: q25
+  question: 교육연구시설 용도 건물 중 증미역 500m 안에 있는 건물 수는?
+  kind: count
+  gold: |
+    SELECT (COUNT(DISTINCT ?b) AS ?n) WHERE { ?b a jgk:Building ; jgk:useName "교육연구시설" ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:500}})) }
