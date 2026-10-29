@@ -37,7 +37,7 @@
 ## 구조
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph SRC["공공데이터 (data/raw, 커밋 안 함)"]
     A1[GIS건물통합정보]
     A2[도로명주소 내비게이션용DB]
