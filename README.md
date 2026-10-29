@@ -4,6 +4,8 @@
 
 국토교통부 "국가기본도 대전환" 방향인 **객체 원자화, 영구 식별자, 자동 갱신, AI 제안 후 사람 승인**을 작은 지역에서 처음부터 끝까지 실제 공공데이터로 돌려 보는 것이 목표입니다.
 
+**URI가 실제로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/ (예: [증미역](https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001), [어휘](https://yeodh10.github.io/jeungmi-geokg/def/)). 객체마다 사람이 읽는 페이지와 Turtle(`index.ttl`)이 있습니다.
+
 | 지도 화면 | 변경 제안 검토 화면 |
 |---|---|
 | ![지도 화면: 그래프의 건물을 상태별 색으로 보여 주고, 고른 객체의 속성과 연결을 왼쪽에 보여 준다](docs/images/map.jpg) | ![검토 화면: 강서구 도로명주소 폐지 고시로 만든 건물 폐지 제안을 지금과 바뀐 뒤로 보여 준다](docs/images/review.jpg) |
@@ -13,7 +15,7 @@
 | 방향 | 이 프로젝트에서 한 것 | 어디에 |
 |---|---|---|
 | 객체 원자화 | 원천 자료 5종을 건물, 출입구, 필지, 공공시설, 역, 행정동 객체로 쪼갰습니다. 모든 객체는 GeoSPARQL Feature이고 모양(Geometry)은 따로 둡니다. | `src/model/`, `src/graph/ontology.ttl` |
-| 영구 식별자 | 새 번호를 만들지 않고 건물관리번호, PNU, 행정동코드, 행정표준코드 기관코드를 그대로 URI에 씁니다. 객체가 사라져도 URI는 남기고 상태만 폐지로 바꿉니다. 11,710개 URI를 실제로 열리는 페이지로 만들었습니다. | [docs/uri-policy.md](docs/uri-policy.md), `src/graph/publish.py` |
+| 영구 식별자 | 새 번호를 만들지 않고 건물관리번호, PNU, 행정동코드, 행정표준코드 기관코드를 그대로 URI에 씁니다. 객체가 사라져도 URI는 남기고 상태만 폐지로 바꿉니다. 11,710개 URI를 GitHub Pages에 올려 실제로 열리게 했습니다. | [docs/uri-policy.md](docs/uri-policy.md), `src/graph/publish.py` |
 | 자동 갱신 | 새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 비교해 신규, 변경, 폐지, 주소 연결 제안을 만듭니다. | `src/review/diff_proposals.py` |
 | AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
 
@@ -106,6 +108,15 @@ cp .env.example .env                                   # ANTHROPIC_API_KEY 등 �
 
 http://localhost:8000 은 변경 제안 검토, http://localhost:8000/map 은 지도와 자연어 질의입니다.
 
+URI 페이지 다시 올리기 (`gh-pages` 브랜치에 `data/processed/site/`를 통째로 올리면 GitHub Pages가 알아서 다시 만듭니다):
+
+```bash
+git worktree add ../jeungmi-geokg-pages gh-pages
+cp -r data/processed/site/. ../jeungmi-geokg-pages/ && rm ../jeungmi-geokg-pages/publish_report.json
+cd ../jeungmi-geokg-pages && git add -A && git commit -m "URI 공개 페이지 다시 만듦" && git push && cd -
+git worktree remove ../jeungmi-geokg-pages
+```
+
 제안 만들기:
 
 ```bash
@@ -182,12 +193,12 @@ docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
 | 10/28 ~ 11/3 | 데이터 받기, 범위 자르기, 이용 조건 기록 | 전자지도만 승인 대기 |
 | 11/4 ~ 11/10 | 객체 쪼개기, URI, 그래프, SPARQL | 끝 (10/29) |
 | 11/11 ~ 11/17 | LLM 변경 제안, 자연어 질의 | 끝 (가짜 클라이언트로 확인, 실제 키로 돌리기 남음) |
-| 11/18 ~ 11/24 | 검토 화면, 지도 화면, 배포, README와 시연 영상 | 화면과 README 끝, 배포와 영상 남음 |
+| 11/18 ~ 11/24 | 검토 화면, 지도 화면, 배포, README와 시연 영상 | 화면, README, 배포 끝, 영상 남음 |
 
 남은 일:
 
 - [ ] 실제 Claude API 키로 고시공고(등촌1구역 관리처분계획 변경인가)와 자연어 질의 돌려 보기
-- [ ] GitHub Pages로 URI 페이지 배포 (공개 전 확인)
+- [x] GitHub Pages로 URI 페이지 배포 (10/29, `gh-pages` 브랜치, 공공시설 23곳은 이용 조건 확인 전까지 제외)
 - [ ] 도로명주소 전자지도가 오면 도로 구간, 출입구의 `facesRoad`, 행정동 경계 넣기. 주소 미연결 건물 628개도 `geof:sfWithin`으로 행정동에 잇기
 - [ ] 민원행정기관, 전자지도 이용 조건 확인
 - [ ] 새 기준일 자료(내비게이션용DB 10월분 등)로 자동 갱신 실제로 돌려 보기
