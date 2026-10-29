@@ -169,7 +169,7 @@ def group_of(p: Proposal) -> tuple[str, str | None]:
         if m:
             named = re.search(r"\(([^()]*" + NOTICE_NO.pattern + r"[^()]*)\)", e)
             return f"notice:{m.group(1)}", (named.group(1) if named else m.group(0)).strip()
-    if p.id.startswith(("table-", "llm-", "diff-")) and "-" in p.id:
+    if p.id.startswith(("table-", "llm-", "diff-", "rule-basemap-link-")) and "-" in p.id:
         return p.id.rsplit("-", 1)[0], p.source_detail
     return f"single:{p.id}", None
 
