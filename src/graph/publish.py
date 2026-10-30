@@ -6,6 +6,7 @@
   id/{종류}/index.html          종류별 목록 (이름, 번호로 거르기)
   id/{종류}/{번호}/index.html   사람이 보는 객체 페이지 (주요 정보, 연결, 출처, 작은 지도)
   id/{종류}/{번호}/index.ttl    그 URI가 주어인 트리플 (N-Triples 줄로 쓴 Turtle)
+  map/index.html               전체 지도 (assets/map/*.geojson을 그린다. 서버 없이 열리는 지도 화면)
   def/index.html, def/ontology.ttl  어휘
   assets/  화면 모양(web/style.css를 그대로 씀)과 스크립트, search.json(전체 찾기용 목록)
 
@@ -79,7 +80,25 @@ ICON = {
     "search": '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     "file": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
 }
+# 전체 지도에 그릴 종류 -> 레이어, 레이어 순서와 처음에 켤지
+MAP_LAYER = {"building": "building", "building-gis": "building", "entrance": "entrance", "station": "station"}
+MAP_LAYERS = [("building", "건물", True), ("entrance", "건물 출입구", False), ("station", "역", True)]
 e = html.escape
+
+
+def area_circle() -> dict:
+    """config/area.yaml의 대상 범위 원. 지도 화면 API(src.review.app.area_geojson)와 같은 방법으로 EPSG:5186에서 그린다."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+    with open(ROOT / "config" / "area.yaml", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    lon, lat = cfg["center"]["epsg4326_lonlat"]
+    metric = (cfg.get("crs") or {}).get("metric", "EPSG:5186")
+    circle = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326").to_crs(metric) \
+        .buffer(cfg["radius_m"], quad_segs=64).to_crs("EPSG:4326").iloc[0]
+    g = shapely.set_precision(circle, 1e-6)
+    return {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": mapping(g), "properties": {}}],
+            "center": [lon, lat], "bbox": [round(v, 6) for v in circle.bounds]}
 
 
 def term_nt(t) -> str:
@@ -96,9 +115,9 @@ def kind_of(uri: str) -> str:
     return uri[len(BASE) + 1:].split("/")[0]
 
 
-def page(title: str, body: str, *, nav: str = "", head: str = "", desc: str = "") -> str:
+def page(title: str, body: str, *, nav: str = "", head: str = "", desc: str = "", wide: bool = False) -> str:
     """모든 공개 페이지가 같이 쓰는 틀. 링크는 SITE_PATH로 시작해 GitHub Pages와 같은 경로에서 열린다."""
-    navs = [("", "처음"), ("/id/building/", "건물"), ("/id/parcel/", "필지"), ("/id/road/", "도로"), ("/def/", "어휘")]
+    navs = [("", "처음"), ("/map/", "지도"), ("/id/building/", "건물"), ("/id/parcel/", "필지"), ("/id/road/", "도로"), ("/def/", "어휘")]
     links = "".join(f'<a href="{SITE_PATH}{p}"{" class=on" if nav == p else ""}>{n}</a>' for p, n in navs)
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)} | 증미역 공간 지식 그래프</title>{f'<meta name="description" content="{e(desc)}">' if desc else ""}
@@ -107,7 +126,7 @@ def page(title: str, body: str, *, nav: str = "", head: str = "", desc: str = ""
 <script src="{SITE_PATH}/assets/common.js"></script><script src="{SITE_PATH}/assets/site.js" defer></script></head><body>
 <header class="topbar"><a class="brand" href="{SITE_PATH}/">증미역 공간 지식 그래프<small>URI 사이트</small></a><nav>{links}</nav>
 <span class="spacer"></span><a class="tb-link" href="{REPO}" target="_blank" rel="noopener">{ICON["code"]}<span>소스 코드</span></a></header>
-<main class="page">{body}</main>
+<main class="page{" wide" if wide else ""}">{body}</main>
 <footer class="foot"><div>증미역 반경 1km 공간 지식 그래프, GeoSPARQL 1.1. 객체마다 공식 번호로 바뀌지 않는 URI를 붙였습니다.</div>
 <div>배경지도 © OpenStreetMap contributors. 이용 조건을 확인 중인 출처의 객체는 이 사이트에 넣지 않았습니다.</div></footer></body></html>"""
 
@@ -182,6 +201,7 @@ def main() -> None:
                 inbound[o.value].append((p.value, s))
 
     by_kind = defaultdict(list)  # 종류 -> [(uri, 이름, 상태)]
+    map_feats = defaultdict(list)  # 지도 레이어 -> GeoJSON Feature (공개 객체만)
     n = 0
     for s, plist in triples.items():
         # 모양 노드(…/geometry)도 이미 공개한 URI라 페이지를 계속 만든다. 목록과 찾기에는 넣지 않는다
@@ -231,6 +251,12 @@ def main() -> None:
             if wkt:
                 g = shapely.set_precision(shapely.from_wkt(wkt), 1e-6)
                 geom_json = json.dumps(mapping(g), separators=(",", ":"))
+                layer = MAP_LAYER.get(kind)
+                if layer and not is_geom:
+                    use = next((o.value for o in by_p.get(JGK + "useName", [])), "")
+                    map_feats[layer].append({"type": "Feature", "geometry": mapping(g), "properties": {
+                        "u": s[len(BASE) + 1:], "n": title, "s": status[0] if status else "", "use": use,
+                        "addr": addrs.get(s, "") if addrs.get(s, "") != title else ""}})
         all_rows = "".join(f'<tr><td class="k">{e(pname(p.value))}</td><td class="mono">{e(o.value[:300])}</td></tr>'
                            for p, o in sorted(keep, key=lambda t: t[0].value))
         crumbs = (f'<nav class="crumbs"><a href="{SITE_PATH}/">처음</a><span>/</span>'
@@ -251,7 +277,7 @@ def main() -> None:
     <details class="card sec"><summary>모든 트리플 ({len(keep)}개)</summary><div class="tablewrap"><table class="kv">{all_rows}</table></div></details>
   </div>
   <aside class="obj-side">
-    {f'<section class="card mapcard"><div id="objmap" data-geom="{e(geom_json)}"></div></section>' if geom_json else ""}
+    {f'<section class="card mapcard"><div id="objmap" data-geom="{e(geom_json)}"></div>' + (f'<a class="mapcard-link small" href="{SITE_PATH}/map/?u={e(s[len(BASE) + 1:])}">전체 지도에서 보기</a>' if MAP_LAYER.get(kind) and not is_geom else "") + '</section>' if geom_json else ""}
     <section class="card sec"><h2>이 URI</h2><p class="small">{e(rule)}</p>{f'<p class="small">객체: {link(parent)}</p>' if is_geom else ""}
       <p class="small muted">이 주소는 객체의 이름입니다. 객체가 없어져도 지우지 않고 상태만 폐지로 바꿉니다.</p></section>
     {f'<section class="card sec"><h2>출처</h2><ul class="plain small">{sources}</ul></section>' if sources else ""}
@@ -282,6 +308,35 @@ def main() -> None:
         d.mkdir(parents=True, exist_ok=True)
         nav_key = f"/id/{kind}/" if kind in ("building", "parcel", "road") else ""
         (d / "index.html").write_text(page(f"{kind_ko} 목록", body, nav=nav_key), encoding="utf-8")
+
+    # 전체 지도: 레이어마다 GeoJSON 하나, 대상 범위 원 하나
+    (assets / "map").mkdir()
+    for layer, feats in map_feats.items():
+        (assets / "map" / f"{layer}.geojson").write_text(
+            json.dumps({"type": "FeatureCollection", "features": feats}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    (assets / "map" / "area.geojson").write_text(json.dumps(area_circle(), ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    layer_rows = "".join(
+        f'<label class="lp-row"><input type="checkbox" data-layer="{k}"{" checked" if on else ""}><i class="sw {k}"></i>{e(t)}'
+        f'<span class="n">{len(map_feats.get(k, [])):,}</span></label>' for k, t, on in MAP_LAYERS if map_feats.get(k))
+    body = f"""<div class="sitemap">
+  <div id="sitemap" role="region" aria-label="증미역 반경 1km 지도"></div>
+  <aside class="card sm-panel" id="sm-panel">
+    <div class="sm-head"><h1>증미역 반경 1km 지도</h1>
+      <p class="small muted">이 사이트에 공개한 객체를 모두 그렸습니다. 객체를 누르면 그 URI 페이지로 갈 수 있습니다.</p></div>
+    <div class="search-field">{ICON["search"]}<input id="sm-q" class="field" type="search" autocomplete="off" placeholder="지도에서 찾기 (이름, 주소)" aria-label="지도에서 찾기"></div>
+    <div id="sm-hits"></div>
+    <h2 class="sm-sub">레이어</h2>{layer_rows}
+    <h2 class="sm-sub">건물 상태</h2><div class="sm-legend" id="sm-legend"></div>
+    <p class="small muted sm-note">민원행정기관, 도로명주소 전자지도, 국가기본도, 수치지형도에서 온 객체와 모양은 이용 조건을 확인하는 중이라 넣지 않았습니다.
+    도로 구간, 법정동 경계, 국가기본도 건물까지 보이는 지도 화면은 <a href="{REPO}#실행">저장소에서 서버를 켜면</a> 열립니다.</p>
+    <div id="sm-info"></div>
+  </aside>
+</div>"""
+    head = ('<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">'
+            '<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" defer></script>')
+    (OUT / "map").mkdir()
+    (OUT / "map" / "index.html").write_text(page("지도", body, nav="/map/", head=head, wide=True,
+                                                 desc="증미역 반경 1km 공간 지식 그래프의 공개 객체 지도"), encoding="utf-8")
 
     # 전체 찾기용 목록 (이름이 있는 객체와 번호)
     search = [[l or u.rsplit("/", 1)[-1], u[len(BASE) + 1:], KINDS.get(k, (k,))[0]] for k, rows in by_kind.items() for u, l, _ in rows]
@@ -329,6 +384,7 @@ def main() -> None:
   <div class="find hero-find"><div class="search-field">{ICON["search"]}<input id="site-q" class="field" type="search" autocomplete="off" placeholder="이름, 주소, 번호로 찾기 (예: 증미역, 양천로)" aria-label="객체 찾기"></div>
   <div id="site-hits" aria-live="polite"></div></div>
   <div class="examples"><span class="muted small">예:</span>{ex}</div>
+  <p class="hero-cta"><a class="btn primary" href="{SITE_PATH}/map/">{ICON["globe"]}지도로 보기</a></p>
 </div><figure class="hero-fig card"><svg class="kg-diagram" viewBox="0 0 440 290" role="img" aria-label="증미역 객체가 서로 이어진 모양: 역은 역사 건물 안에 있고, 건물은 출입구, 법정동, 필지, 국가기본도 건물과 이어지며, 출입구는 도로 구간에 면한다">
   <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="var(--muted)"/></marker></defs>
   <g stroke="var(--line-2)" stroke-width="1.6" fill="none" marker-end="url(#ar)">

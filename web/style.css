@@ -73,7 +73,8 @@ input, textarea, select { font: inherit; color: inherit; }
                  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; height: auto; min-height: var(--topbar); padding: 8px 16px; gap: 6px 14px; }
-  .topbar nav { height: 36px; }
+  .topbar nav { height: 36px; order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .topbar nav a { white-space: nowrap; padding: 0 10px; }
   .topbar .brand small, .topbar .tb-link span { display: none; }
 }
 

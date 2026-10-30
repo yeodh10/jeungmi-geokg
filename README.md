@@ -6,6 +6,8 @@
 
 **URI가 실제로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/ (예: [증미역](https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001), [어휘](https://yeodh10.github.io/jeungmi-geokg/def/)). 객체마다 사람이 읽는 페이지와 Turtle(`index.ttl`)이 있습니다.
 
+**지도도 바로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/map/ 에서 공개한 건물, 출입구, 역을 지도로 보고, 누르면 그 객체의 URI 페이지로 갑니다. 도로 구간, 법정동 경계, 국가기본도 건물, 자연어 질문까지 되는 전체 지도 화면은 [실행](#실행)처럼 서버를 켜고 http://localhost:8000/map 에서 엽니다.
+
 | 지도 화면 | 변경 제안 검토 화면 |
 |---|---|
 | ![지도 화면: 그래프의 건물을 상태별 색으로 회색 배경지도 위에 보여 주고, 왼쪽에 찾기, 질문, 고른 객체의 속성과 연결을, 오른쪽에 레이어와 범례를 둔다](docs/images/map.png) | ![검토 화면: 강서구 도로명주소 폐지 고시로 만든 건물 폐지 제안을 지금과 바뀐 뒤, SHACL 검사 결과, 위치 지도로 보여 준다](docs/images/review.png) |
