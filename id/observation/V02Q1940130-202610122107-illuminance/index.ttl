@@ -1,0 +1,7 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/ns/sosa/resultTime> "2026-10-12T21:07:00"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/ns/sosa/observedProperty> <https://yeodh10.github.io/jeungmi-geokg/def#illuminance> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/ns/sosa/madeBySensor> <https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/ns/sosa/hasSimpleResult> "0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sdot> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/2000/01/rdf-schema#label> "V02Q1940130 조도 2026-10-12 21:07"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610122107-illuminance> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/sosa/Observation> .

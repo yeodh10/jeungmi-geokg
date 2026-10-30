@@ -1,0 +1,19 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#sensorSerial> "V02Q1940130" .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#sensorModel> "SDOT001" .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#installArea> "residential_area" .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#installAddress> "서울특별시 강서구 허준로 198" .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#addressBuildingDistance> "24.1"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <https://yeodh10.github.io/jeungmi-geokg/def#addressBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114880000009508> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/ns/sosa/observes> <https://yeodh10.github.io/jeungmi-geokg/def#uv> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/ns/sosa/observes> <https://yeodh10.github.io/jeungmi-geokg/def#temperature> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/ns/sosa/observes> <https://yeodh10.github.io/jeungmi-geokg/def#noise> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/ns/sosa/observes> <https://yeodh10.github.io/jeungmi-geokg/def#illuminance> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/ns/sosa/observes> <https://yeodh10.github.io/jeungmi-geokg/def#humidity> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sdot> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/2000/01/rdf-schema#label> "S-DoT 센서 V02Q1940130"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Sensor> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/sosa/Sensor> .
+<https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

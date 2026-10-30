@@ -87,7 +87,7 @@
   if (sm && window.maplibregl) {
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const STATUS = [["사용", "--active"], ["주소 연결됨", "--linked"], ["주소 미연결", "--unlinked"], ["폐지", "--retired"]];
-    const KIND = { building: "건물", "building-gis": "건물 (주소 미연결)", entrance: "건물 출입구", station: "역" };
+    const KIND = { building: "건물", "building-gis": "건물 (주소 미연결)", entrance: "건물 출입구", station: "역", sensor: "센서" };
     const map = new maplibregl.Map({ container: sm, style: baseStyle(), attributionControl: { compact: true },
       center: [126.8612, 37.5577], zoom: 14.6, maxZoom: 19 });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -109,8 +109,8 @@
       else map.fitBounds(b, { padding: { top: 60, bottom: 60, left: innerWidth > 700 ? 360 : 40, right: 60 }, maxZoom: 18 });
     };
     whenStyleReady(map, async () => {
-      const [area, building, entrance, station] = await Promise.all(["area", "building", "entrance", "station"].map(n => get(n).catch(() => null)));
-      Object.assign(data, { building, entrance, station });
+      const [area, building, entrance, station, sensor] = await Promise.all(["area", "building", "entrance", "station", "sensor"].map(n => get(n).catch(() => null)));
+      Object.assign(data, { building, entrance, station, sensor });
       const statusColor = ["match", ["get", "s"], ...STATUS.flatMap(([n, v]) => [n, css(v)]), css("--active")];
       if (area) {
         map.addSource("area", { type: "geojson", data: area });
@@ -132,6 +132,11 @@
           paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 1.5, 18, 5], "circle-color": css("--accent"),
                    "circle-stroke-width": 1, "circle-stroke-color": "#fff" } });
       }
+      if (sensor) {
+        map.addSource("sensor", { type: "geojson", data: sensor });
+        map.addLayer({ id: "sensor", type: "circle", source: "sensor",
+          paint: { "circle-radius": 6.5, "circle-color": css("--sensor"), "circle-stroke-width": 2, "circle-stroke-color": "#fff" } });
+      }
       if (station) {
         map.addSource("station", { type: "geojson", data: station });
         map.addLayer({ id: "station", type: "circle", source: "station",
@@ -149,14 +154,14 @@
         `<div><i class="sw" style="background:var(${v})"></i>${n}<span class="n">${cnt[n].toLocaleString()}</span></div>`).join("");
 
       // 레이어 켜고 끄기
-      const ids = { building: ["building", "building-line", "building-pt"], entrance: ["entrance"], station: ["station"] };
+      const ids = { building: ["building", "building-line", "building-pt"], entrance: ["entrance"], station: ["station"], sensor: ["sensor"] };
       document.querySelectorAll("input[data-layer]").forEach(cb => {
         const apply = () => (ids[cb.dataset.layer] || []).forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", cb.checked ? "visible" : "none"));
         cb.onchange = apply; apply();
       });
 
       // 누르기와 가리키기 (점이 위에 있으면 점 먼저)
-      const clickable = ["station", "entrance", "building-pt", "building"];
+      const clickable = ["station", "sensor", "entrance", "building-pt", "building"];
       map.on("click", ev => {
         const hit = map.queryRenderedFeatures(ev.point, { layers: clickable.filter(id => map.getLayer(id)) })[0];
         if (!hit) return;
@@ -170,7 +175,7 @@
 
       // 지도에서 찾기
       const q = $("sm-q"), hits = $("sm-hits");
-      const all = ["station", "building", "entrance"].flatMap(k => (data[k] ? data[k].features : []));
+      const all = ["station", "sensor", "building", "entrance"].flatMap(k => (data[k] ? data[k].features : []));
       q.oninput = () => {
         const t = tight(q.value);
         if (t.length < 2) { hits.innerHTML = ""; return; }

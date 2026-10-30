@@ -1,0 +1,7 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/ns/sosa/resultTime> "2026-10-17T04:07:00"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/ns/sosa/observedProperty> <https://yeodh10.github.io/jeungmi-geokg/def#humidity> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/ns/sosa/madeBySensor> <https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940104> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/ns/sosa/hasSimpleResult> "82"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sdot> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/2000/01/rdf-schema#label> "V02Q1940104 습도 2026-10-17 04:07"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940104-202610170407-humidity> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/sosa/Observation> .

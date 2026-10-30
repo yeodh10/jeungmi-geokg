@@ -1,0 +1,7 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/ns/sosa/resultTime> "2026-10-13T20:07:00"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/ns/sosa/observedProperty> <https://yeodh10.github.io/jeungmi-geokg/def#temperature> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/ns/sosa/madeBySensor> <https://yeodh10.github.io/jeungmi-geokg/id/sensor/V02Q1940130> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/ns/sosa/hasSimpleResult> "19.7"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sdot> .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/2000/01/rdf-schema#label> "V02Q1940130 기온 2026-10-13 20:07"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/observation/V02Q1940130-202610132007-temperature> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/sosa/Observation> .

@@ -1,0 +1,74 @@
+# 어휘 정렬: jgk 어휘를 바깥 표준 어휘와 잇는다 (상호운용성)
+#
+# jgk만 모르는 시스템도 이 그래프를 읽을 수 있게, 우리 종류와 속성이 바깥 어휘의 어느 것에 해당하는지 적는다.
+#  - schema.org: 웹 검색엔진과 일반 시스템이 아는 어휘. rdfs:subClassOf, rdfs:subPropertyOf로 이어서 RDFS 추론만으로 바깥 이름으로 물을 수 있다.
+#  - INSPIRE 지형지물 개념 등록부(유럽 공간정보 기반 지침): 공간정보 기관끼리 쓰는 지형지물 이름. 정의가 같지는 않아 skos:closeMatch로만 잇는다.
+#  - 위키데이터: 누구나 쓰는 개념 번호. 종류는 skos:closeMatch로, 같은 실물(증미역)은 owl:sameAs로 잇는다.
+#  - BOT(W3C Linked Building Data): BIM을 그래프로 바꿀 때 쓰는 건물 위상 어휘. 우리 건물을 bot:Building의 하위 종류로 둔다(docs/bim.md).
+# 모든 바깥 주소는 2026-10-30에 실제로 열리는 것을 확인했다(src/graph/interop.py가 다시 확인한다).
+# 확인할 수 없는 주소(없는 이름에도 200을 주는 OGC CityGML 3.0 주소)는 넣지 않았다.
+
+@prefix jgk: <https://yeodh10.github.io/jeungmi-geokg/def#> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix schema: <https://schema.org/> .
+@prefix wd: <http://www.wikidata.org/entity/> .
+@prefix inspire: <http://inspire.ec.europa.eu/featureconcept/> .
+@prefix bot: <https://w3id.org/bot#> .
+
+# schema.org: 위치가 있는 객체는 모두 schema:Place, 역은 schema:SubwayStation
+jgk:Building rdfs:subClassOf schema:Place .
+jgk:BuildingEntrance rdfs:subClassOf schema:Place .
+jgk:Parcel rdfs:subClassOf schema:Place .
+jgk:Road rdfs:subClassOf schema:Place .
+jgk:RoadSegment rdfs:subClassOf schema:Place .
+jgk:AdminDong rdfs:subClassOf schema:Place .
+jgk:LegalDong rdfs:subClassOf schema:Place .
+jgk:BasicZone rdfs:subClassOf schema:Place .
+jgk:PublicFacility rdfs:subClassOf schema:Place .
+jgk:Station rdfs:subClassOf schema:SubwayStation .
+jgk:roadAddress rdfs:subPropertyOf schema:address .
+jgk:installAddress rdfs:subPropertyOf schema:address .
+jgk:buildingMgtNo rdfs:subPropertyOf schema:identifier .
+jgk:gisBuildingId rdfs:subPropertyOf schema:identifier .
+jgk:pnu rdfs:subPropertyOf schema:identifier .
+jgk:roadCode rdfs:subPropertyOf schema:identifier .
+jgk:legalDongCode rdfs:subPropertyOf schema:identifier .
+jgk:admDongCode rdfs:subPropertyOf schema:identifier .
+jgk:sensorSerial rdfs:subPropertyOf schema:identifier .
+jgk:within rdfs:subPropertyOf schema:containedInPlace .
+jgk:inLegalDong rdfs:subPropertyOf schema:containedInPlace .
+jgk:housedIn rdfs:subPropertyOf schema:containedInPlace .
+
+# BIM: W3C Linked Building Data 그룹의 BOT. 우리 건물도 BIM 모델 건물과 같은 bot:Building이라 BOT 도구가 함께 읽는다
+jgk:Building rdfs:subClassOf bot:Building .
+jgk:bimBuilding rdfs:subPropertyOf skos:related .
+
+# INSPIRE 지형지물 개념 (정의 범위가 달라 가까운 개념으로만)
+jgk:Building skos:closeMatch inspire:Building .
+jgk:Parcel skos:closeMatch inspire:CadastralParcel .
+jgk:RoadSegment skos:closeMatch inspire:RoadLink .
+jgk:AdminDong skos:closeMatch inspire:AdministrativeUnit .
+jgk:LegalDong skos:closeMatch inspire:AdministrativeUnit .
+jgk:Sensor skos:closeMatch inspire:EnvironmentalMonitoringFacility .
+
+# 위키데이터 개념
+jgk:Building skos:closeMatch wd:Q41176 .
+jgk:Station skos:closeMatch wd:Q928830 .
+jgk:Road skos:closeMatch wd:Q34442 .
+jgk:Parcel skos:closeMatch wd:Q683595 .
+jgk:Sensor skos:closeMatch wd:Q167676 .
+
+# 같은 실물: 위키데이터의 증미역 (역 번호 908, 9호선)
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> owl:sameAs wd:Q59989 .
+
+# 화면에 보일 이름
+schema:Place rdfs:label "장소(schema.org)"@ko .
+schema:SubwayStation rdfs:label "지하철역(schema.org)"@ko .
+schema:address rdfs:label "주소(schema.org)"@ko .
+schema:identifier rdfs:label "식별자(schema.org)"@ko .
+schema:containedInPlace rdfs:label "속한 장소(schema.org)"@ko .
+skos:closeMatch rdfs:label "가까운 바깥 개념"@ko .
+bot:Building rdfs:label "건물(BOT)"@ko .
