@@ -1,12 +1,12 @@
 # 증미역 공간 지식 그래프 (Jeungmi GeoKG)
 
-서울 9호선 증미역 반경 1km 안의 건물, 출입구, 필지, 도로, 공공시설, 역, 행정동과 법정동을 "의미 있는 객체"로 쪼개고, 객체마다 나라에서 쓰는 관리번호로 바뀌지 않는 주소(URI)를 붙여 GeoSPARQL 1.1 지식 그래프로 엮은 프로토타입입니다.
+서울 9호선 증미역 반경 1km 안의 건물, 출입구, 필지, 도로, 공공시설, 역, 행정동과 법정동, 환경 센서를 "의미 있는 객체"로 쪼개고, 객체마다 나라에서 쓰는 관리번호로 바뀌지 않는 주소(URI)를 붙여 GeoSPARQL 1.1 지식 그래프로 엮은 프로토타입입니다.
 
 국토교통부 "국가기본도 대전환" 방향인 **객체 원자화, 영구 식별자, 자동 갱신, AI 제안 후 사람 승인**을 작은 지역에서 처음부터 끝까지 실제 공공데이터로 돌려 보는 것이 목표입니다.
 
 **URI가 실제로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/ (예: [증미역](https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001), [어휘](https://yeodh10.github.io/jeungmi-geokg/def/)). 객체마다 사람이 읽는 페이지와 Turtle(`index.ttl`)이 있습니다.
 
-**지도도 바로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/map/ 에서 공개한 건물, 출입구, 역을 지도로 보고, 누르면 그 객체의 URI 페이지로 갑니다. 도로 구간, 법정동 경계, 국가기본도 건물, 자연어 질문까지 되는 전체 지도 화면은 [실행](#실행)처럼 서버를 켜고 http://localhost:8000/map 에서 엽니다.
+**지도도 바로 열립니다:** https://yeodh10.github.io/jeungmi-geokg/map/ 에서 공개한 건물, 출입구, 센서, 역을 지도로 보고, 누르면 그 객체의 URI 페이지로 갑니다. 도로 구간, 법정동 경계, 국가기본도 건물, 자연어 질문까지 되는 전체 지도 화면은 [실행](#실행)처럼 서버를 켜고 http://localhost:8000/map 에서 엽니다.
 
 | 지도 화면 | 변경 제안 검토 화면 |
 |---|---|
@@ -25,9 +25,28 @@
 | 자동 갱신 | 새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 비교해 신규, 변경, 폐지, 주소 연결 제안을 만듭니다. | `src/review/diff_proposals.py` |
 | AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 국가기본도 건물의 주소로 주소 미연결 건물을 건물관리번호 건물에 잇는 제안도 규칙이 냅니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
 
+## 표준과 상호운용성
+
+우리 어휘(jgk)만 아는 시스템이 아니어도 이 그래프를 읽을 수 있게, 바깥 표준 위에 세우거나 바깥 표준과 이었습니다. 바깥 주소는 실제로 열리는지(없는 이름이면 404인지) 확인한 것만 씁니다.
+
+| 표준 | 쓰임 | 어디에 |
+|---|---|---|
+| GeoSPARQL 1.1 (OGC) | 모든 공간 객체와 모양, 위상 함수 | `src/graph/ontology.ttl` |
+| SOSA/SSN (W3C, OGC) | 환경 센서와 1시간 관측값 | `src/model/build_sensors.py` |
+| QUDT 단위 | 관측값 단위 (℃, %, dB, lux) | 어휘의 관측 항목 |
+| PROV-O, SHACL, SKOS | 승인 기록, 데이터 규칙, 국가기본도 지형지물 분류 | `src/review/`, `shapes.ttl` |
+| schema.org, INSPIRE 지형지물 개념, 위키데이터 | 바깥 이름으로 읽기 (증미역은 위키데이터 Q59989와 같은 실물) | [docs/interop.md](docs/interop.md), `src/graph/alignment.ttl` |
+| BOT (W3C Linked Building Data) | BIM 모델 건물과 잇기 | [docs/bim.md](docs/bim.md) |
+
+상호운용성 검사(`python -m src.graph.interop`)는 바깥 주소 17개가 모두 열리는지, RDFS 추론 뒤 schema.org 이름만으로 역과 주소, 식별자를 찾는지, JSON-LD와 N-Triples로 바꿔도 18만여 트리플이 하나도 안 바뀌는지, 증미역 좌표가 위키데이터와 얼마나 다른지(44.8m)를 잽니다.
+
+## 시점별 판
+
+승인된 변경은 바꾼 트리플 하나하나를 RDF 진술(`jgk:hasChange`)로 함께 남깁니다. 그래서 그래프를 판마다 통째로 복사하지 않고도, 어느 시각의 값과 두 시각 사이에 바뀐 것을 SPARQL로 묻습니다(쿼리 15, 16, `src/graph/editions.py`). 지도 화면의 변경 이력에서 '승인 바로 전 값과 견주기'를 누르면 그 시점의 값을 되살려 지금 값과 나란히 보여 줍니다. 되살린 값이 승인 전 원천 그래프와 똑같은지 테스트로 확인합니다.
+
 실제 사례: 강서구 **도로명주소 폐지 고시(제2026-140호, 2026-10-28)** 의 첨부 폐지조서 12줄 중 범위 안 4곳을 그래프의 건물 5개와 맞춰, 건물과 출입구를 폐지하는 제안 5건을 만들었습니다(위 오른쪽 화면).
 
-## 숫자로 보기 (2026-10-29)
+## 숫자로 보기 (2026-10-30)
 
 | 항목 | 값 |
 |---|---|
@@ -37,13 +56,14 @@
 | 공공시설 | 23 (행정표준코드 기관코드, 26곳 중 3곳은 사람 검토로) |
 | 도로 | 도로 76, 도로 구간 233 (출입구 2,120개가 면한 구간에 이어짐) |
 | 행정동, 법정동, 기초구역, 역 | 8, 6, 54, 1 |
+| 환경 센서 (S-DoT) | 5대, 2026-10-12~18 1시간 평균 관측 2,428개 (기온, 습도, 소음, 조도, 자외선) |
 | 국가기본도와 연결 | 국가기본도 건물 375(약 600m 영역) 중 109동, 수치지형도 건물 4,093(도엽 37608075) 중 1,685동을 우리 건물과 이음 |
-| 트리플 | 167,500여 (어휘 포함) |
+| 트리플 | 185,100여 (어휘와 바깥 어휘 정렬 포함) |
 | SHACL 검사 | 원천 자료 문제 1건만 남음 (대지면적 0인 필지) |
-| URI 페이지 | 11,831쪽 (이용 조건 확인 중인 공공시설, 도로 구간, 국가기본도와 수치지형도 건물 등 4,739개는 보류) |
-| 전체 다시 만들기 | `python -m src.pipeline` 한 번, 약 5분 30초 |
+| URI 페이지 | 14,269쪽과 전체 지도 (이용 조건 확인 중인 공공시설, 도로 구간, 국가기본도와 수치지형도 건물 등 4,739개는 보류) |
+| 전체 다시 만들기 | `python -m src.pipeline` 한 번, 약 7분 |
 | LLM 평가 (실제 모델) | 자연어 질의 25문제 중 23 맞음 (나머지 2개도 정답은 결과에 있음), 실제 강서구 고시 95건 추출에서 근거 문장과 주소를 지어낸 것 0건. [docs/llm-eval.md](docs/llm-eval.md) |
-| 테스트 | 9종 (검토, 자동 갱신, 고시공고 LLM, 자연어 질의, SHACL, 폐지조서, 화면 API, 국가기본도 주소 연결, 평가 채점) |
+| 테스트 | 13종 (검토, 자동 갱신, 고시공고 LLM, 자연어 질의, SHACL, 폐지조서, 화면 API, 국가기본도 주소 연결, 평가 채점, 센서와 관측, 상호운용성, 시점별 판, BIM 연결) |
 
 ## 구조
 
@@ -55,6 +75,7 @@ flowchart TB
     A3[건축물대장 총괄표제부]
     A4[행정표준코드 기관코드]
     A5[민원행정기관 전자지도]
+    A6[환경 센서 S-DoT]
   end
   SRC --> B[범위 자르기<br>증미역 1km]
   B --> C[객체 쪼개기, URI 붙이기]
@@ -90,6 +111,7 @@ flowchart TB
 | 도로명주소 전자지도 (서울) | 행정안전부 | 확인 중 (도로 구간과 경계 모양은 공개 페이지에서 뺌) | 도로 구간, 법정동과 기초구역 경계 |
 | 국가기본도, 수치지형도 Ver2.0 | 국토지리정보원 | 확인 중 (공개 페이지에서 뺌) | 국가기본도 건물과 우리 건물 잇기, 층수와 주소 견주기 |
 | 강서구청 고시공고 | 강서구청 | 저작권법 제7조 (고시, 공고) | 변경 제안의 근거 |
+| 도시데이터 센서(S-DoT) 환경정보 | 서울열린데이터광장 | 공공누리 1유형 | 센서 위치와 1시간 관측값 |
 
 서울, 전국으로 키울 때의 설계와 근거(저장소 크기, 질의 시간 측정)는 [docs/scale-design.md](docs/scale-design.md)에 있습니다.
 
@@ -121,6 +143,14 @@ cp .env.example .env                                   # ANTHROPIC_API_KEY 등 �
 
 http://localhost:8000 은 변경 제안 검토, http://localhost:8000/map 은 지도와 자연어 질의입니다.
 
+시점별 판과 상호운용성 검사:
+
+```bash
+.venv/Scripts/python -m src.graph.editions changes 2026-10-01 2026-11-01          # 두 시각 사이에 승인된 변경
+.venv/Scripts/python -m src.graph.editions as-of <객체 URI> 2026-10-30T09:00       # 그 시각의 객체 값
+.venv/Scripts/python -m src.graph.interop                                         # 바깥 주소 확인까지 (인터넷 필요)
+```
+
 URI 페이지 다시 올리기 (`gh-pages` 브랜치에 `data/processed/site/`를 통째로 올리면 GitHub Pages가 알아서 다시 만듭니다):
 
 ```bash
@@ -138,12 +168,13 @@ git worktree remove ../jeungmi-geokg-pages
 .venv/Scripts/python -m src.review.diff_proposals --raw <새 원본 폴더> --label 202610
 .venv/Scripts/python -m src.review.make_proposals                               # 공공시설 기관코드 후보
 .venv/Scripts/python -m src.review.basemap_proposals                            # 국가기본도 주소로 주소 미연결 건물 잇기
+.venv/Scripts/python -m src.review.bim_proposals <BOT Turtle 파일>               # BIM 모델 건물 잇기 (docs/bim.md)
 ```
 
 테스트 (LLM 부분은 가짜 클라이언트로 돌아서 키가 없어도 됩니다. 제안 기록은 임시 복사본만 씁니다):
 
 ```bash
-for t in test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api; do .venv/Scripts/python -m tests.$t; done
+for t in test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api test_basemap_link test_eval test_sensors test_interop test_editions test_bim_link; do .venv/Scripts/python -m tests.$t; done
 ```
 
 ## 주요 기능
@@ -182,13 +213,34 @@ for t in test_review test_diff test_notice test_nl test_shacl test_address_retir
 - 실행 전에 코드가 읽기 쿼리(SELECT, ASK)만 통과시키고 500행으로 제한합니다. 실패하면 오류를 붙여 한 번 더 쓰게 합니다.
 - pyoxigraph에 거리 함수가 없어서, "역에서 300m 안" 같은 조건은 LLM이 `{{NEAR:<URI>:<미터>}}`를 쓰면 코드가 원 모양(EPSG:5186에서 계산)으로 바꿉니다.
 
+### 센서와 관측 (SOSA/SSN)
+
+- 서울시 도시데이터 센서(S-DoT) 설치 위치정보에서 증미역 1km 안 5대를 골라 모델 시리얼 그대로 `sensor/{시리얼}` URI를 붙였습니다. 관측은 `observation/{시리얼}-{측정 시각}-{항목}`입니다.
+- 센서는 설치 주소와 같은 도로명주소 건물에 `jgk:addressBuilding`으로 잇습니다. 센서 점이 그 건물에서 8.8~24.1m 떨어져 있어(가로등, 전봇대에 단 것으로 보임) '건물에 달렸다'(`sosa:isHostedBy`)고 쓰지 않았습니다.
+- 공개 사이트의 센서 페이지는 항목별 개수, 평균, 범위와 시간별 꺾은선을 보여 줍니다. 쿼리 14는 증미역 500m 안 센서의 평균 소음과 기온을 그래프에서 내고, 원본 CSV를 직접 계산한 값과 같은지 테스트로 확인합니다.
+
+### BIM 연결
+
+- BIM은 그래프에 합치지 않고 같은 건물이라는 연결(`jgk:bimBuilding`)만 둡니다. 층, 공간, 부재는 IFC를 W3C BOT로 바꾼 BIM 그래프에 그대로 둡니다.
+- 건물관리번호가 같으면 번호로, 없으면 위치 점을 품은 건물 모양이 하나뿐일 때만 위치로 잇고, 층 수를 대장과 견줘 근거에 적은 뒤 사람이 승인합니다.
+- 이 범위 건물의 공개 IFC는 찾지 못해, 규칙은 테스트 안에서 만든 작은 BOT 그래프로만 확인했습니다([docs/bim.md](docs/bim.md)).
+
 ### 데이터 규칙 (SHACL)
 
-`src/graph/shapes.ttl`: 상태 값, 출처, 기본 모양, 건물 식별 번호(건물관리번호 25자리와 GIS 번호 28자리 중 정확히 하나), PNU 형식, 기관코드 7자리, 폐지하면 폐지 확인일, 출입구는 건물과 이어질 것 등. 첫 검사에서 필지 1,697개에 출처가 빠진 것을 찾아 고쳤습니다.
+`src/graph/shapes.ttl`: 상태 값, 출처, 기본 모양, 건물 식별 번호(건물관리번호 25자리와 GIS 번호 28자리 중 정확히 하나), PNU 형식, 기관코드 7자리, 폐지하면 폐지 확인일, 출입구는 건물과 이어질 것, 관측은 센서, 항목, 값, 시각이 하나씩일 것 등. 첫 검사에서 필지 1,697개에 출처가 빠진 것을 찾아 고쳤습니다.
 
 ## 기술 스택
 
-Python 3.12, geopandas, shapely, pyproj, pyogrio, rdflib, pyoxigraph (SPARQL, GeoSPARQL 위상 함수), pyshacl, Claude API, FastAPI, MapLibre GL JS, OpenStreetMap 배경지도. 저장 좌표계는 EPSG:4326, 거리 계산은 EPSG:5186입니다. 기본값에서 바꾸거나 새로 정한 것은 [docs/decisions.md](docs/decisions.md)에 날짜와 이유를 적었습니다.
+Python 3.12, geopandas, shapely, pyproj, pyogrio, rdflib, pyoxigraph (SPARQL, GeoSPARQL 위상 함수), pyshacl, owlrl (RDFS 추론), Claude API, FastAPI, MapLibre GL JS, OpenStreetMap 배경지도. 저장 좌표계는 EPSG:4326, 거리 계산은 EPSG:5186입니다. 기본값에서 바꾸거나 새로 정한 것은 [docs/decisions.md](docs/decisions.md)에 날짜와 이유를 적었습니다.
+
+## 만든 방법
+
+이 저장소는 AI 코딩 에이전트(Claude Code)와 함께 만들었습니다. 사람이 목표, 규칙, 자료와 이용 조건, 승인 여부를 정하고, 에이전트가 구현과 검증을 맡았습니다.
+
+- **규칙을 먼저 정함**: 값과 좌표는 추측하지 않는다, 공식 번호를 URI에 그대로 쓴다, 원본과 키는 커밋하지 않는다, 이용 조건을 확인하지 못한 자료는 공개하지 않는다. 에이전트는 이 규칙을 지키며 일하고, 규칙과 부딪히는 선택은 근거와 함께 [docs/decisions.md](docs/decisions.md)에 남겼습니다.
+- **확인한 것만 씀**: 바깥 어휘 주소는 실제로 열어 보고, 없는 이름에도 200을 주는 주소(OGC CityGML 3.0)는 쓰지 않았습니다. 센서 평균, 위키데이터 좌표 같은 숫자는 원본을 따로 계산한 값과 견줘 맞췄습니다.
+- **여러 에이전트로 감사**: 화면과 API를 고칠 때는 감사, 구현, 검증을 나눈 워크플로로 돌렸습니다(커밋 790ce20).
+- **테스트로 묶음**: 기능마다 흐름 테스트를 두고, 실제 승인 기록은 건드리지 않게 임시 복사본으로만 시험합니다.
 
 ## 폴더 구조
 
@@ -202,9 +254,9 @@ src/graph/       어휘, 그래프, 예시 쿼리, SHACL, URI 페이지
 src/llm/         Claude API 호출, 고시공고 추출
 src/review/      변경 제안, 자동 갱신 비교, 폐지조서, 검토 API
 src/query/       자연어 질의
-web/             검토 화면, 지도 화면
+web/             검토 화면, 지도 화면, 공개 사이트의 모양과 스크립트
 tests/           흐름 테스트
-docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
+docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서, 규모 설계, LLM 평가, 상호운용성, BIM 연결
 ```
 
 ## 진행 상황과 남은 일
@@ -213,7 +265,7 @@ docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
 |---|---|---|
 | 10/28 ~ 11/3 | 데이터 받기, 범위 자르기, 이용 조건 기록 | 전자지도만 승인 대기 |
 | 11/4 ~ 11/10 | 객체 쪼개기, URI, 그래프, SPARQL | 끝 (10/29) |
-| 11/11 ~ 11/17 | LLM 변경 제안, 자연어 질의 | 끝 (가짜 클라이언트로 확인, 실제 키로 돌리기 남음) |
+| 11/11 ~ 11/17 | LLM 변경 제안, 자연어 질의 | 끝 (실제 모델로 평가까지, 10/30) |
 | 11/18 ~ 11/24 | 검토 화면, 지도 화면, 배포, README와 시연 영상 | 화면, README, 배포 끝, 영상 남음 |
 
 남은 일:
@@ -234,5 +286,10 @@ docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서
 - [x] 같은 고시 제안 묶어 승인 (SHACL 통과한 것만, 앞 제안을 반영한 상태로 다음 제안을 검사)
 - [x] 결정 정정 기록 (반려 기록은 지우지 않는 설계와 맞춰 "정정"을 새 기록으로 남기기)
 - [x] 서버 시작 때 그래프 미리 불러오기, 자연어 질의 쿼리 시간 제한
+- [x] 공개 사이트에 전체 지도 (서버 없이 건물, 출입구, 센서, 역)
+- [x] 환경 센서와 관측을 SOSA/SSN으로 (S-DoT 5대, 관측 2,428개)
+- [x] 바깥 표준 어휘와 잇기, 상호운용성 검사 (schema.org, INSPIRE, 위키데이터, BOT)
+- [x] 시점별 판: 지난 시점 값과 두 시각 사이 변경을 SPARQL로
+- [x] BIM 연결 설계와 프로토타입 (실제 IFC로는 아직)
 
 다른 컴퓨터에서 이어 할 때는 `git clone`, 가상환경 만들기, 원본 압축 파일 6개(`data/raw/_archives/`, 약 590MB)와 고시공고 폴더(`data/raw/notices/`)를 같은 자리에 두고 `python -m src.pipeline --unpack`을 실행하면 됩니다.

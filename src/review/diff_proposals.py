@@ -10,6 +10,7 @@
 만드는 제안:
 - create: 새 자료에만 있는 객체
 - retire: 새 자료에서 사라진 객체. 지우지 않고 상태를 폐지로 바꾼다 (URI는 남는다)
+          객체의 출처 자료가 새 자료에 하나도 없으면(예: 새 원본에 센서 자료가 없음) 사라졌다고 보지 않고 견주지 않는다
 - update: 양쪽에 있지만 값이 달라진 객체
 - link:   주소 미연결 건물(building-gis)이 사라지고 같은 GIS 번호를 가진 건물관리번호 건물이 새로 생긴 경우
 """
@@ -21,6 +22,7 @@ from pathlib import Path
 
 import shapely
 from rdflib import RDF, Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS
 
 from src.graph import build_graph
 from src.model import uri
@@ -33,7 +35,7 @@ GEO = build_graph.GEO
 OWL_SAMEAS = URIRef("http://www.w3.org/2002/07/owl#sameAs")
 XSD_DATE = "http://www.w3.org/2001/XMLSchema#date"
 KIND_KO = {"Building": "건물", "BuildingEntrance": "출입구", "Parcel": "필지", "PublicFacility": "공공시설",
-           "Station": "역", "AdminDong": "행정동"}
+           "Station": "역", "AdminDong": "행정동", "Sensor": "센서"}
 
 
 def to_term(o) -> Term:
@@ -108,9 +110,13 @@ def diff(g_old: Graph, g_new: Graph, tag: str, source: str) -> list[Proposal]:
                           [f"새 자료에만 있다 ({source})", f"트리플 {len(triples)}개"],
                           [Change(op="add", s=str(a), p=str(b), o=to_term(c)) for a, b, c in sorted(triples)], g_new))
 
+    new_sources = set(g_new.objects(None, DCTERMS.source))
     for s, kind in old.items():
         if s in new:
             continue
+        sources = set(g_old.objects(s, DCTERMS.source))
+        if sources and not sources & new_sources:
+            continue  # 이 객체의 출처 자료를 새로 받지 않았다. 없어진 것이 아니라 견줄 자료가 없는 것이다
         gis_ids = [str(o) for o in g_old.objects(s, JGK.gisBuildingId)]
         linked_to = next((new_by_gis[i] for i in gis_ids if i in new_by_gis), None)
         if linked_to is not None:
