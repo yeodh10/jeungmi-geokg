@@ -243,7 +243,7 @@ def main() -> None:
     inbound = defaultdict(list)
     for s, plist in triples.items():
         for p, o in plist:
-            if o.value.startswith(BASE) and s.startswith(BASE) and not p.value.startswith(GEO):
+            if o.value.startswith(BASE) and s.startswith(BASE) and not p.value.startswith(GEO) and "/change/" not in s:
                 inbound[o.value].append((p.value, s))
 
     by_kind = defaultdict(list)  # 종류 -> [(uri, 이름, 상태)]
@@ -269,7 +269,7 @@ def main() -> None:
         title = f"{name_of(parent)}의 모양" if is_geom else name_of(s)
         if is_geom:
             rule = f"{name_of(parent)}의 모양(Geometry)입니다. 좌표는 경도, 위도 순서의 WKT(CRS84)로 적었습니다."
-        else:
+        elif "/change/" not in s:  # 제안이 바꾼 트리플 기록(…/change/1)은 페이지만 두고 목록에는 넣지 않는다
             by_kind[kind].append((s, name_of(s), status[0] if status else ""))
 
         # 주요 정보(값), 연결(우리 객체), 출처를 나눈다

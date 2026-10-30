@@ -1,0 +1,11 @@
+# 두 시각 사이에 승인된 변경과 그 변경이 넣고 뺀 트리플 (시점별 판 비교). {{SINCE}}, {{UNTIL}}은 xsd:dateTime
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?decidedAt ?proposal ?action ?target ?op ?s ?p ?o WHERE {
+  ?proposal a jgk:ChangeProposal ; jgk:decidedAt ?decidedAt ; jgk:proposalAction ?action ; jgk:affects ?target ; jgk:hasChange ?c .
+  ?c jgk:changeOp ?op ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
+  FILTER (?decidedAt > "{{SINCE}}"^^xsd:dateTime && ?decidedAt <= "{{UNTIL}}"^^xsd:dateTime)
+} ORDER BY ?decidedAt ?proposal ?op

@@ -46,6 +46,10 @@
   .pub a { text-decoration: none; font-weight: 500; }
   ul.hist { list-style: none; margin: 0; padding: 0; }
   ul.hist li { padding: 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+  .asof-out:empty { display: none; }
+  .asof-out { margin-top: 8px; }
+  table.asof-t th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 4px 6px; }
+  table.asof-t td { font-size: 12px; vertical-align: top; }
   .tablewrap { overflow-x: auto; margin-top: 6px; }
   .answer-yn { margin-top: 8px; padding: 12px 14px; font-size: 18px; font-weight: 700; border: 2px solid var(--answer); border-radius: var(--radius); background: color-mix(in srgb, var(--answer) 8%, var(--panel)); }
 
@@ -504,6 +508,23 @@ function bindInfo() {
   if (back) back.onclick = ev => { ev.preventDefault(); renderAnswer(lastAnswer, true); };
   const cur = $("go-current");
   if (cur) cur.onclick = ev => { ev.preventDefault(); show(current, { quiet: true, intro: !focusParam, focus: true }); };
+  // 시점별 판: 승인 1초 전의 값을 되살려 지금 값과 나란히 보여 준다
+  info.querySelectorAll("a.asof").forEach(a => a.onclick = async ev => {
+    ev.preventDefault();
+    const out = a.closest("li").querySelector(".asof-out");
+    const at = new Date(Date.parse(a.dataset.at) - 1000).toISOString();
+    out.innerHTML = '<div class="small muted">되살리는 중...</div>';
+    try {
+      const r = await fetchJSON(`/api/editions/as-of?uri=${encodeURIComponent(current)}&at=${encodeURIComponent(at)}`);
+      const nm = v => (r.names[v] && r.names[v].label) || ext(v) || (String(v).startsWith("http") ? localName(v) : v);
+      const cell = vs => vs.length ? vs.map(v => esc(nm(v))).join("<br>") : '<span class="muted">없음</span>';
+      out.innerHTML = r.diff.length
+        ? `<table class="kv asof-t"><tr><th>속성</th><th>승인 전</th><th>지금</th></tr>${r.diff.map(d =>
+            `<tr><td class="k">${esc(nm(d.p))}</td><td>${cell(d.before)}</td><td>${cell(d.after)}</td></tr>`).join("")}</table>
+           <div class="small muted">승인 기록(jgk:hasChange)을 거꾸로 되돌려 ${esc(new Date(r.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }))} 시점의 값을 그래프에서 되살렸습니다.</div>`
+        : '<div class="small muted">그 시점과 지금 값이 같습니다.</div>';
+    } catch (e) { out.innerHTML = `<div class="banner no">${esc(e.message)}</div>`; }
+  });
   const copy = $("copy-uri");
   if (copy) copy.onclick = () => {
     const done = t => { copy.textContent = t; setTimeout(() => copy.textContent = "URI 복사", 1500); };
@@ -580,7 +601,8 @@ async function show(uri, opts = {}) {
     + `<button type="button" class="btn ghost mini" id="copy-uri" data-u="${esc(uri)}">URI 복사</button></div>`;
   const hist = (f.history || []).map(h => `<li><span class="small muted">${esc((h.decided_at || h.created || "").slice(0, 10))}</span>
       <span class="chip ${esc(h.action)}">${esc(ACTION[h.action] || h.action)}</span> ${esc(h.summary)}
-      <div class="small muted">${h.decided_by ? `승인 ${esc(h.decided_by)}, ` : ""}<a href="/?id=${encodeURIComponent(h.id)}">검토 화면에서 보기</a></div></li>`).join("");
+      <div class="small muted">${h.decided_by ? `승인 ${esc(h.decided_by)}, ` : ""}<a href="/?id=${encodeURIComponent(h.id)}">검토 화면에서 보기</a>
+      ${h.decided_at ? `, <a href="#" class="asof" data-at="${esc(h.decided_at)}">승인 바로 전 값과 견주기</a>` : ""}</div><div class="asof-out"></div></li>`).join("");
   const proposalId = isProposal ? uri.slice((BASE + "proposal/").length) : null;
   let mapNote = "";
   if (isDong) {

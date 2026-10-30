@@ -1,0 +1,20 @@
+# 한 객체의 시각 {{AT}} 값: 지금 값에서 그 뒤에 승인된 변경을 거꾸로 되돌린다 (시점별 판). 기본은 증미역 역사 건물
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+SELECT ?p ?o WHERE {
+  VALUES ?s { <{{URI}}> }
+  {
+    ?s ?p ?o .
+    FILTER NOT EXISTS { ?c jgk:changeOp "add" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
+                        ?pr jgk:hasChange ?c ; jgk:decidedAt ?t . FILTER (?t > "{{AT}}"^^xsd:dateTime) }
+    FILTER NOT EXISTS { ?o jgk:decidedAt ?t2 . FILTER (?t2 > "{{AT}}"^^xsd:dateTime) }
+  } UNION {
+    ?c jgk:changeOp "remove" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
+    ?pr jgk:hasChange ?c ; jgk:decidedAt ?t . FILTER (?t > "{{AT}}"^^xsd:dateTime)
+    FILTER NOT EXISTS { ?c2 jgk:changeOp "add" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
+                        ?pr2 jgk:hasChange ?c2 ; jgk:decidedAt ?t3 . FILTER (?t3 > "{{AT}}"^^xsd:dateTime) }
+  }
+}

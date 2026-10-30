@@ -39,12 +39,14 @@ from shapely.geometry import Point, mapping
 
 from src.graph.store import load_store
 from src.model.uri import BASE
-from src.review.proposals import Decision, ProposalStore, group_of, now
+from src.review.proposals import Decision, ProposalStore, group_of, iri, now
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "web" / "review.html"
 CONTEXT_RADIUS_M = 150
 MAX_TRIPLES = 2000   # /api/feature 가 주는 나가는 트리플 수
+RDF_SUBJECT = ox.NamedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#subject")
+RDF_OBJECT = ox.NamedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#object")
 MAX_INBOUND = 30     # /api/feature 가 속성마다 주는 들어오는 객체 수
 
 log = logging.getLogger(__name__)
@@ -501,7 +503,8 @@ def feature(uri: str):
 
     by_p = defaultdict(list)
     for q in g.quads_for_pattern(None, None, node, None):
-        if q.predicate not in (HAS_GEOMETRY, HAS_DEFAULT_GEOMETRY):
+        # 모양 노드와, 승인된 제안이 바꾼 트리플 기록(rdf:subject, rdf:object)은 연결로 보이지 않는다 (변경 이력에서 따로 본다)
+        if q.predicate not in (HAS_GEOMETRY, HAS_DEFAULT_GEOMETRY, RDF_SUBJECT, RDF_OBJECT):
             by_p[q.predicate].append(q.subject)
     counts = {p.value: len(set(subs)) for p, subs in by_p.items()}
     inbound = []
@@ -540,6 +543,34 @@ def feature(uri: str):
     return {"uri": uri, "in_graph": in_graph, "triples": rows, "inbound": inbound, "names": named,
             "inbound_counts": counts, "triples_truncated": truncated, "geometry": geometry,
             "public": public, "history": history}
+
+
+@app.get("/api/editions/as-of")
+def edition_as_of(uri: str, at: str):
+    """객체 하나의 시각 at 값과 지금 값의 차이 (시점별 판). 승인된 변경 기록을 거꾸로 되돌려 구한다."""
+    from src.graph.editions import as_of, diff_states, moment
+    try:
+        iri(uri)
+        when = moment(at)
+    except ValueError as e:
+        raise HTTPException(400, f"URI나 시각이 올바르지 않다: {e}") from None
+    g = store()
+    rows = diff_states(as_of(g, uri, when), as_of(g, uri, "2999-12-31T00:00:00+09:00"))
+    shown = [u for r in rows for u in [r["p"], *r["before"], *r["after"]] if u.startswith("http")]
+    return {"uri": uri, "at": when, "diff": rows, "names": names(shown)}
+
+
+@app.get("/api/editions/changes")
+def edition_changes(since: str = "1900-01-01", until: str = "2999-12-31"):
+    """두 시각 사이에 승인된 변경과 그 변경이 넣고 뺀 트리플."""
+    from src.graph.editions import changes_between, moment
+    try:
+        since, until = moment(since), moment(until)
+    except ValueError as e:
+        raise HTTPException(400, f"시각이 올바르지 않다: {e}") from None
+    rows = changes_between(store(), since, until)
+    shown = [r[k] for r in rows for k in ("target", "s", "p", "o") if r[k].startswith("http")]
+    return {"since": since, "until": until, "changes": rows, "names": names(shown)}
 
 
 LAYER_QUERY = {

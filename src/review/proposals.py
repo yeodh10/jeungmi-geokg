@@ -30,6 +30,7 @@ JGK = "https://yeodh10.github.io/jeungmi-geokg/def#"
 PROV = "http://www.w3.org/ns/prov#"
 DCTERMS = "http://purl.org/dc/terms/"
 XSD = "http://www.w3.org/2001/XMLSchema#"
+RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 LANG_TAG = re.compile(r"^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$")
 NOTICE_NO = re.compile(r"고시\s*제\s*([\d-]+)\s*호")
 ECHAR = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}  # SPARQL 문자열 안의 이스케이프
@@ -136,7 +137,11 @@ class Proposal(BaseModel):
         return f"{uri.BASE}/proposal/{self.id}"
 
     def sparql_update(self) -> str:
-        """승인됐을 때 그래프에 실행할 SPARQL UPDATE. 바꾸는 내용과 출처 기록을 함께 넣는다."""
+        """승인됐을 때 그래프에 실행할 SPARQL UPDATE. 바꾸는 내용과 출처 기록을 함께 넣는다.
+
+        바꾼 트리플 하나하나도 RDF 진술(rdf:Statement, {제안 URI}/change/{번호})로 남긴다.
+        그래야 승인 시각보다 앞의 그래프를 SPARQL로 되살릴 수 있다 (src/graph/editions.py).
+        """
         removes = [c for c in self.changes if c.op == "remove"]
         adds = [c for c in self.changes if c.op == "add"]
         parts = []
@@ -152,6 +157,13 @@ class Proposal(BaseModel):
             f"  <{self.uri}> <{DCTERMS}created> {Term(kind='literal', value=self.created_at, datatype=XSD + 'dateTime').sparql()} .",
             f"  <{self.target}> <{PROV}wasInfluencedBy> <{self.uri}> .",
         ]
+        for i, c in enumerate(self.changes, 1):
+            node = f"{self.uri}/change/{i}"
+            prov += [
+                f"  <{self.uri}> <{JGK}hasChange> <{node}> .",
+                f"  <{node}> a <{RDF}Statement> ; <{JGK}changeOp> {Term(kind='literal', value=c.op).sparql()} ;",
+                f"    <{RDF}subject> <{c.s}> ; <{RDF}predicate> <{c.p}> ; <{RDF}object> {c.o.sparql()} .",
+            ]
         if self.decision:
             prov += [
                 f"  <{self.uri}> <{JGK}decidedBy> {Term(kind='literal', value=self.decision.reviewer).sparql()} .",

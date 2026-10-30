@@ -39,7 +39,8 @@ def main() -> None:
     store = load_store()
     lines = [f"# SPARQL 확인 결과", "",
              f"- 트리플 수: {len(store):,}, 불러오기 {time.perf_counter() - t0:.1f}초", ""]
-    params = {"{{AREA_WKT}}": station_area_wkt(200)}
+    params = {"{{AREA_WKT}}": station_area_wkt(200), "{{SINCE}}": "1900-01-01T00:00:00+09:00", "{{UNTIL}}": "2999-12-31T00:00:00+09:00",
+              "{{URI}}": "https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106660040000001", "{{AT}}": "2026-10-01T00:00:00+09:00"}
 
     for q in sorted(QUERIES.glob("*.rq")):
         text = q.read_text(encoding="utf-8")

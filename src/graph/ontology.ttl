@@ -1,6 +1,7 @@
 @prefix jgk: <https://yeodh10.github.io/jeungmi-geokg/def#> .
 @prefix geo: <http://www.opengis.net/ont/geosparql#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
@@ -177,6 +178,9 @@ jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, up
 jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice, notice-table)"@ko .
 jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "승인한 사람"@ko .
 jgk:decidedAt a owl:DatatypeProperty ; rdfs:label "승인 시각"@ko ; rdfs:range xsd:dateTime .
+jgk:hasChange a owl:ObjectProperty ; rdfs:label "바꾼 트리플"@ko ; rdfs:domain jgk:ChangeProposal ; rdfs:range rdf:Statement ;
+    rdfs:comment "승인된 제안이 넣거나 뺀 트리플 하나. rdf:subject, rdf:predicate, rdf:object와 jgk:changeOp로 적는다. 이 기록으로 승인 전 시점의 그래프를 되살린다."@ko .
+jgk:changeOp a owl:DatatypeProperty ; rdfs:label "넣기(add) 또는 빼기(remove)"@ko ; rdfs:range xsd:string .
 
 # 센서와 관측 (W3C, OGC 공동 표준 SOSA/SSN)
 
