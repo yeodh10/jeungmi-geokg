@@ -26,6 +26,7 @@ PROC = ROOT / "data" / "processed"
 JGK = "https://yeodh10.github.io/jeungmi-geokg/def#"
 OWL_SAMEAS = "http://www.w3.org/2002/07/owl#sameAs"
 MAX_DISTANCE_M = 10  # 점 건물의 점과 주소 미연결 건물 모양 사이 (EPSG:5186)
+SHAPE_NEAR_M = 5  # 모양 붙이기에서 모양 밖 점을 가장 가까운 모양에 이을 때의 한계 (EPSG:5186)
 
 
 def candidates(proc: Path = PROC) -> pd.DataFrame:
@@ -90,11 +91,106 @@ def make(row) -> Proposal:
     )
 
 
+def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
+    """모양 없이 점만 있는 건물에 국가기본도 건물 모양을 붙일 짝과, 제안하지 않은 까닭별 개수.
+
+    규칙 (모두 맞아야 제안한다):
+    1. 점이 국가기본도 건물 모양 하나에만 들어 있고, 그 모양 안에 다른 점 건물이 없다.
+    2. 그 국가기본도 건물이 우리 다른 건물과 이어져 있지 않다 (이어져 있으면 이미 모양이 있는 건물의 것이다).
+    3. 같은 점 건물을 주소 미연결 건물 잇기 제안(candidates)이 다루지 않는다 (그쪽은 sameAs로 모양을 얻는다).
+    4. 국가기본도 건물의 도로명주소가 점 건물과 같다. 국가기본도에 주소가 없으면 '확인 필요'로 제안하고, 다르면 제안하지 않는다.
+    5. 점이 어느 모양에도 들지 않으면(중심점이 외곽선 바로 밖에 찍힌 경우), SHAPE_NEAR_M 안에서 가장 가까운 모양이
+       도로명주소까지 같을 때만 2, 3을 따져 제안한다. 이때는 주소가 없는 모양은 쓰지 않는다.
+    """
+    gpkg = proc / "objects.gpkg"
+    buildings = gpd.read_file(gpkg, layer="building")
+    stored_crs = buildings.crs
+    pts = buildings[buildings.geom_type == "Point"].to_crs("EPSG:5186")
+    basemap = gpd.read_file(gpkg, layer="basemap_building")
+    bm = basemap.to_crs("EPSG:5186").rename(columns={"uri": "map_uri", "pnu": "map_pnu", "floors": "map_floors"})
+    centers = gpd.read_file(proc / "jeungmi_area.gpkg", layer="navi_building_center")
+    key_of = dict(zip(centers["bldg_mgt_no"], centers["road_code"] + "-" + centers["bldg_main_no"] + "-" + centers["bldg_sub_no"]))
+    taken = set(pd.read_csv(proc / "building_basemap.csv", dtype=str)["map_uri"])
+    by_link = set(candidates(proc)["building_uri"])
+
+    j = gpd.sjoin(pts, bm[["map_uri", "nf_id", "name", "addr_key", "map_pnu", "map_floors", "geometry"]],
+                  predicate="within", how="inner")
+    j["distance_m"], j["inside"] = 0.0, True
+    outside = pts[~pts["uri"].isin(j["uri"])]
+    near = gpd.sjoin_nearest(outside, bm[["map_uri", "nf_id", "name", "addr_key", "map_pnu", "map_floors", "geometry"]],
+                             max_distance=SHAPE_NEAR_M, distance_col="distance_m").drop_duplicates("uri")
+    near = near[near["addr_key"].notna() & (near["addr_key"] == near["bldg_mgt_no"].map(key_of))].assign(inside=False)
+    skipped = {f"국가기본도 건물 밖 ({SHAPE_NEAR_M}m 안에 주소 같은 모양 없음)": len(outside) - len(near)}
+    per_point = j.groupby("uri").size()
+    j = pd.concat([j, near], ignore_index=True)
+    per_map = j.groupby("map_uri").size()
+    poly_of = basemap.set_index("uri").geometry.to_crs(stored_crs)
+    rows = []
+    for r in j.itertuples():
+        reason = ("주소 미연결 건물 잇기 제안이 다룸" if r.uri in by_link
+                  else "국가기본도 건물 여럿에 걸침" if per_point.get(r.uri, 1) > 1
+                  else "한 국가기본도 건물에 점 건물이 여럿" if per_map[r.map_uri] > 1
+                  else "국가기본도 건물이 우리 다른 건물과 이어짐" if r.map_uri in taken
+                  else "도로명주소가 다름" if isinstance(r.addr_key, str) and r.addr_key != key_of.get(r.bldg_mgt_no)
+                  else None)
+        if reason:
+            skipped[reason] = skipped.get(reason, 0) + 1
+            continue
+        rows.append({"building_uri": r.uri, "mgt": r.bldg_mgt_no, "label": r.label, "address": r.road_address,
+                     "point": buildings.set_index("uri").at[r.uri, "geometry"], "polygon": poly_of[r.map_uri],
+                     "map_uri": r.map_uri, "nf_id": r.nf_id, "map_name": r.name, "address_same": isinstance(r.addr_key, str),
+                     "inside": r.inside, "distance_m": round(float(r.distance_m), 1),
+                     "pnu": r.pnu, "map_pnu": r.map_pnu, "floors": r.floors_above, "map_floors": r.map_floors})
+    return pd.DataFrame(rows), skipped
+
+
+def make_shape(row) -> Proposal:
+    import shapely
+
+    from src.model import uri as uri_mod
+    geo = "http://www.opengis.net/ont/geosparql#"
+    gu = uri_mod.geometry(row["building_uri"])
+    wkt = lambda g: Term(kind="literal", value=shapely.to_wkt(g, rounding_precision=7), datatype=geo + "wktLiteral")
+    name = row["label"] if isinstance(row["label"], str) else row["address"]
+    num = lambda v: "없음" if pd.isna(v) else str(int(v))
+    pnu = lambda v: v if isinstance(v, str) else "없음"
+    floors_same = not pd.isna(row["floors"]) and not pd.isna(row["map_floors"]) and int(row["floors"]) == int(row["map_floors"])
+    return Proposal(
+        id=f"rule-basemap-shape-{row['mgt']}", created_at=now(), source_kind="rule-candidate",
+        source_detail="점만 있는 건물에 국가기본도 건물 모양 붙이기 (src/review/basemap_proposals.py shape_candidates 규칙 1~4)",
+        action="update", target=row["building_uri"], target_type="Building",
+        summary=f"'{name}'(건물관리번호 {row['mgt']})에 국가기본도 건물 {row['nf_id']}의 모양을 붙인다",
+        evidence=[
+            f"이 건물은 내비게이션용DB 건물 중심점만 있고 모양이 없다. 그 점이 국가기본도 건물 {row['nf_id']}"
+            + (f" '{row['map_name']}'" if isinstance(row["map_name"], str) else "")
+            + (" 안에 있다" if row["inside"] else f"에서 {row['distance_m']}m 밖에 있고, {SHAPE_NEAR_M}m 안에서 가장 가까운 모양이다")
+            + " (그 모양에 이은 점 건물은 이것 하나)",
+            "그 국가기본도 건물은 우리 다른 건물과 이어져 있지 않다",
+            "국가기본도 건물의 도로명주소가 이 건물과 같다" if row["address_same"]
+            else "국가기본도 건물에 도로명주소가 없다 (확인 필요)",
+            f"PNU: 이 건물 {pnu(row['pnu'])}, 국가기본도 {pnu(row['map_pnu'])}"
+            + ("" if pnu(row["pnu"]) == pnu(row["map_pnu"])
+               else " (한쪽에 없어 견주지 못함)" if "없음" in (pnu(row["pnu"]), pnu(row["map_pnu"]))
+               else " (서로 다르다, 확인 필요)"),
+            f"층수: 건축물대장 {num(row['floors'])}, 국가기본도 {num(row['map_floors'])}" + ("" if floors_same else " (다르다, 참고)"),
+            "모양 출처는 국가기본도라 이용 조건 확인 전까지 공개 페이지에서 모양만 빠진다. 바꾸기 전 점은 시점별 판 기록에 남는다",
+        ],
+        changes=[Change(op="remove", s=gu, p=geo + "asWKT", o=wkt(row["point"])),
+                 Change(op="add", s=gu, p=geo + "asWKT", o=wkt(row["polygon"])),
+                 Change(op="add", s=gu, p="http://purl.org/dc/terms/source", o=Term(kind="uri", value=JGK + "dataset-ngii-basemap")),
+                 Change(op="add", s=row["building_uri"], p=JGK + "basemapFeature", o=Term(kind="uri", value=row["map_uri"]))],
+        location=tuple(row["point"].coords[0]),
+    )
+
+
 def main() -> None:
     df = candidates()
     props = [make(r) for _, r in df.iterrows()]
+    shapes, skipped = shape_candidates()
+    props += [make_shape(r) for _, r in shapes.iterrows()]
     for p in props:
         print(f"[제안] {p.id}: {p.summary}")
+    print("모양 붙이기에서 제안하지 않은 점 건물:", skipped)
     added = ProposalStore().add_new(props)
     print(f"새 제안 {added}건 (후보 {len(props)}건)")
 

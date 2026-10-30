@@ -51,6 +51,47 @@ def run() -> None:
     finally:
         shutil.rmtree(tmp.parent, ignore_errors=True)
     print(f"국가기본도 주소 연결 제안 확인 통과: {len(props)}건")
+    run_shape(g, b)
+
+
+def run_shape(g, b) -> None:
+    """점만 있는 건물에 국가기본도 모양을 붙이는 제안: 규칙을 지키고, 승인하면 모양이 면 하나로 바뀌는지 본다."""
+    from src.graph.store import load_store
+    from src.graph.validate import check_proposal
+    from src.review.basemap_proposals import SHAPE_NEAR_M, candidates, make_shape, shape_candidates
+    from src.review.proposals import ProposalStore, group_of
+
+    df, skipped = shape_candidates()
+    assert len(df) >= 1, ("후보가 없다", skipped)
+    assert df["building_uri"].is_unique and df["map_uri"].is_unique
+    assert (b.loc[df["building_uri"]].geometry.geom_type == "Point").all()
+    inside = df["inside"].astype(bool)
+    assert all(poly.contains(pt) for pt, poly in zip(df.loc[inside, "point"], df.loc[inside, "polygon"]))
+    assert (df["distance_m"] <= SHAPE_NEAR_M).all() and df.loc[~inside, "address_same"].all()  # 모양 밖이면 주소가 같아야 한다
+    assert not set(df["building_uri"]) & set(candidates()["building_uri"])  # 주소 연결 제안과 겹치지 않는다
+    props = [make_shape(r) for _, r in df.iterrows()]
+    for p in props:
+        ok, res = check_proposal(g, p)
+        assert ok, (p.id, res)
+        removed = [c for c in p.changes if c.op == "remove"]
+        assert len(removed) == 1 and g.query(f"ASK {{ <{removed[0].s}> <{removed[0].p}> {removed[0].o.sparql()} }}"), p.id
+    assert len({group_of(p)[0] for p in props}) == 1
+
+    tmp = Path(tempfile.mkdtemp()) / "proposals.json"
+    shutil.copy(REAL, tmp)
+    try:
+        store = ProposalStore(tmp)
+        store.add_new(props)
+        p = store.decide(props[0].id, "approved", "시험 검토자")
+        g2 = load_store(store)
+        q = f"SELECT ?w WHERE {{ <{p.target}> <http://www.opengis.net/ont/geosparql#hasGeometry>/<http://www.opengis.net/ont/geosparql#asWKT> ?w }}"
+        wkts = [r["w"].value for r in g2.query(q)]
+        assert len(wkts) == 1 and wkts[0].startswith("POLYGON"), wkts  # 점은 빠지고 면만 남는다
+        q = f"ASK {{ <{p.target}> <{JGK}basemapFeature> <{df.iloc[0]['map_uri']}> }}"
+        assert g2.query(q)
+    finally:
+        shutil.rmtree(tmp.parent, ignore_errors=True)
+    print(f"국가기본도 모양 붙이기 제안 확인 통과: {len(props)}건, 제안하지 않음 {skipped}")
 
 
 def test_basemap_link():

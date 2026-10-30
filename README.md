@@ -23,7 +23,7 @@
 | 객체 원자화 | 원천 자료 8종을 건물, 출입구, 필지, 도로와 도로 구간, 공공시설, 역, 행정동, 법정동, 기초구역 객체로 쪼갰습니다. 출입구는 면한 도로 구간에 이어집니다. 국가기본도 지형지물 분류(수치지도 작성 작업규칙 제9조)를 어휘에 넣고, 국가기본도 건물을 객체ID 그대로 받아 우리 건물과 이었습니다. 모든 객체는 GeoSPARQL Feature이고 모양(Geometry)은 따로 둡니다. | `src/model/`, `src/graph/ontology.ttl` |
 | 영구 식별자 | 새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드, 도로구간 일련번호, 법정동코드, 행정동코드, 기초구역번호, 행정표준코드 기관코드를 그대로 URI에 씁니다. 객체가 사라져도 URI는 남기고 상태만 폐지로 바꿉니다. 11,831개 URI를 GitHub Pages에 올려 실제로 열리게 했습니다. | [docs/uri-policy.md](docs/uri-policy.md), `src/graph/publish.py` |
 | 자동 갱신 | 새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 비교해 신규, 변경, 폐지, 주소 연결 제안을 만듭니다. | `src/review/diff_proposals.py` |
-| AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 국가기본도 건물의 주소로 주소 미연결 건물을 건물관리번호 건물에 잇는 제안도 규칙이 냅니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
+| AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 국가기본도 건물의 주소로 주소 미연결 건물을 건물관리번호 건물에 잇는 제안, 점만 있는 건물에 국가기본도 모양을 붙이는 제안도 규칙이 냅니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
 
 ## 표준과 상호운용성
 
@@ -167,7 +167,7 @@ git worktree remove ../jeungmi-geokg-pages
 .venv/Scripts/python -m src.llm.notice data/raw/notices/<고시공고>.txt          # Claude API 키 필요
 .venv/Scripts/python -m src.review.diff_proposals --raw <새 원본 폴더> --label 202610
 .venv/Scripts/python -m src.review.make_proposals                               # 공공시설 기관코드 후보
-.venv/Scripts/python -m src.review.basemap_proposals                            # 국가기본도 주소로 주소 미연결 건물 잇기
+.venv/Scripts/python -m src.review.basemap_proposals                            # 국가기본도로 주소 미연결 건물 잇기, 점만 있는 건물에 모양 붙이기
 .venv/Scripts/python -m src.review.bim_proposals <BOT Turtle 파일>               # BIM 모델 건물 잇기 (docs/bim.md)
 ```
 
@@ -279,7 +279,8 @@ docs/            데이터 출처, URI 규칙, 결정 기록, 시연 순서, 규
 - [x] 국가기본도 주소로 주소 미연결 건물 잇기 제안 (41건, 검토 대기)
 - [x] 국가기본도를 반경 1km 전체로 받기 (10/30, 반경 1.25km 원. 이은 건물 109 → 1,834동, 주소 연결 제안 5 → 41건)
 - [ ] 수치지형도 37608085 도엽 받기
-- [ ] 전자지도 건물 폴리곤으로 점만 있는 건물 324개에 모양 붙이기, 주소 미연결 건물 628개를 겹침으로 건물관리번호에 잇는 제안 만들기 (전자지도 이용 조건 확인 뒤)
+- [x] 점만 있는 건물 324개에 국가기본도 건물 모양 붙이기 제안 (208건, 검토 대기. 나머지 116개는 까닭을 셈)
+- [ ] 전자지도 건물 폴리곤으로 주소 미연결 건물 628개를 겹침으로 건물관리번호에 잇는 제안 만들기 (전자지도 이용 조건 확인 뒤)
 - [ ] 민원행정기관, 전자지도 이용 조건 확인
 - [ ] 새 기준일 자료(내비게이션용DB 10월분 등)로 자동 갱신 실제로 돌려 보기
 - [ ] 필지 경계(연속지적도) 붙이기
