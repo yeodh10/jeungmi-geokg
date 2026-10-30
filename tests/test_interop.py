@@ -23,7 +23,7 @@ def run() -> None:
     used = {str(x) for t in align for x in t if isinstance(x, URIRef) and str(x).startswith(JGK)}
     assert used and used <= defined, f"어휘에 없는 jgk 이름을 정렬에 썼다: {used - defined}"
     # 바깥 주소는 확인할 수 있는 곳만: schema.org, INSPIRE 등록부, 위키데이터 (그리고 표준 어휘 자체)
-    allowed = ("https://schema.org/", "http://inspire.ec.europa.eu/featureconcept/", "http://www.wikidata.org/entity/",
+    allowed = ("https://schema.org/", "http://inspire.ec.europa.eu/featureconcept/", "http://www.wikidata.org/entity/", "https://w3id.org/bot#",
                "http://www.w3.org/", "https://yeodh10.github.io/jeungmi-geokg/")
     bad = {str(x) for t in align for x in t if isinstance(x, URIRef) and not str(x).startswith(allowed)}
     assert not bad, f"확인할 수 없는 바깥 주소: {bad}"

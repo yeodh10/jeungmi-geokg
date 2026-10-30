@@ -165,7 +165,8 @@ def align_section() -> str:
     kinds = {"http://www.w3.org/2000/01/rdf-schema#subClassOf": "하위 종류", "http://www.w3.org/2000/01/rdf-schema#subPropertyOf": "하위 속성",
              "http://www.w3.org/2004/02/skos/core#closeMatch": "가까운 개념", "http://www.w3.org/2002/07/owl#sameAs": "같은 실물"}
     short = lambda u: (u.replace(JGK, "jgk:").replace("https://schema.org/", "schema:").replace("http://www.wikidata.org/entity/", "wd:")
-                       .replace("http://inspire.ec.europa.eu/featureconcept/", "inspire:").replace(BASE + "/", "id:"))
+                       .replace("http://inspire.ec.europa.eu/featureconcept/", "inspire:").replace("https://w3id.org/bot#", "bot:")
+                       .replace("http://www.w3.org/2004/02/skos/core#", "skos:").replace(BASE + "/", "id:"))
     rows = sorted((str(s), str(p), str(o)) for s, p, o in g if str(p) in kinds)
     trs = "".join(f'<tr><td class="mono">{e(short(s))}</td><td>{kinds[p]}</td><td class="mono"><a href="{e(o)}" rel="noopener">{e(short(o))}</a></td></tr>' for s, p, o in rows)
     return (f'<section class="card sec"><h2>바깥 표준 어휘와 잇기 <span class="muted">{len(rows)}</span></h2>'

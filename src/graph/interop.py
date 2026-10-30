@@ -33,11 +33,12 @@ GEO = Namespace("http://www.opengis.net/ont/geosparql#")
 SCHEMA = Namespace("https://schema.org/")
 WD = "http://www.wikidata.org/entity/"
 INSPIRE = "http://inspire.ec.europa.eu/featureconcept/"
+BOT = "https://w3id.org/bot#"
 STATION = URIRef("https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001")
 
 
-def fetch(url: str, timeout: int = 30) -> tuple[int, bytes]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+def fetch(url: str, timeout: int = 30, accept: str = "*/*") -> tuple[int, bytes]:
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": accept})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read()
@@ -56,6 +57,12 @@ def external_iris(align: Graph) -> list[dict]:
         elif iri.startswith(INSPIRE):
             code, _ = fetch(iri.replace("http://", "https://"))
             out.append({"iri": iri, "where": "INSPIRE", "status": code, "ok": code == 200})
+        elif iri.startswith(BOT):
+            # BOT는 문서 하나에 모든 이름이 있어 '#이름'은 늘 열린다. 문서를 받아 그 이름이 정의돼 있는지 본다
+            code, body = fetch("https://w3id.org/bot", accept="text/turtle")
+            name = iri[len(BOT):]
+            ok = code == 200 and (f"bot:{name} " in body.decode("utf-8", "replace") or f"<{iri}>" in body.decode("utf-8", "replace"))
+            out.append({"iri": iri, "where": "BOT (W3C LBD)", "status": code, "ok": ok})
         elif iri.startswith(WD):
             qid = iri.rsplit("/", 1)[-1]
             code, body = fetch(f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json")

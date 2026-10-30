@@ -182,6 +182,11 @@ jgk:hasChange a owl:ObjectProperty ; rdfs:label "바꾼 트리플"@ko ; rdfs:dom
     rdfs:comment "승인된 제안이 넣거나 뺀 트리플 하나. rdf:subject, rdf:predicate, rdf:object와 jgk:changeOp로 적는다. 이 기록으로 승인 전 시점의 그래프를 되살린다."@ko .
 jgk:changeOp a owl:DatatypeProperty ; rdfs:label "넣기(add) 또는 빼기(remove)"@ko ; rdfs:range xsd:string .
 
+# BIM 모델과 잇기 (docs/bim.md)
+
+jgk:bimBuilding a owl:ObjectProperty ; rdfs:label "BIM 모델 건물"@ko ; rdfs:domain jgk:Building ;
+    rdfs:comment "같은 실물 건물의 BIM 모델 건물(IFC를 W3C BOT로 바꾼 bot:Building). BIM의 층, 공간, 부재는 BIM 그래프에 두고 여기에는 이 연결만 둔다. 제안을 거쳐 사람이 승인한다(src/review/bim_proposals.py)."@ko .
+
 # 센서와 관측 (W3C, OGC 공동 표준 SOSA/SSN)
 
 jgk:Sensor a owl:Class ; rdfs:subClassOf sosa:Sensor, geo:Feature ; rdfs:label "센서"@ko ;

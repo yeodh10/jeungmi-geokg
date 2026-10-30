@@ -16,6 +16,7 @@
 | schema.org | 웹, 일반 시스템 | `rdfs:subClassOf`, `rdfs:subPropertyOf` | 역은 `schema:SubwayStation`, 도로명주소는 `schema:address`, 건물관리번호와 PNU는 `schema:identifier` |
 | INSPIRE 지형지물 개념 등록부 | 유럽 공간정보 기관 | `skos:closeMatch` | 건물은 `inspire:Building`, 필지는 `inspire:CadastralParcel`, 도로 구간은 `inspire:RoadLink` |
 | 위키데이터 | 누구나 쓰는 개념 번호 | 종류는 `skos:closeMatch`, 같은 실물은 `owl:sameAs` | 건물 Q41176, 도시철도역 Q928830, 증미역 Q59989 |
+| BOT (W3C Linked Building Data) | BIM | `rdfs:subClassOf` | 우리 건물은 `bot:Building`. BIM 모델 건물과는 `jgk:bimBuilding` ([bim.md](bim.md)) |
 
 schema.org는 하위 종류, 하위 속성으로 이었다. 그러면 RDFS 추론만 돌려도 바깥 이름으로 물을 수 있다. INSPIRE와 위키데이터는 정의 범위가 우리와 꼭 같지 않다. 예를 들어 INSPIRE의 Building은 유럽 건물 정의를 따른다. 그래서 '가까운 개념'으로만 이었다.
 
@@ -25,7 +26,7 @@ OGC CityGML 3.0의 주소(`https://www.opengis.net/ont/citygml/building/Building
 
 | 검사 | 결과 |
 |---|---|
-| 바깥 주소가 열리나 | 16개 모두 열림 (schema.org 5, INSPIRE 5, 위키데이터 6). 위키데이터는 이름까지 읽음: 건물, 도로, 대지, 센서, 도시철도역, 증미역 |
+| 바깥 주소가 열리나 | 17개 모두 열림 (schema.org 5, INSPIRE 5, 위키데이터 6, BOT 1). BOT는 문서를 받아 이름이 정의돼 있는지까지 봄. 위키데이터는 이름까지 읽음: 건물, 도로, 대지, 센서, 도시철도역, 증미역 |
 | 바깥 어휘로만 묻기 | 그래프 일부(1,135 트리플)에 owlrl로 RDFS 추론을 돌리니 3,372 트리플이 됨. 그 뒤 schema.org와 GeoSPARQL 이름만으로 지하철역 1곳(위키데이터 Q59989와 같은 실물), 주소가 있는 장소 51곳, 식별자가 있는 장소 53곳, 역이 속한 장소(역사 건물, 행정동)를 찾음. SOSA 이름만으로 센서 4대와 관측 항목도 찾음 |
 | 형식 바꾸기 | 전체 184,637 트리플을 JSON-LD(30MB)와 N-Triples(38MB)로 쓰고 다시 읽음. 두 형식 모두 트리플이 하나도 바뀌지 않음 |
 | GeoSPARQL 모양 | WKT 9,760개 모두 읽힘. 모두 경도, 위도 순서(CRS84)로 한국 범위 안. 모양이 없는 객체 1,844개는 행정동, 필지처럼 경계 자료를 아직 넣지 않은 것 |
