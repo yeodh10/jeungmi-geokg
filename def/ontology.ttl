@@ -5,6 +5,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 # 증미역 공간 지식 그래프 어휘
 # 모든 객체는 geo:Feature, 모양은 geo:Geometry로 따로 둔다.
@@ -28,6 +29,60 @@ jgk:Road a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로"@ko ;
 jgk:LegalDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "법정동"@ko .
 jgk:BasicZone a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "기초구역"@ko ;
     rdfs:comment "국가기초구역. 번호 5자리는 우편번호와 같다."@ko .
+
+# 국가기본도(수치지도) 지형지물 분류
+# 수치지도 작성 작업규칙(국토교통부령) 제9조 제2항의 대분류 8개. 세분류는 국토지리정보원장이 정한다(같은 조 제3항).
+# 이 어휘의 객체 종류가 어느 대분류에 드는지 jgk:basemapClass로 적는다. 대분류가 분명하지 않은 종류(출입구, 필지, 역, 공공시설, 기초구역)는 적지 않는다.
+
+jgk:basemap-classes a skos:ConceptScheme ;
+    rdfs:label "수치지도 지형지물 분류체계 (수치지도 작성 작업규칙 제9조)"@ko ;
+    dcterms:source <https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=171727> .
+jgk:basemap-A a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "A" ; skos:prefLabel "교통"@ko .
+jgk:basemap-B a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "B" ; skos:prefLabel "건물"@ko .
+jgk:basemap-C a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "C" ; skos:prefLabel "시설"@ko .
+jgk:basemap-D a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "D" ; skos:prefLabel "식생"@ko .
+jgk:basemap-E a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "E" ; skos:prefLabel "수계"@ko .
+jgk:basemap-F a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "F" ; skos:prefLabel "지형"@ko .
+jgk:basemap-G a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "G" ; skos:prefLabel "경계"@ko .
+jgk:basemap-H a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "H" ; skos:prefLabel "주기"@ko .
+
+jgk:basemapClass a owl:AnnotationProperty ; rdfs:label "국가기본도 지형지물 대분류"@ko ;
+    rdfs:comment "객체 종류(owl:Class)가 수치지도 지형지물 분류체계의 어느 대분류에 드는지."@ko .
+jgk:basemap-B0010000 a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:broader jgk:basemap-B ;
+    skos:notation "B0010000" ; skos:prefLabel "건물"@ko ;
+    skos:scopeNote "수치지형도 Ver2.0 레이어 N3A_B0010000. 속성 '종류' 값(아파트, 일반주택, 주택외건물, 무벽건물 등)으로 건물 레이어임을 확인했다."@ko .
+
+jgk:BaseMapFeature a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "국가기본도 지형지물"@ko ;
+    rdfs:comment "국토지리정보원 국가기본도(국토정보플랫폼 '국가기본도' 내려받기)의 지형지물 하나. 번호는 국가기본도 객체ID(nf_id)다."@ko .
+jgk:DigitalMapFeature a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "수치지형도 지형지물"@ko ;
+    rdfs:comment "국토지리정보원 수치지형도 Ver2.0(1:5,000 도엽)의 지형지물 하나. 번호는 유일식별자(UFID, 34자리)다."@ko .
+jgk:basemapId a owl:DatatypeProperty ; rdfs:label "국가기본도 객체ID(nf_id)"@ko ; rdfs:range xsd:string .
+jgk:molitUfid a owl:DatatypeProperty ; rdfs:label "국토부 UFID(molit_ufid)"@ko ; rdfs:range xsd:string .
+jgk:ufid a owl:DatatypeProperty ; rdfs:label "유일식별자(UFID)"@ko ; rdfs:range xsd:string .
+jgk:sheetCode a owl:DatatypeProperty ; rdfs:label "도엽코드"@ko ; rdfs:range xsd:string .
+jgk:featureCode a owl:ObjectProperty ; rdfs:label "지형지물 분류"@ko ; rdfs:range skos:Concept .
+jgk:mapKind a owl:DatatypeProperty ; rdfs:label "지도의 건물 종류"@ko ; rdfs:range xsd:string .
+jgk:mapUse a owl:DatatypeProperty ; rdfs:label "지도의 건물 용도"@ko ; rdfs:range xsd:string .
+jgk:mapKindCode a owl:DatatypeProperty ; rdfs:label "국가기본도 건물 구분 코드(buld_se)"@ko ;
+    rdfs:comment "코드 값의 뜻은 코드 정의서를 확인하지 못해 값 그대로 둔다."@ko ; rdfs:range xsd:string .
+jgk:mapUseCode a owl:DatatypeProperty ; rdfs:label "국가기본도 건물 용도 코드(bprp_se)"@ko ;
+    rdfs:comment "코드 값의 뜻은 코드 정의서를 확인하지 못해 값 그대로 둔다."@ko ; rdfs:range xsd:string .
+jgk:mapFloors a owl:DatatypeProperty ; rdfs:label "지도의 층수"@ko ; rdfs:range xsd:integer .
+jgk:basemapFeature a owl:ObjectProperty ; rdfs:label "국가기본도의 같은 건물"@ko ;
+    rdfs:comment "모양이 서로 가장 많이 겹치고 IoU가 0.5 이상인 짝. 겹친 정도는 지도 쪽 jgk:matchIoU에 적는다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:BaseMapFeature .
+jgk:digitalMapFeature a owl:ObjectProperty ; rdfs:label "수치지형도의 같은 건물"@ko ;
+    rdfs:comment "jgk:basemapFeature와 같은 규칙으로 수치지형도 건물에 잇는다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:DigitalMapFeature .
+jgk:matchIoU a owl:DatatypeProperty ; rdfs:label "모양 겹침 정도(IoU)"@ko ; rdfs:range xsd:decimal .
+jgk:pnuAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 PNU가 같다"@ko ; rdfs:range xsd:boolean .
+jgk:addressAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 도로명주소가 같다"@ko ; rdfs:range xsd:boolean .
+
+jgk:Building jgk:basemapClass jgk:basemap-B .
+jgk:Road jgk:basemapClass jgk:basemap-A .
+jgk:RoadSegment jgk:basemapClass jgk:basemap-A .
+jgk:AdminDong jgk:basemapClass jgk:basemap-G .
+jgk:LegalDong jgk:basemapClass jgk:basemap-G .
 
 # 객체 사이 관계
 
@@ -104,6 +159,15 @@ jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; r
 
 # 변경 제안 (사람이 승인한 것만 그래프에 들어온다)
 
+jgk:Notice a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "고시공고"@ko ;
+    rdfs:comment "구청 고시 한 건. URI는 고시 번호(시군구코드-연도-번호)를 그대로 쓴다. 구역, 사업에는 전국 공통 번호가 없어 고시를 객체로 두고 대상을 잇는다."@ko .
+jgk:noticeNumber a owl:DatatypeProperty ; rdfs:label "고시 번호"@ko ; rdfs:domain jgk:Notice ; rdfs:range xsd:string .
+jgk:zoneKind a owl:DatatypeProperty ; rdfs:label "구역, 사업 종류"@ko ; rdfs:domain jgk:Notice ; rdfs:range xsd:string .
+jgk:zoneDesignatedBy a owl:ObjectProperty ; rdfs:label "구역 지정, 결정 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:zoneReleasedBy a owl:ObjectProperty ; rdfs:label "지정 해제, 실효 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:planApprovedBy a owl:ObjectProperty ; rdfs:label "사업, 계획 인가 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:completedBy a owl:ObjectProperty ; rdfs:label "준공, 공사완료 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+
 jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
 jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
 jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko .
@@ -133,6 +197,14 @@ jgk:dataset-juso-emap a jgk:Dataset ;
     dcterms:title "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     rdfs:label "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     dcterms:source <https://business.juso.go.kr> .
+jgk:dataset-ngii-basemap a jgk:Dataset ;
+    dcterms:title "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-29, 증미역 둘레 약 600m 영역)"@ko ;
+    rdfs:label "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-29, 증미역 둘레 약 600m 영역)"@ko ;
+    dcterms:source <https://map.ngii.go.kr> .
+jgk:dataset-ngii-digital-map a jgk:Dataset ;
+    dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
+    rdfs:label "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
+    dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;
     rdfs:label "행정안전부 행정표준코드 기관코드"@ko ;

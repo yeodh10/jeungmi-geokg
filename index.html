@@ -1,8 +1,44 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>증미역 공간 지식 그래프</title><link rel="alternate" type="text/turtle" href="index.ttl"><style>body{font-family:"Pretendard","Malgun Gothic",system-ui,sans-serif;max-width:860px;margin:24px auto;padding:0 16px;color:#1d2330;background:#fff}
-h1{font-size:20px;margin:0 0 4px}.uri{color:#667085;font-size:13px;word-break:break-all}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px}
-td{border-top:1px solid #e3e6eb;padding:6px;vertical-align:top;word-break:break-all}td:first-child{color:#667085;width:30%}a{color:#2457d6}
-.wkt{font-family:monospace;font-size:12px;max-height:6em;overflow:auto;display:block}footer{margin-top:24px;color:#667085;font-size:12px}
-@media (prefers-color-scheme:dark){body{background:#14171c;color:#e6e8eb}td{border-color:#2b313a}a{color:#7aa2ff}}</style></head><body>
-<h1>증미역 공간 지식 그래프</h1><div class="uri">https://yeodh10.github.io/jeungmi-geokg/</div><table><tr><td>admin-dong</td><td>8</td></tr><tr><td>basic-zone</td><td>48</td></tr><tr><td>building</td><td>2162</td></tr><tr><td>building-gis</td><td>628</td></tr><tr><td>entrance</td><td>2180</td></tr><tr><td>legal-dong</td><td>5</td></tr><tr><td>parcel</td><td>1760</td></tr><tr><td>road</td><td>68</td></tr><tr><td>station</td><td>1</td></tr></table><p>예: <a href="https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001">증미역</a>, <a href="https://yeodh10.github.io/jeungmi-geokg/def">어휘</a></p><p>객체마다 바뀌지 않는 URI를 붙이고 GeoSPARQL 1.1로 엮은 그래프입니다. 공개를 보류한 출처의 객체는 넣지 않았습니다.</p>
-<footer>증미역 공간 지식 그래프, <a href="index.ttl">Turtle</a>, <a href="https://yeodh10.github.io/jeungmi-geokg/">처음으로</a></footer></body></html>
+<title>처음 | 증미역 공간 지식 그래프</title><meta name="description" content="증미역 반경 1km 공간 지식 그래프의 URI 사이트">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/jeungmi-geokg/assets/style.css"><link rel="stylesheet" href="/jeungmi-geokg/assets/site.css">
+<script src="/jeungmi-geokg/assets/common.js"></script><script src="/jeungmi-geokg/assets/site.js" defer></script></head><body>
+<header class="topbar"><a class="brand" href="/jeungmi-geokg/">증미역 공간 지식 그래프<small>URI 사이트</small></a><nav><a href="/jeungmi-geokg" class=on>처음</a><a href="/jeungmi-geokg/id/building/">건물</a><a href="/jeungmi-geokg/id/parcel/">필지</a><a href="/jeungmi-geokg/id/road/">도로</a><a href="/jeungmi-geokg/def/">어휘</a></nav>
+<span class="spacer"></span><a class="tb-link" href="https://github.com/yeodh10/jeungmi-geokg" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span>소스 코드</span></a></header>
+<main class="page"><section class="hero"><div class="hero-text">
+  <p class="eyebrow">서울 9호선 증미역 반경 1km, GeoSPARQL 1.1</p>
+  <h1>공식 번호로 엮은<br>증미역 공간 지식 그래프</h1>
+  <p class="lead">건물, 출입구, 필지, 도로, 행정구역을 객체로 쪼개고 객체마다 나라에서 쓰는 관리번호로 바뀌지 않는 URI를 붙였습니다.
+  이 사이트의 모든 주소는 그 객체의 이름이자 내용 페이지입니다.</p>
+  <div class="find hero-find"><div class="search-field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="site-q" class="field" type="search" autocomplete="off" placeholder="이름, 주소, 번호로 찾기 (예: 증미역, 양천로)" aria-label="객체 찾기"></div>
+  <div id="site-hits" aria-live="polite"></div></div>
+  <div class="examples"><span class="muted small">예:</span><a class="chip type" href="/jeungmi-geokg/id/station/1150010200106660040000001/">증미역</a><a class="chip type" href="/jeungmi-geokg/id/building/1150010200106660040000001/">증미역 역사 건물</a><a class="chip type" href="/jeungmi-geokg/id/legal-dong/1150010200/">등촌동 (법정동)</a><a class="chip type" href="/jeungmi-geokg/id/road/115003115008/">양천로 (도로)</a></div>
+</div><figure class="hero-fig card"><svg class="kg-diagram" viewBox="0 0 440 290" role="img" aria-label="증미역 객체가 서로 이어진 모양: 역은 역사 건물 안에 있고, 건물은 출입구, 법정동, 필지, 국가기본도 건물과 이어지며, 출입구는 도로 구간에 면한다">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="var(--muted)"/></marker></defs>
+  <g stroke="var(--line-2)" stroke-width="1.6" fill="none" marker-end="url(#ar)">
+    <path d="M74 62 L186 120"/><path d="M276 128 L318 58"/><path d="M371 62 L371 98"/>
+    <path d="M276 160 L318 194"/><path d="M222 172 L222 236"/><path d="M170 158 L128 186" stroke-dasharray="4 4"/>
+  </g>
+  <g font-size="10.5" fill="var(--muted)" font-family="var(--font)">
+    <text x="96" y="84">건물 안에 있다</text><text x="300" y="96">출입구</text><text x="378" y="84">면한다</text>
+    <text x="300" y="168">법정동</text><text x="228" y="210">필지 위</text><text x="112" y="164">같은 건물</text>
+  </g>
+  <g font-family="var(--font)" font-size="12.5" font-weight="700" text-anchor="middle">
+    <rect x="16" y="20" width="100" height="40" rx="10" fill="var(--station)"/><text x="66" y="45" fill="#fff">증미역</text>
+    <rect x="170" y="120" width="104" height="52" rx="12" fill="var(--brand)"/><text x="222" y="142" fill="var(--panel)">역사 건물</text>
+    <text x="222" y="159" fill="var(--panel)" font-size="9.5" font-weight="500">건물관리번호 25자리</text>
+    <rect x="318" y="20" width="106" height="40" rx="10" fill="var(--accent-soft)" stroke="var(--accent-line)"/><text x="371" y="45" fill="var(--accent)">주출입구</text>
+    <rect x="318" y="100" width="106" height="40" rx="10" fill="var(--soft)" stroke="var(--road)"/><text x="371" y="125" fill="var(--road)">양천로 구간</text>
+    <rect x="318" y="180" width="106" height="40" rx="10" fill="var(--soft)" stroke="var(--line-2)"/><text x="371" y="205" fill="var(--text-2)">등촌동</text>
+    <rect x="170" y="238" width="104" height="40" rx="10" fill="var(--soft)" stroke="var(--line-2)"/><text x="222" y="263" fill="var(--text-2)">필지 PNU</text>
+    <rect x="16" y="186" width="112" height="40" rx="10" fill="var(--panel)" stroke="var(--basemap)" stroke-dasharray="4 3"/><text x="72" y="211" fill="var(--basemap)">국가기본도 건물</text>
+  </g>
+</svg><figcaption class="small muted">객체는 공식 번호로 이름 붙고, 관계로 서로 이어진다.</figcaption></figure>
+</section>
+<section><h2 class="sec-title">객체 종류</h2><div class="kgrid"><a class="kcard card" href="/jeungmi-geokg/id/building/"><span class="kn">2,162</span><span class="kl">건물</span></a><a class="kcard card" href="/jeungmi-geokg/id/building-gis/"><span class="kn">628</span><span class="kl">건물 (주소 미연결)</span></a><a class="kcard card" href="/jeungmi-geokg/id/entrance/"><span class="kn">2,180</span><span class="kl">건물 출입구</span></a><a class="kcard card" href="/jeungmi-geokg/id/parcel/"><span class="kn">1,760</span><span class="kl">필지</span></a><a class="kcard card" href="/jeungmi-geokg/id/road/"><span class="kn">68</span><span class="kl">도로</span></a><a class="kcard card" href="/jeungmi-geokg/id/legal-dong/"><span class="kn">5</span><span class="kl">법정동</span></a><a class="kcard card" href="/jeungmi-geokg/id/admin-dong/"><span class="kn">8</span><span class="kl">행정동</span></a><a class="kcard card" href="/jeungmi-geokg/id/basic-zone/"><span class="kn">48</span><span class="kl">기초구역</span></a><a class="kcard card" href="/jeungmi-geokg/id/station/"><span class="kn">1</span><span class="kl">역</span></a></div></section>
+<section><h2 class="sec-title">국가기본도 대전환 4원칙과 이 그래프</h2><div class="pgrid"><div class="pcard card"><span class="pn">1</span><h3>객체 원자화</h3><p>건물, 출입구, 필지, 도로, 행정구역, 공공시설을 각각 하나의 객체로 쪼개고 모양(Geometry)은 따로 둡니다.</p></div><div class="pcard card"><span class="pn">2</span><h3>영구 식별자</h3><p>새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드 같은 공식 번호를 그대로 URI에 씁니다. 객체가 없어져도 URI는 남습니다.</p></div><div class="pcard card"><span class="pn">3</span><h3>자동 갱신</h3><p>새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 견줘 신규, 변경, 폐지 제안을 만듭니다.</p></div><div class="pcard card"><span class="pn">4</span><h3>AI 제안 후 사람 승인</h3><p>고시공고는 LLM이 바뀌는 내용만 뽑고, 사람이 승인한 변경만 그래프에 들어가며 누가 언제 승인했는지 남습니다.</p></div></div></section>
+<section class="card sec two"><div><h2>그래프 쓰기</h2><p class="small">페이지마다 같은 주소에 Turtle 파일(<code>index.ttl</code>)이 있어 기계가 그대로 읽을 수 있습니다.
+어휘는 <a href="/jeungmi-geokg/def/">jgk</a>이고, 원본에서 그래프를 다시 만드는 코드는 <a href="https://github.com/yeodh10/jeungmi-geokg">GitHub 저장소</a>에 있습니다.</p></div>
+<div><h2>공개 범위</h2><p class="small">민원행정기관 전자지도, 도로명주소 전자지도, 국가기본도, 수치지형도에서 온 객체와 모양은 이용 조건을 확인하는 중이라 이 사이트에 넣지 않았습니다.</p></div></section></main>
+<footer class="foot"><div>증미역 반경 1km 공간 지식 그래프, GeoSPARQL 1.1. 객체마다 공식 번호로 바뀌지 않는 URI를 붙였습니다.</div>
+<div>배경지도 © OpenStreetMap contributors. 이용 조건을 확인 중인 출처의 객체는 이 사이트에 넣지 않았습니다.</div></footer></body></html>
