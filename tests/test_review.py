@@ -95,7 +95,7 @@ def run() -> None:
                   json={"result": "rejected", "reviewer": "테스트 검토자", "comment": "시험용 반려"}).status_code == 200
     review_app.state["store"] = None
     assert not c.get("/api/feature", params={"uri": p["target"] + "-test"}).json()["in_graph"]
-    assert c.get("/api/proposals?status=rejected").json()[0]["id"] == "test-reject"
+    assert "test-reject" in {x["id"] for x in c.get("/api/proposals?status=rejected").json()}
 
     print("검토 흐름 확인 통과:", p["id"])
 

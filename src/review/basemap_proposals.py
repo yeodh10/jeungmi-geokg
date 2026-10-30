@@ -8,6 +8,7 @@
 1. 주소 미연결 건물(building-gis)이 국가기본도 건물과 이어져 있고(서로 가장 많이 겹치고 IoU 0.5 이상), 그 국가기본도 건물에 도로명주소가 있다.
 2. 그 주소를 쓰는 내비게이션용DB 건물 가운데 모양 없이 점만 있는 건물의 점이 이 건물 모양에서 MAX_DISTANCE_M 안에 하나만 있다.
 3. 그 점 건물을 더 가까운 다른 주소 미연결 건물이 차지하지 않았다 (점 건물 하나에 제안 하나).
+4. 출처끼리 PNU가 다르면, GIS 쪽 PNU가 그 점 건물의 지번(내비게이션용DB 대표 지번과 관련 지번) 가운데 하나여야 한다.
 주소만으로는 고르지 않는다. 아파트 단지처럼 한 주소에 건물이 여러 동이라서다.
 승인하면 주소 미연결 건물의 URI는 남기고 상태를 '주소 연결됨'으로 바꾸고 owl:sameAs로 건물관리번호 건물을 가리킨다 (자동 갱신의 link 제안과 같은 꼴).
 """
@@ -27,6 +28,18 @@ JGK = "https://yeodh10.github.io/jeungmi-geokg/def#"
 OWL_SAMEAS = "http://www.w3.org/2002/07/owl#sameAs"
 MAX_DISTANCE_M = 10  # 점 건물의 점과 주소 미연결 건물 모양 사이 (EPSG:5186)
 SHAPE_NEAR_M = 5  # 모양 붙이기에서 모양 밖 점을 가장 가까운 모양에 이을 때의 한계 (EPSG:5186)
+# 아래 셋은 2026-10-30 제안 검토에서 정한 기준이다. 이미 이은 국가기본도 건물 1,834쌍에서 잰 값으로 정했다 (docs/decisions.md)
+SHAPE_MAX_OVERLAP = 0.1  # 국가기본도 모양이 우리 다른 건물 모양과 겹치는 비율의 한계 (이은 쌍의 99%가 0.13 이하)
+SHAPE_MIN_AREA_M2 = 15  # 이은 국가기본도 건물 넓이의 하위 1%
+SHAPE_FLOOR_GAP = 3  # 국가기본도 2층 이하인데 건축물대장이 이만큼 높으면 부속 구조물로 본다 (이은 쌍의 0.4%)
+
+
+def related_lots(proc: Path = PROC) -> dict[str, set[str]]:
+    """건물관리번호마다 내비게이션용DB가 적은 관련 지번의 PNU (대표 지번은 건물 객체의 pnu에 있다)."""
+    nj = pd.read_csv(proc / "navi_jibun.csv", dtype=str)
+    pnu = (nj["legal_dong_code"] + nj["is_mountain"].map({"0": "1", "1": "2"})
+           + nj["jibun_main"].str.zfill(4) + nj["jibun_sub"].str.zfill(4))
+    return pnu.groupby(nj["bldg_mgt_no"]).apply(set).to_dict()
 
 
 def candidates(proc: Path = PROC) -> pd.DataFrame:
@@ -40,6 +53,7 @@ def candidates(proc: Path = PROC) -> pd.DataFrame:
     centers["addr_key"] = centers["road_code"] + "-" + centers["bldg_main_no"] + "-" + centers["bldg_sub_no"]
     point_only = set(buildings.loc[buildings.geom_type == "Point", "bldg_mgt_no"])
     by_uri = buildings.set_index("uri")
+    lots = related_lots(proc)
 
     rows = []
     for r in links.itertuples():
@@ -54,6 +68,9 @@ def candidates(proc: Path = PROC) -> pd.DataFrame:
             continue
         c = near.iloc[0]
         target = by_uri.loc[uri.building(c["bldg_mgt_no"])]
+        pnus = {v for v in (by_uri.at[r.building_uri, "pnu"], m["pnu"], target["pnu"]) if isinstance(v, str)}
+        if len(pnus) > 1 and by_uri.at[r.building_uri, "pnu"] not in lots.get(c["bldg_mgt_no"], set()) | {target["pnu"]}:
+            continue  # 규칙 4
         rows.append({"gis_uri": r.building_uri, "building_uri": target.name, "mgt": c["bldg_mgt_no"],
                      "distance_m": round(float(dist[near.index[0]]), 1), "basemap_uri": r.map_uri,
                      "nf_id": m["nf_id"], "basemap_name": m["name"], "iou": float(r.iou),
@@ -101,6 +118,10 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     4. 국가기본도 건물의 도로명주소가 점 건물과 같다. 국가기본도에 주소가 없으면 '확인 필요'로 제안하고, 다르면 제안하지 않는다.
     5. 점이 어느 모양에도 들지 않으면(중심점이 외곽선 바로 밖에 찍힌 경우), SHAPE_NEAR_M 안에서 가장 가까운 모양이
        도로명주소까지 같을 때만 2, 3을 따져 제안한다. 이때는 주소가 없는 모양은 쓰지 않는다.
+    6. 국가기본도 모양이 우리 다른 건물 모양과 SHAPE_MAX_OVERLAP보다 많이 겹치지 않는다.
+    7. 국가기본도 PNU가 점 건물과 다르면, 그 PNU가 점 건물의 관련 지번 가운데 하나여야 한다.
+    8. 국가기본도 모양이 SHAPE_MIN_AREA_M2㎡ 이상이고, 국가기본도 2층 이하인데 건축물대장이 SHAPE_FLOOR_GAP층 넘게 높지 않다
+       (아파트 동 중심점이 경비실 같은 작은 부속 구조물 모양에 떨어진 경우를 거른다).
     """
     gpkg = proc / "objects.gpkg"
     buildings = gpd.read_file(gpkg, layer="building")
@@ -112,6 +133,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     key_of = dict(zip(centers["bldg_mgt_no"], centers["road_code"] + "-" + centers["bldg_main_no"] + "-" + centers["bldg_sub_no"]))
     taken = set(pd.read_csv(proc / "building_basemap.csv", dtype=str)["map_uri"])
     by_link = set(candidates(proc)["building_uri"])
+    lots = related_lots(proc)
 
     j = gpd.sjoin(pts, bm[["map_uri", "nf_id", "name", "addr_key", "map_pnu", "map_floors", "geometry"]],
                   predicate="within", how="inner")
@@ -125,6 +147,15 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     j = pd.concat([j, near], ignore_index=True)
     per_map = j.groupby("map_uri").size()
     poly_of = basemap.set_index("uri").geometry.to_crs(stored_crs)
+    metric_of = bm.set_index("map_uri").geometry
+    ours = buildings[buildings.geom_type != "Point"].to_crs("EPSG:5186").geometry.reset_index(drop=True)
+
+    def overlap(map_uri: str) -> float:
+        poly = metric_of[map_uri]
+        return max((poly.intersection(g).area / poly.area for g in ours.iloc[ours.sindex.query(poly, predicate="intersects")]), default=0.0)
+
+    def floor_gap(r) -> bool:
+        return not pd.isna(r.floors_above) and not pd.isna(r.map_floors) and r.floors_above > 0             and r.map_floors <= 2 and r.floors_above - r.map_floors >= SHAPE_FLOOR_GAP
     rows = []
     for r in j.itertuples():
         reason = ("주소 미연결 건물 잇기 제안이 다룸" if r.uri in by_link
@@ -132,6 +163,11 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
                   else "한 국가기본도 건물에 점 건물이 여럿" if per_map[r.map_uri] > 1
                   else "국가기본도 건물이 우리 다른 건물과 이어짐" if r.map_uri in taken
                   else "도로명주소가 다름" if isinstance(r.addr_key, str) and r.addr_key != key_of.get(r.bldg_mgt_no)
+                  else "PNU가 다르고 관련 지번에도 없음" if isinstance(r.pnu, str) and isinstance(r.map_pnu, str)
+                  and r.pnu != r.map_pnu and r.map_pnu not in lots.get(r.bldg_mgt_no, set())
+                  else "국가기본도 모양이 너무 작음" if metric_of[r.map_uri].area < SHAPE_MIN_AREA_M2
+                  else "층수 차이로 부속 구조물로 보임" if floor_gap(r)
+                  else "우리 다른 건물 모양과 많이 겹침" if overlap(r.map_uri) > SHAPE_MAX_OVERLAP
                   else None)
         if reason:
             skipped[reason] = skipped.get(reason, 0) + 1

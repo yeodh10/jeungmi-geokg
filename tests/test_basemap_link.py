@@ -14,6 +14,14 @@ REAL = ROOT / "data" / "processed" / "review" / "proposals.json"
 JGK = "https://yeodh10.github.io/jeungmi-geokg/def#"
 
 
+def copy_without_basemap(dst: Path) -> None:
+    """실제 제안 파일을 복사하되 이 규칙의 제안은 뺀다 (실제 파일에서 이미 결정됐어도 다시 승인해 볼 수 있게)."""
+    import json
+    rows = json.loads(REAL.read_text(encoding="utf-8"))
+    rows = [r for r in rows if not r["id"].startswith(("rule-basemap-link-", "rule-basemap-shape-"))]
+    dst.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def run() -> None:
     import geopandas as gpd
 
@@ -30,7 +38,10 @@ def run() -> None:
     assert (df["distance_m"] <= MAX_DISTANCE_M).all() and df["building_uri"].is_unique
     assert df["gis_uri"].str.contains("/building-gis/").all() and (df["iou"] >= 0.5).all()
 
-    g = load_store()
+    base = Path(tempfile.mkdtemp()) / "proposals.json"  # 이 규칙의 제안을 결정하기 전 그래프
+    copy_without_basemap(base)
+    g = load_store(ProposalStore(base))
+    shutil.rmtree(base.parent, ignore_errors=True)
     props = [make(r) for _, r in df.iterrows()]
     for p in props:
         ok, res = check_proposal(g, p)
@@ -39,7 +50,7 @@ def run() -> None:
 
     # 승인하면 상태가 주소 연결됨이 되고 sameAs로 건물관리번호 건물을 가리킨다
     tmp = Path(tempfile.mkdtemp()) / "proposals.json"
-    shutil.copy(REAL, tmp)
+    copy_without_basemap(tmp)
     try:
         store = ProposalStore(tmp)
         store.add_new(props)
@@ -78,7 +89,7 @@ def run_shape(g, b) -> None:
     assert len({group_of(p)[0] for p in props}) == 1
 
     tmp = Path(tempfile.mkdtemp()) / "proposals.json"
-    shutil.copy(REAL, tmp)
+    copy_without_basemap(tmp)
     try:
         store = ProposalStore(tmp)
         store.add_new(props)

@@ -24,6 +24,8 @@ def run() -> None:
     shutil.copy(REAL, tmp / "proposals.json")
     ps = ProposalStore(tmp / "proposals.json")
     props = ps.load()
+    for p in props:  # 실제 기록의 결정은 지우고 시작한다 (이 시험이 고른 두 승인만 그래프에 있게)
+        p.status, p.decision, p.corrections = "pending", None, []
     retire = next(p for p in props if p.action == "retire" and p.status == "pending")
     link = next(p for p in props if p.action == "link" and p.status == "pending")
     for p, at in ((retire, "2026-10-30T10:00:00+09:00"), (link, "2026-10-30T11:00:00+09:00")):

@@ -37,6 +37,7 @@ SITE_PATH = "/" + SITE.split("://", 1)[1].split("/", 1)[1]  # /jeungmi-geokg (�
 REPO = "https://github.com/yeodh10/jeungmi-geokg"
 JGK = SITE + "/def#"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+RDF_SUBJ, RDF_PRED, RDF_OBJ = (f"http://www.w3.org/1999/02/22-rdf-syntax-ns#{x}" for x in ("subject", "predicate", "object"))
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 DCT_SOURCE = "http://purl.org/dc/terms/source"
@@ -199,6 +200,18 @@ def main() -> None:
     obs_summary = observation_summary(triples)
     held = {s for s, plist in triples.items() if any(p.value == DCT_SOURCE and o.value in hold for p, o in plist)}
     held |= {f"{s}/geometry" for s in held}
+    # 공개 보류 출처로 바뀐 모양은 바뀌기 전 값(승인 기록의 rdf:Statement, changeOp remove)으로 보여 준다
+    # 예: 점만 있던 건물에 국가기본도 모양을 붙이면, 이용 조건 확인 전까지 공개 사이트에는 내비게이션용DB 점이 남는다
+    earlier_wkt = {}
+    for s, plist in triples.items():
+        if "/change/" in s:
+            d = {p.value: o.value for p, o in plist}
+            if d.get(RDF_PRED) == GEO + "asWKT" and d.get(JGK + "changeOp") == "remove" and d.get(RDF_SUBJ) in held:
+                earlier_wkt[d[RDF_SUBJ]] = d[RDF_OBJ]
+    # 공개 보류 객체나 모양을 바꾼 제안은 제안과 변경 기록 페이지를 통째로 보류한다 (기록에 그 값이 그대로 들어 있다)
+    touched = {s.rsplit("/change/", 1)[0] for s, plist in triples.items() if "/change/" in s
+               and any(p.value in (RDF_SUBJ, RDF_OBJ) and o.value in held for p, o in plist)}
+    held |= touched | {s for s in triples if "/change/" in s and s.rsplit("/change/", 1)[0] in touched}
     public = lambda s: s.startswith(BASE + "/") and s not in held and not s.endswith("/geometry")
     pname = lambda p: labels.get(p) or EXT_LABEL.get(p) or p.rsplit("#", 1)[-1]
 
@@ -306,8 +319,8 @@ def main() -> None:
         # 모양: 지도에 그릴 GeoJSON (좌표는 소수 6자리)
         geom_json = ""
         gnode = s if is_geom else f"{s}/geometry"
-        if gnode not in held:
-            wkt = next((o.value for p, o in triples.get(gnode, []) if p.value == GEO + "asWKT"), None)
+        if gnode not in held or gnode in earlier_wkt:
+            wkt = earlier_wkt.get(gnode) or next((o.value for p, o in triples.get(gnode, []) if p.value == GEO + "asWKT"), None)
             if wkt:
                 g = shapely.set_precision(shapely.from_wkt(wkt), 1e-6)
                 geom_json = json.dumps(mapping(g), separators=(",", ":"))
