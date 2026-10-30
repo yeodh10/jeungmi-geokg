@@ -55,10 +55,17 @@ def preload() -> None:
     try:
         g = store()
         system_prompt()
+        # 지도 화면이 처음에 받는 레이어도 미리 만들어 둔다 (처음 화면이 비어 있는 시간을 줄인다)
+        for kind in ("station", "facility", "building", "road"):
+            version = state["version"]
+            body = layer_body(kind)
+            if state["version"] == version:
+                layer_cache[(kind, version)] = body
+        area_geojson()
     except Exception:  # 미리 불러오기에 실패해도 서버는 뜨고, 첫 요청이 다시 불러 보며 오류를 낸다
         log.exception("그래프를 미리 불러오지 못했다")
         return
-    log.info("그래프를 미리 불러왔다: 트리플 %d개, %.1f초", len(g), time.perf_counter() - t0)
+    log.info("그래프와 지도 레이어를 미리 불러왔다: 트리플 %d개, %.1f초", len(g), time.perf_counter() - t0)
 
 
 @asynccontextmanager
@@ -71,6 +78,15 @@ async def lifespan(_app):
 app = FastAPI(title="증미역 GeoKG 변경 제안 검토", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
+
+
+@app.middleware("http")
+async def no_stale_ui(request: Request, call_next):
+    """화면 파일(HTML, CSS, JS)은 매번 바뀌었는지 묻게 한다. 고친 화면이 브라우저에 남은 옛 파일에 가려지지 않게."""
+    response = await call_next(request)
+    if request.url.path in ("/", "/map") or request.url.path.startswith("/static/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
 proposals = ProposalStore()
 # boot: 서버를 켤 때마다 달라지는 값. 다시 켜면 판 번호가 0으로 돌아가도 ETag가 겹치지 않게 한다
 state = {"store": None, "version": 0, "boot": format(time.time_ns(), "x")}

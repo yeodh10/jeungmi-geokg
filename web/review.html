@@ -3,91 +3,105 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>변경 제안 검토</title>
+<title>변경 제안 검토 | 증미역 공간 지식 그래프</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/common.js"></script>
 <style>
-  .wrap { display: grid; grid-template-columns: 340px 1fr; height: calc(100% - 52px); }
+  .wrap { display: grid; grid-template-columns: 360px 1fr; height: calc(100% - var(--topbar)); }
   .side { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
-  .tabs { display: flex; gap: 4px; padding: 12px 12px 8px; flex-wrap: wrap; }
-  .tabs button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 12px; color: var(--muted); }
-  .tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .filters { display: grid; gap: 6px; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+  .side-top { padding: 14px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+  .tabs { display: flex; gap: 2px; padding: 3px; background: var(--soft); border-radius: 10px; }
+  .tabs button { flex: 1; border: 0; background: transparent; border-radius: 8px; padding: 5px 4px; color: var(--muted); font-weight: 600; font-size: 13px; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button[aria-selected="true"] { background: var(--panel); color: var(--text); box-shadow: var(--shadow-1); }
+  .filters { display: grid; gap: 8px; }
   .filters .row { display: flex; gap: 6px; }
-  .filters select.field { flex: 1; min-width: 0; padding: 5px 6px; font-size: 12px; }
-  .list { margin: 0; padding: 8px; overflow-y: auto; flex: 1; }
+  .filters select.field { flex: 1; min-width: 0; padding: 6px 26px 6px 9px; font-size: 12px; }
+  .list { margin: 0; padding: 8px 10px 16px; overflow-y: auto; flex: 1; }
   .list .item { display: block; width: 100%; text-align: left; background: none; color: inherit; padding: 10px 12px;
-                border-radius: var(--radius); margin-bottom: 4px; border: 1px solid transparent; }
-  .list .item:hover { background: var(--soft); }
-  .list .item[aria-current="true"] { background: var(--accent-soft); border-color: #c9d8f7; }
+                border-radius: var(--radius); margin-bottom: 4px; border: 1px solid transparent; transition: background .1s; }
+  .list .item:hover { background: var(--hover); }
+  .list .item[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); }
   .list .item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .list .item > span { display: block; }
-  .list .t { font-weight: 600; margin: 4px 0 2px; overflow-wrap: anywhere; }
-  .list .dec { margin-top: 3px; color: var(--text); }
+  .list .item .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .list .t { font-weight: 600; margin: 6px 0 2px; overflow-wrap: anywhere; line-height: 1.4; }
+  .list .dec { margin-top: 4px; color: var(--text-2); }
   .list .why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .list .ghead { font-size: 12px; font-weight: 600; color: var(--text); padding: 10px 4px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
-  .list .ghead:first-child { border-top: 0; margin-top: 0; padding-top: 2px; }
-  .list .ghead .gsum { display: block; font-weight: 400; color: var(--muted); }
-  .list .ghead .gbtn { margin-top: 5px; padding: 2px 10px; font-size: 12px; color: var(--accent); border-color: #c9d8f7; }
+  .list .ghead { font-size: 13px; font-weight: 700; color: var(--text); padding: 14px 6px 6px; margin-top: 4px; border-top: 1px solid var(--line); }
+  .list .ghead:first-child { border-top: 0; margin-top: 0; padding-top: 4px; }
+  .list .ghead .gsum { display: block; font-weight: 500; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .list .ghead .gbtn { margin-top: 8px; color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+  .list-toggle { display: none; margin: 0 12px 8px; }
+
+  .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+  .detail .body { padding: 22px 28px 28px; flex: 1; max-width: 1280px; width: 100%; }
+  .head { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow-1); }
+  .head .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .head h2 { font-size: 20px; margin: 10px 0 6px; }
+  .head .uri { margin-top: 6px; }
+  .head:focus { outline: none; }
+  #shacl { margin-top: 14px; display: flex; align-items: center; gap: 8px; }
+  #shacl::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; opacity: .8; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+  @media (max-width: 1200px) { .cols { grid-template-columns: 1fr; } }
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px 16px; box-shadow: var(--shadow-1); min-width: 0; }
+  .pane > h3:first-child { margin-top: 14px; }
+  .pane table.kv { border: 1px solid var(--line); border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+  #map { height: 340px; border-radius: 8px; border: 1px solid var(--line); }
+  #map.nomap { height: auto; padding: 28px 12px; text-align: center; color: var(--muted); background: var(--soft); }
+  .legend { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .map-sum { margin-top: 4px; }
+  .obj-title { font-weight: 600; margin: 14px 0 6px; }
+  ul.evidence { margin: 0; padding: 0; list-style: none; }
+  ul.evidence li { margin: 0; padding: 8px 0 8px 22px; overflow-wrap: anywhere; border-top: 1px solid var(--line); position: relative; }
+  ul.evidence li:first-child { border-top: 0; }
+  ul.evidence li::before { content: ""; position: absolute; left: 6px; top: 16px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: .6; }
+  .body > details, .body > h3 { margin-left: 2px; }
+  table.kv.decision td:last-child { white-space: pre-wrap; }
   table.batch td:first-child { width: 36px; color: var(--muted); }
+  table.batch td:last-child { width: 40%; }
+  .applied { margin-top: 6px; }
+  #shacl .btn { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
   .correct { margin-top: 12px; }
   .correct summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   .correct .row { display: flex; gap: 8px 12px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
   .correct label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
-  .correct .f-reviewer { width: 150px; } .correct .f-to { width: 170px; } .correct .f-reason { flex: 1; min-width: 220px; }
-  table.batch td:last-child { width: 40%; }
-  .list-toggle { display: none; margin: 0 12px 8px; }
-  .detail { overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
-  .detail .body { padding: 18px 22px; flex: 1; }
-  .head .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .head:focus { outline: none; }
-  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 14px; }
-  @media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
-  #map { height: 330px; border-radius: var(--radius); border: 1px solid var(--line); }
-  #map.nomap { height: auto; padding: 28px 12px; text-align: center; color: var(--muted); background: var(--soft); }
-  .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .map-sum { margin-top: 4px; }
-  .obj-title { font-weight: 600; margin: 12px 0 4px; }
-  ul.evidence { margin: 0; padding-left: 18px; }
-  ul.evidence li { margin: 3px 0; overflow-wrap: anywhere; }
-  table.kv.decision td:last-child { white-space: pre-wrap; }
-  .applied { margin-top: 6px; }
-  #shacl .btn { margin-left: 8px; padding: 2px 10px; font-size: 12px; }
-  .decide { position: sticky; bottom: 0; z-index: 5; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 22px 12px;
-            display: flex; gap: 8px 12px; align-items: flex-end; flex-wrap: wrap; }
-  .decide label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
-  .decide .f-reviewer { width: 150px; }
-  .decide .f-comment { flex: 1; min-width: 220px; }
-  .decide textarea.field { resize: vertical; min-height: 36px; display: block; }
+  .correct .f-reviewer { width: 150px; } .correct .f-to { width: 190px; } .correct .f-reason { flex: 1; min-width: 220px; }
+
+  .decide { position: sticky; bottom: 0; z-index: 5; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(6px);
+            border-top: 1px solid var(--line); padding: 12px 28px 14px; box-shadow: 0 -6px 16px rgba(16, 24, 40, .06);
+            display: flex; gap: 8px 14px; align-items: flex-end; flex-wrap: wrap; }
+  .decide label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .decide .f-reviewer { width: 160px; }
+  .decide .f-comment { flex: 1; min-width: 240px; }
+  .decide textarea.field { resize: vertical; min-height: 38px; display: block; }
   .decide .btns { display: flex; gap: 8px; align-items: center; }
+  .decide .btns .btn { min-width: 84px; }
   .decide .err { flex-basis: 100%; }
-  .decide .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .hint-err { color: var(--no); font-size: 12px; }
+  .hint-err { color: var(--no); font-size: 12px; margin-top: 3px; }
   .hint-err:empty { display: none; }
-  .reasons { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
-  .reasons button { border: 1px solid var(--line); background: var(--soft); color: var(--muted); border-radius: 999px; padding: 0 9px; font-size: 12px; }
-  .reasons button:hover { color: var(--text); }
-  .toast { position: fixed; top: 60px; left: 50%; transform: translate(-50%, -8px); z-index: 30; max-width: calc(100% - 32px);
-           background: var(--text); color: #fff; padding: 9px 16px; border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,.18);
-           opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+  .reasons { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .reasons button { border: 1px solid var(--line); background: var(--soft); color: var(--muted); border-radius: 999px; padding: 0 10px; font-size: 12px; line-height: 22px; }
+  .reasons button:hover { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+  .toast { position: fixed; top: 68px; left: 50%; transform: translate(-50%, -8px); z-index: 30; max-width: calc(100% - 32px);
+           background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 10px; box-shadow: var(--shadow-3);
+           opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; font-weight: 500; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-  .toast a { color: #9fc0ff; }
-  .help-btn { margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-weight: 700; flex: none; }
-  .help-box { position: fixed; top: 58px; right: 14px; z-index: 40; width: 270px; background: var(--panel); border: 1px solid var(--line);
-              border-radius: var(--radius); box-shadow: 0 6px 22px rgba(0,0,0,.14); padding: 12px 14px; }
-  .help-box h3 { margin: 0 0 6px; }
-  .help-box table td { padding: 3px 4px; vertical-align: top; }
-  kbd { display: inline-block; min-width: 20px; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px;
-        background: var(--soft); font: 12px/1.6 ui-monospace, Consolas, monospace; text-align: center; }
-  @media (max-width: 860px) {
-    .topbar { height: auto; min-height: 52px; flex-wrap: wrap; padding: 6px 16px; gap: 6px 14px; }
-    .topbar .brand { white-space: normal; }
+  .toast a { color: var(--accent-line); }
+  .help-box { position: fixed; top: 64px; right: 16px; z-index: 40; width: 290px; background: var(--raised); border: 1px solid var(--line);
+              border-radius: 12px; box-shadow: var(--shadow-3); padding: 14px 16px; }
+  .help-box h3 { margin: 0 0 8px; }
+  .help-box table td { padding: 4px; vertical-align: top; }
+  @media (max-width: 900px) {
     .wrap { grid-template-columns: 1fr; height: auto; }
-    .side { max-height: 32vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    .side { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
     .side.folded { max-height: none; }
-    .side.folded .filters, .side.folded .list { display: none; }
+    .side.folded .side-top .filters, .side.folded .list { display: none; }
     .list-toggle { display: block; }
     .detail { overflow: visible; }
     .detail .body { padding: 14px 16px; }
@@ -98,9 +112,11 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">증미역 공간 지식 그래프</div>
+  <a class="brand" href="/map">증미역 공간 지식 그래프<small>반경 1km, GeoSPARQL 1.1</small></a>
   <nav><a href="/map">지도</a><a href="/" class="on">변경 제안 검토<span class="count" id="pending-count" style="display:none"></span></a></nav>
-  <button class="help-btn" id="help-btn" type="button" aria-expanded="false" aria-controls="help" title="단축키 안내 (?)">?</button>
+  <span class="spacer"></span>
+  <a class="tb-link" href="https://yeodh10.github.io/jeungmi-geokg/" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><span>공개 URI 사이트</span></a>
+  <button class="icon-btn help-btn" id="help-btn" type="button" aria-expanded="false" aria-controls="help" title="단축키 안내 (?)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
 </header>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="help-box" id="help" role="dialog" aria-label="단축키 안내" hidden>
@@ -119,13 +135,14 @@
 </div>
 <div class="wrap">
   <aside class="side" id="side">
+    <div class="side-top">
     <div class="tabs" id="tabs" role="tablist" aria-label="제안 상태">
       <button type="button" role="tab" data-s="pending" aria-controls="list">대기</button><button type="button" role="tab" data-s="approved" aria-controls="list">승인</button>
       <button type="button" role="tab" data-s="rejected" aria-controls="list">반려</button><button type="button" role="tab" data-s="all" aria-controls="list">전체</button>
     </div>
-    <button type="button" class="btn ghost list-toggle" id="list-toggle" aria-expanded="true" aria-controls="list">목록 접기</button>
     <div class="filters">
-      <input id="q" type="search" class="field" placeholder="검색: 이름, 요약, URI, 검토자" aria-label="제안 검색" autocomplete="off">
+      <div class="search-field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" class="field" placeholder="검색: 이름, 요약, URI, 검토자" aria-label="제안 검색" autocomplete="off"></div>
       <div class="row">
         <select id="f-action" class="field" aria-label="종류"></select>
         <select id="f-source" class="field" aria-label="출처"></select>
@@ -134,6 +151,8 @@
         </select>
       </div>
     </div>
+    </div>
+    <button type="button" class="btn ghost list-toggle" id="list-toggle" aria-expanded="true" aria-controls="list">목록 접기</button>
     <div class="list" id="list" role="region" aria-label="제안 목록"></div>
   </aside>
   <section class="detail" id="detail">
@@ -171,6 +190,8 @@ function when(iso, full) {
   const hm = `${z(d.getHours())}:${z(d.getMinutes())}`;
   return full ? `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${hm}` : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 }
+// 출처 설명의 '(src/....py 규칙 1~3)' 같은 꼬리는 화면에서 뗀다 (기록에는 남아 있다)
+const plain = s => String(s ?? "").replace(/\s*\([^()]*\.py[^()]*\)/g, "");
 const timeOf = iso => { const t = Date.parse(iso || ""); return isNaN(t) ? 0 : t; };
 const narrow = () => matchMedia("(max-width: 860px)").matches;
 const proposalUri = p => p.uri || BASE + "proposal/" + p.id;
@@ -241,9 +262,9 @@ function itemHTML(p) {
   const d = decisionOf(p);
   const why = d && p.status === "rejected" && d.comment ? d.comment.split("\n")[0] : "";
   return `<button type="button" class="item" data-id="${esc(p.id)}" tabindex="-1">
-    <span><span class="chip ${p.action}">${ACTION[p.action] || esc(p.action)}</span> <span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
+    <span class="chips"><span class="chip ${p.action}">${ACTION[p.action] || esc(p.action)}</span><span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
       ${p.status !== "pending" ? `<span class="chip ${p.status}">${STATUS[p.status]}</span>` : ""}</span>
-    <span class="t">${esc(p.target_name || p.summary)}</span><span class="small muted">${esc(p.summary)}</span>
+    <span class="t">${esc(p.target_name || p.summary)}</span>${p.target_name ? `<span class="small muted">${esc(p.summary)}</span>` : ""}
     ${d ? `<span class="small dec">${STATUS[d.result || p.status]}, ${esc(d.reviewer)}, ${esc(when(d.at))}${p.corrections ? ", 정정됨" : ""}</span>` : ""}
     ${why ? `<span class="small muted why">사유: ${esc(why)}</span>` : ""}</button>`;
 }
@@ -271,7 +292,7 @@ function renderList() {
     for (const [g, ps] of groups) {
       const members = all.filter(p => groupOf(p) === g);
       const c = s => members.filter(p => p.status === s).length;
-      const label = ps[0].group_label || SOURCE[ps[0].source_kind] || ps[0].source_kind;
+      const label = plain(ps[0].group_label) || SOURCE[ps[0].source_kind] || ps[0].source_kind;
       const gbtn = c("pending") > 1 ? `<button type="button" class="btn ghost gbtn" data-group="${esc(g)}">대기 ${c("pending")}건 묶어 결정</button>` : "";
       html += `<div class="ghead">${esc(label)}<span class="gsum">${g.startsWith("notice:") ? "이 고시" : "이 묶음"} ${members.length}건, 대기 ${c("pending")}, 승인 ${c("approved")}, 반려 ${c("rejected")}</span>${gbtn}</div>`
         + ps.map(itemHTML).join("");
@@ -476,18 +497,18 @@ async function show(id, opts = {}) {
   d.innerHTML = `<div class="body">
     <div class="head" id="dhead" tabindex="-1">
       <div class="chips"><span class="chip ${p.action}">${ACTION[p.action]}</span><span class="chip src">${esc(SOURCE[p.source_kind] || p.source_kind)}</span>
-        <span class="chip ${p.status}">${STATUS[p.status]}</span>${p.group_label ? `<span class="chip src">${esc(p.group_label)}</span>` : ""}</div>
+        <span class="chip ${p.status}">${STATUS[p.status]}</span>${p.group_label ? `<span class="chip src">${esc(plain(p.group_label))}</span>` : ""}</div>
       <h2>${esc(p.summary)}</h2>
-      <div class="small muted">대상 <a href="/map?focus=${enc(p.target)}">${esc(target)}</a>, ${esc(p.source_detail)}</div>
+      <div class="small muted">대상 <a href="/map?focus=${enc(p.target)}">${esc(target)}</a>, ${esc(plain(p.source_detail))}</div>
       <div class="uri">${esc(p.target)}</div>
     </div>
     <div id="shacl" class="banner wait" role="status" style="margin-top:12px">${decided ? "결정이 끝난 제안입니다." : "데이터 규칙(SHACL)을 검사하는 중..."}</div>
     <div class="cols">
-      <div><h3>무엇이 바뀌나</h3>${diffTables(p)}</div>
-      <div><h3>위치</h3><div id="map"></div>
+      <div class="pane"><h3>무엇이 바뀌나</h3>${diffTables(p)}</div>
+      <div class="pane"><h3>위치</h3><div id="map"></div>
         <div class="legend">${legend}</div><div class="small muted map-sum" id="map-sum"></div></div>
     </div>
-    <h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul>
+    <div class="pane" style="margin-top:16px"><h3>근거</h3><ul class="evidence">${p.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>
     <details><summary>트리플로 보기 (${p.changes.length}개)</summary><table class="kv">${p.changes.map(c =>
       `<tr><td>${c.op === "add" ? "추가" : "삭제"}</td><td>${esc(c.s.replace(BASE, "id:"))}</td><td>${esc(localName(c.p))}</td><td>${esc(c.o.kind === "uri" ? c.o.value.replace(BASE, "id:") : c.o.value.slice(0, 80))}</td></tr>`).join("")}</table></details>
     <details><summary>승인하면 실행할 SPARQL</summary><pre>${esc(p.sparql_update)}</pre></details>
@@ -570,10 +591,9 @@ function statusNow(p, u, given) {
 }
 
 // whenStyleReady와 같지만, 그 사이 다른 제안을 골라 지도가 바뀌면 기다리기를 그만둔다
+// 배경지도 타일을 기다리지 않고 스타일만 준비되면 그린다. 그사이 다른 제안으로 옮겨 지도가 바뀌었으면 그리지 않는다
 function readyThen(m, cb) {
-  if (map !== m) return;
-  if (m.isStyleLoaded()) cb();
-  else setTimeout(() => readyThen(m, cb), 50);
+  whenStyleReady(m, () => { if (map === m) cb(); });
 }
 
 async function drawMap(p, signal) {
@@ -713,7 +733,7 @@ async function showGroup(g) {
   d.innerHTML = `<div class="body">
     <div class="head" id="dhead" tabindex="-1">
       <div class="chips"><span class="chip src">묶어 결정</span></div>
-      <h2>${esc(v.group_label || g)}</h2>
+      <h2>${esc(plain(v.group_label) || g)}</h2>
       <div class="small muted">대기 ${n}건을 제안 순서대로, 앞 제안을 반영한 그래프에서 다음 제안을 검사했습니다.
         승인은 통과한 제안만 하고, 통과하지 못한 제안은 대기로 남습니다.</div>
     </div>

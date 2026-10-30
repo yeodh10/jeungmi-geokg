@@ -3,112 +3,169 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>증미역 공간 지식 그래프</title>
+<title>지도 | 증미역 공간 지식 그래프</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/common.js"></script>
 <style>
-  .wrap { display: grid; grid-template-columns: 380px 1fr; height: calc(100% - 52px); }
-  .side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
-  .sec { padding: 14px 16px; border-bottom: 1px solid var(--line); }
-  .sec h3 { margin: 0 0 8px; }
-  .row { display: flex; gap: 6px; }
-  .row .btn { flex: none; white-space: nowrap; }
-  .mapbox { position: relative; min-height: 300px; min-width: 0; }
-  #map { position: absolute; inset: 0; }
-  .loadbox { position: absolute; top: 10px; left: 10px; z-index: 2; max-width: calc(100% - 70px); display: flex; flex-direction: column; gap: 6px; }
-  .loadbox .banner { box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
-  .loadbox .banner.wait { background: var(--panel); }
-  .area-tag { background: rgba(255, 255, 255, .92); border: 1px solid #98a2b3; border-radius: 4px; padding: 0 6px; font-size: 12px; color: #344054; white-space: nowrap; pointer-events: none; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn.mini { padding: 2px 10px; font-size: 12px; font-weight: 600; }
-  .loadbox .btn.mini { margin-left: 8px; }
-  .layer { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .layer .n { margin-left: auto; color: var(--muted); font-size: 12px; }
-  .layer .btn.mini { margin-left: 6px; }
-  .status-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 4px 0 0 22px; font-size: 12px; color: var(--muted); }
-  .status-legend .st { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-  .status-legend .st input { margin: 0; }
-  .status-legend .st .n { margin-left: auto; }
-  .status-legend .st.zero { opacity: .45; cursor: not-allowed; }
-  .status-legend span.st { cursor: help; padding-left: 18px; }
-  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 6px 22px; }
-  .sw.retired { box-shadow: inset 0 0 0 2px #7a1a12; }
-  .sw.answer { background: rgba(122, 90, 248, .2); box-shadow: inset 0 0 0 2px var(--answer); }
-  .sw.area { background: transparent; border: 1.5px dashed #344054; }
-  #hits ul { list-style: none; margin: 4px 0 0; padding: 0; }
-  button.hit { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 5px 6px; border-radius: 6px; overflow-wrap: anywhere; }
-  button.hit:hover, button.hit.on { background: var(--soft); }
+  .wrap { display: grid; grid-template-columns: 400px 1fr; height: calc(100% - var(--topbar)); }
+  .side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; display: flex; flex-direction: column; }
+  .side-head { padding: 16px 18px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; position: sticky; top: 0; background: var(--panel); z-index: 5; }
+  .find { position: relative; }
+  /* 찾기 결과는 입력칸 아래에 뜨는 목록으로 보인다 */
+  #hits:empty { display: none; }
+  #hits { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 10; background: var(--raised); border: 1px solid var(--line);
+          border-radius: var(--radius); box-shadow: var(--shadow-3); max-height: 55vh; overflow-y: auto; padding: 6px; }
+  #hits ul { list-style: none; margin: 0; padding: 0; }
+  #hits > .small { padding: 6px 8px; }
+  button.hit { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 7px 8px; border-radius: 6px; overflow-wrap: anywhere; }
+  button.hit:hover, button.hit.on { background: var(--hover); }
   button.hit.on { box-shadow: inset 2px 0 0 var(--accent); }
   button.hit .sub { display: block; }
-  .chip.kind { font-weight: 600; font-size: 11px; padding: 0 6px; }
-  .chip.k-station { background: #fdf3d6; color: #6f5200; }
-  .chip.k-facility { background: #f0ebfc; color: #5531b8; }
-  .chip.k-building { background: var(--soft); color: var(--text); }
-  .chip.k-entrance { background: var(--accent-soft); color: var(--accent); }
-  .info h2 { margin-top: 8px; }
+  .ask { display: flex; gap: 6px; }
+  .ask .field { flex: 1; }
+  .ask .btn { flex: none; white-space: nowrap; }
+  .ask-note { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .ask-note .eg { border: 1px solid var(--line); background: var(--soft); color: var(--text-2); border-radius: 999px; padding: 1px 10px; font-size: 12px; }
+  .ask-note .eg:hover { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+  .info { padding: 18px; flex: 1; }
+  .info h2 { margin-top: 10px; }
   .info h2:focus { outline: none; }
+  .info h3 { margin-top: 20px; }
+  .info table.kv { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; border-collapse: separate; border-spacing: 0; }
+  .info table.kv td { border-top: 1px solid var(--line); }
+  .info table.kv tr:first-child td { border-top: 0; }
+  .intro { color: var(--text-2); }
+  .intro p { margin: 0 0 10px; }
+  .intro .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 13px; color: var(--muted); align-items: center; margin-top: 12px; }
   .links a { display: inline-block; margin: 0 8px 2px 0; }
   .navlinks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; margin-bottom: 6px; }
-  .pub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 12px; }
+  .pub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; font-size: 12px; }
+  .pub a { text-decoration: none; font-weight: 500; }
   ul.hist { list-style: none; margin: 0; padding: 0; }
-  ul.hist li { padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+  ul.hist li { padding: 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
   .tablewrap { overflow-x: auto; margin-top: 6px; }
-  .answer-yn { margin-top: 8px; padding: 10px 12px; font-size: 18px; font-weight: 700; border: 3px solid var(--answer); border-radius: var(--radius); }
-  /* 좁은 화면: 지도를 위에, 목록과 정보를 그 아래에 이어서 둔다 */
-  @media (max-width: 860px) {
-    .wrap { grid-template-columns: 1fr; grid-template-rows: 55vh auto; height: auto; }
+  .answer-yn { margin-top: 8px; padding: 12px 14px; font-size: 18px; font-weight: 700; border: 2px solid var(--answer); border-radius: var(--radius); background: color-mix(in srgb, var(--answer) 8%, var(--panel)); }
+
+  .mapbox { position: relative; min-height: 300px; min-width: 0; }
+  #map { position: absolute; inset: 0; }
+  .loadbox { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: min(520px, calc(100% - 340px));
+             display: flex; flex-direction: column; gap: 6px; }
+  .loadbox .banner { box-shadow: var(--shadow-2); }
+  .loadbox .banner.wait { background: var(--raised); }
+  .loadbox .btn.mini { margin-left: 8px; }
+  .area-tag { background: var(--raised); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 10px; font-size: 12px; color: var(--text-2);
+              white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-1); }
+
+  /* 지도 위 레이어 패널 */
+  .layer-panel { position: absolute; top: 12px; right: 12px; z-index: 4; width: 292px; max-height: calc(100% - 24px); display: flex; flex-direction: column;
+                 background: var(--raised); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-2); }
+  .layer-panel > .lp-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 0; background: none; color: var(--text); width: 100%;
+                            font-weight: 700; font-size: 13px; text-align: left; }
+  .layer-panel > .lp-head .chev { margin-left: auto; transition: transform .15s; color: var(--muted); }
+  .layer-panel.folded > .lp-head .chev { transform: rotate(-90deg); }
+  .layer-panel.folded .lp-body { display: none; }
+  .lp-body { overflow-y: auto; padding: 0 12px 12px; border-top: 1px solid var(--line); }
+  .lp-body h4 { margin: 12px 0 6px; font-size: 11px; color: var(--muted); letter-spacing: .04em; font-weight: 700; }
+  .layer { display: flex; align-items: center; gap: 8px; margin: 2px 0; padding: 3px 4px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .layer:hover { background: var(--hover); }
+  .layer input { margin: 0; accent-color: var(--accent); }
+  .layer .n { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .layer .btn.mini { margin-left: 6px; }
+  .status-legend { display: grid; grid-template-columns: 1fr; gap: 1px; margin: 2px 0 4px 26px; font-size: 12px; color: var(--muted); }
+  .status-legend .st { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .status-legend .st input { margin: 0; accent-color: var(--accent); }
+  .status-legend .st .n { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .status-legend .st.zero { opacity: .45; cursor: not-allowed; }
+  .status-legend span.st { cursor: help; padding-left: 18px; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 6px 26px; }
+  .sw.retired { box-shadow: inset 0 0 0 2px #7a1a12; }
+  .sw.answer { background: color-mix(in srgb, var(--answer) 20%, transparent); box-shadow: inset 0 0 0 2px var(--answer); }
+  .sw.area { background: transparent; border: 1.5px dashed var(--text-2); }
+  .chip.kind { font-weight: 600; font-size: 11px; padding: 0 7px; line-height: 18px; }
+  .chip.k-station { background: #fdf3d6; color: #6f5200; }
+  .chip.k-facility { background: #f0ebfc; color: #5531b8; }
+  .chip.k-building { background: var(--soft); color: var(--text-2); }
+  .chip.k-entrance, .chip.k-road, .chip.k-legaldong { background: var(--accent-soft); color: var(--accent); }
+  .chip.k-basemap, .chip.k-digitalmap { background: #fde8f3; color: #9e165f; }
+
+  /* 좁은 화면: 지도를 위에, 찾기와 정보를 그 아래에 이어서 둔다 */
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
     .mapbox { order: 1; }
     .side { order: 2; overflow: visible; border-right: 0; }
+    .side-head { position: static; }
+    .layer-panel { width: min(292px, calc(100% - 24px)); max-height: calc(58vh - 24px); }
+    .loadbox { left: 12px; transform: none; max-width: calc(100% - 24px); top: auto; bottom: 30px; }
   }
 </style>
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">증미역 공간 지식 그래프<small>반경 1km, GeoSPARQL 1.1</small></div>
+  <a class="brand" href="/map">증미역 공간 지식 그래프<small>반경 1km, GeoSPARQL 1.1</small></a>
   <nav><a href="/map" class="on">지도</a><a href="/">변경 제안 검토<span class="count" id="pending-count" style="display:none"></span></a></nav>
+  <span class="spacer"></span>
+  <a class="tb-link" href="https://yeodh10.github.io/jeungmi-geokg/" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg><span>공개 URI 사이트</span></a>
 </header>
 <div class="wrap">
   <aside class="side">
-    <div class="sec">
-      <h3>찾기</h3>
-      <input id="q" class="field" autocomplete="off" aria-label="건물 이름이나 도로명주소로 찾기" placeholder="건물 이름이나 도로명주소 (예: 양천로 550)">
-      <div id="hits" aria-live="polite"></div>
-    </div>
-    <div class="sec">
-      <h3>질문하기</h3>
-      <form id="askf" class="row"><input id="ask" class="field" aria-label="그래프에 물어볼 질문" placeholder="예: 증미역 300m 안 학교"><button class="btn" id="askb">묻기</button></form>
-      <div class="small muted" style="margin-top:4px">질문을 SPARQL로 바꿔 그래프에 묻습니다 (Claude API 필요).</div>
-    </div>
-    <div class="sec" id="layers">
-      <h3>레이어</h3>
-      <label class="layer"><input type="checkbox" data-l="building"><i class="sw" style="background:var(--active)"></i>건물<span class="n" id="n-building"></span></label>
-      <div class="status-legend" id="st-legend"></div>
-      <div class="quick">
-        <button type="button" class="btn ghost mini" id="only-retired" disabled>폐지만 보기</button>
-        <button type="button" class="btn ghost mini" id="all-status" disabled>모든 상태</button>
+    <div class="side-head">
+      <div class="find">
+        <div class="search-field">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" class="field" type="search" autocomplete="off" aria-label="건물 이름이나 도로명주소로 찾기" placeholder="건물 이름이나 도로명주소 (예: 양천로 550)">
+        </div>
+        <div id="hits" aria-live="polite"></div>
       </div>
-      <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
-      <label class="layer"><input type="checkbox" data-l="facility"><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
-      <label class="layer"><input type="checkbox" data-l="station"><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
-      <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
-      <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽 (증미역 둘레 약 600m만 받음). 우리 건물과 모양이 1:1로 겹치면 서로 이어져 있다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
-      <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000, 도엽 37608075)의 건물 외곽"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
-      <label class="layer" title="도로명주소 전자지도의 법정동 경계"><input type="checkbox" data-l="legaldong"><i class="sw area" style="border-color:var(--legaldong)"></i>법정동 경계<span class="n" id="n-legaldong"></span></label>
-      <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
-      <label class="layer"><input type="checkbox" data-l="osm"><i class="sw" style="background:#d9dde3"></i>배경지도 (OpenStreetMap)</label>
-      <div class="layer"><i class="sw answer" style="margin-left:21px"></i>질문 답<span class="n" id="n-answer"></span><button type="button" class="btn ghost mini" id="clear-answer" disabled>답 지우기</button></div>
+      <form id="askf" class="ask"><input id="ask" class="field" aria-label="그래프에 물어볼 질문" placeholder="그래프에 묻기 (예: 증미역 300m 안 학교)"><button class="btn" id="askb">묻기</button></form>
+      <div class="ask-note small muted">
+        <span>질문을 SPARQL로 바꿔 묻습니다 (Claude API 필요).</span>
+        <button type="button" class="eg" data-q="증미역 500m 안 교육연구시설 건물을 지도에 보여줘">교육연구시설 500m</button>
+        <button type="button" class="eg" data-q="양천로에 면한 출입구를 가진 건물을 보여줘">양천로에 면한 건물</button>
+        <button type="button" class="eg" data-q="지상 20층 이상인 건물을 보여줘">20층 이상</button>
+      </div>
     </div>
-    <div class="sec">
-      <h3>행정동</h3>
-      <label for="dong" class="sr-only">행정동 고르기</label>
-      <select id="dong" class="field" disabled><option value="">전체 (강조 안 함)</option></select>
-      <div class="small muted" id="dong-note" style="margin-top:4px">건물을 받으면 고를 수 있습니다.</div>
-    </div>
-    <div class="sec info" id="info" aria-live="polite"><div class="muted">지도에서 객체를 누르거나 찾기로 고르면 그래프에 담긴 내용이 여기에 나옵니다.</div></div>
+    <div class="info" id="info" aria-live="polite"><div class="muted">지도에서 객체를 누르거나 찾기로 고르면 그래프에 담긴 내용이 여기에 나옵니다.</div></div>
   </aside>
-  <div class="mapbox"><div id="map"></div><div class="loadbox" id="loadbox"></div></div>
+  <div class="mapbox">
+    <div id="map"></div>
+    <div class="loadbox" id="loadbox"></div>
+    <section class="layer-panel" id="layer-panel" aria-label="레이어">
+      <button type="button" class="lp-head" id="lp-toggle" aria-expanded="true" aria-controls="lp-body">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
+        레이어와 범례<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="lp-body" id="lp-body">
+        <div id="layers">
+          <h4>그래프 객체</h4>
+          <label class="layer"><input type="checkbox" data-l="building"><i class="sw" style="background:var(--active)"></i>건물<span class="n" id="n-building"></span></label>
+          <div class="status-legend" id="st-legend"></div>
+          <div class="quick">
+            <button type="button" class="btn ghost mini" id="only-retired" disabled>폐지만 보기</button>
+            <button type="button" class="btn ghost mini" id="all-status" disabled>모든 상태</button>
+          </div>
+          <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
+          <label class="layer"><input type="checkbox" data-l="facility"><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
+          <label class="layer"><input type="checkbox" data-l="station"><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
+          <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
+          <h4>견주어 볼 지도</h4>
+          <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽 (증미역 둘레 약 600m만 받음). 우리 건물과 모양이 1:1로 겹치면 서로 이어져 있다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
+          <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000, 도엽 37608075)의 건물 외곽"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
+          <label class="layer" title="도로명주소 전자지도의 법정동 경계"><input type="checkbox" data-l="legaldong"><i class="sw area" style="border-color:var(--legaldong)"></i>법정동 경계<span class="n" id="n-legaldong"></span></label>
+          <h4>바탕</h4>
+          <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
+          <label class="layer"><input type="checkbox" data-l="osm"><i class="sw" style="background:var(--line-2)"></i>배경지도 (OpenStreetMap)</label>
+          <div class="layer"><i class="sw answer" style="margin-left:21px"></i>질문 답<span class="n" id="n-answer"></span><button type="button" class="btn ghost mini" id="clear-answer" disabled>답 지우기</button></div>
+        </div>
+        <h4>행정동</h4>
+        <label for="dong" class="sr-only">행정동 고르기</label>
+        <select id="dong" class="field" disabled><option value="">전체 (강조 안 함)</option></select>
+        <div class="small muted" id="dong-note" style="margin-top:4px">건물을 받으면 고를 수 있습니다.</div>
+      </div>
+    </section>
+  </div>
 </div>
 <script>
 const data = {};  // 레이어 이름 -> 서버에서 받은 FeatureCollection (받은 것만)
@@ -173,7 +230,7 @@ let areaTag = null;
 
 const map = new maplibregl.Map({ container: "map", style: baseStyle(), center: zc ? zc.center : [126.86125, 37.55772],
   zoom: zc ? zc.zoom : 15, attributionControl: { compact: true } });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
 const styleReady = new Promise(res => whenStyleReady(map, res));
 
@@ -212,7 +269,7 @@ function layerSpecs(k) {
   const statusColor = ["match", ["get", "status"], "주소 미연결", css("--unlinked"), "주소 연결됨", css("--linked"), "폐지", css("--retired"), css("--active")];
   if (k === "building") return [
     { id: "building", type: "fill", source: "building", filter: buildingFilter("fill"),
-      paint: { "fill-color": statusColor, "fill-opacity": 0.7, "fill-outline-color": "#4b5565" } },
+      paint: { "fill-color": statusColor, "fill-opacity": 0.78, "fill-outline-color": darkMode() ? "#0e1116" : "#ffffff" } },
     { id: "building-pt", type: "circle", source: "building", filter: buildingFilter("pt"),
       paint: { "circle-radius": 3.5, "circle-color": statusColor, "circle-stroke-width": ["case", isRetired, 2.5, 1],
                "circle-stroke-color": ["case", isRetired, "#7a1a12", "#fff"] } },
@@ -222,7 +279,7 @@ function layerSpecs(k) {
   ];
   if (k === "entrance") return [{ id: "entrance", type: "circle", source: "entrance", paint: { "circle-radius": 2.5, "circle-color": css("--accent") } }];
   if (k === "road") return [{ id: "road", type: "line", source: "road",
-    paint: { "line-color": css("--road"), "line-width": ["interpolate", ["linear"], ["zoom"], 14, 1.5, 18, 4], "line-opacity": 0.85 } }];
+    paint: { "line-color": css("--road"), "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.8, 18, 3], "line-opacity": 0.55 } }];
   if (k === "basemap") return [{ id: "basemap-line", type: "line", source: "basemap",
     paint: { "line-color": css("--basemap"), "line-width": 1.6 } }];
   if (k === "digitalmap") return [{ id: "digitalmap-line", type: "line", source: "digitalmap",
@@ -300,7 +357,7 @@ function loadArea() {
       if (map.getSource("area")) map.getSource("area").setData(a);
       else {
         map.addSource("area", { type: "geojson", data: a });
-        addLayerAt({ id: "area-line", type: "line", source: "area", paint: { "line-color": "#344054", "line-width": 1.6, "line-dasharray": [3, 2] } });
+        addLayerAt({ id: "area-line", type: "line", source: "area", paint: { "line-color": css("--text-2"), "line-width": 1.6, "line-dasharray": [3, 2] } });
       }
       const b = a.bbox ? new maplibregl.LngLatBounds([a.bbox[0], a.bbox[1]], [a.bbox[2], a.bbox[3]]) : boundsOf(a.features);
       // 글자 레이어(symbol)는 글꼴 파일이 있어야 해서, 원 꼭대기에 작은 글 상자를 붙인다
@@ -529,7 +586,12 @@ async function show(uri, opts = {}) {
     mapNote = '<div class="small muted" style="margin-top:6px">지도에 모양이 없는 객체입니다.</div>';
   }
   info.innerHTML = topLinks()
-    + (opts.intro ? '<div class="small muted" style="margin-bottom:8px">지도에서 객체를 누르거나 찾기로 고르면 그래프에 담긴 내용이 여기에 나옵니다. 색은 건물 상태, 점선 원은 자료 범위입니다 (원에 걸친 건물까지 넣어 원 밖으로 조금 나옵니다).</div>' : "")
+    + (opts.intro ? `<div class="intro card" style="padding:14px 16px;margin-bottom:14px">
+        <p><b>증미역 반경 1km</b>의 건물, 출입구, 필지, 도로, 공공시설을 공식 번호 그대로 URI로 엮은 지식 그래프입니다.</p>
+        <p class="small muted" style="margin:0">지도에서 객체를 누르거나 위에서 찾으면 그래프에 담긴 속성과 연결이 여기에 나옵니다. 아래는 증미역입니다.</p>
+        <div class="keys"><i class="sw" style="background:var(--active)"></i><span>건물 (색은 상태: 사용, 주소 미연결, 폐지)</span>
+          <i class="sw dot" style="background:var(--station)"></i><span>역</span>
+          <i class="sw area"></i><span>자료 범위 1km (원에 걸친 건물까지 넣음)</span></div></div>` : "")
     + `<div><span class="chip type">${esc(me.type || "객체")}</span> ${status ? `<span class="chip ${status.o.endsWith("Retired") ? "retire" : "src"}">${esc(status.o_label || localName(status.o))}</span>` : ""}</div>
     <h2 tabindex="-1">${esc(title)}</h2><div class="uri">${esc(uri)}</div>${pub}
     ${proposalId ? `<div class="small" style="margin-top:4px"><a href="/?id=${encodeURIComponent(proposalId)}">검토 화면에서 이 제안 보기</a></div>` : ""}
@@ -547,7 +609,7 @@ async function show(uri, opts = {}) {
   const sel = opts.group || (feat ? [feat] : []);
   map.getSource("sel").setData({ type: "FeatureCollection", features: sel });
   if (isDong) selectDong(me.label, !opts.quiet);
-  else if (sel.length && !opts.quiet) { initialFit = false; map.fitBounds(boundsOf(sel), { padding: 120, maxZoom: 18, duration: 500 }); }
+  else if (sel.length && !opts.quiet) { initialFit = false; map.fitBounds(boundsOf(sel), { padding: 120, maxZoom: 17, duration: 500 }); }
 }
 
 addEventListener("popstate", () => {
@@ -695,6 +757,16 @@ $("clear-answer").onclick = () => {
   if (panel === "answer") show(current || station, { quiet: true, intro: !focusParam });
   else { const g = $("go-answer"); if (g) g.remove(); }
 };
+
+// 레이어 패널 접고 펴기 (좁은 화면에서는 접힌 채로 시작한다)
+function foldLayers(folded) {
+  $("layer-panel").classList.toggle("folded", folded);
+  $("lp-toggle").setAttribute("aria-expanded", String(!folded));
+}
+$("lp-toggle").onclick = () => foldLayers(!$("layer-panel").classList.contains("folded"));
+if (narrow()) foldLayers(true);
+// 예시 질문 단추: 질문 칸에 넣고 바로 묻는다
+document.querySelectorAll(".ask-note .eg").forEach(b => b.onclick = () => { $("ask").value = b.dataset.q; $("askf").requestSubmit(); });
 
 // 시작: 역, 공공시설, 건물을 받는 대로 그리고 출입구는 켜 둔 경우에만 받는다
 renderStatus();

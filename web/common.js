@@ -16,24 +16,44 @@ const ACTION = { create: "신규", update: "변경", retire: "폐지", link: "�
 const SOURCE = { "rule-candidate": "규칙 후보", "data-diff": "자료 비교", "llm-notice": "LLM 고시 추출", "notice-table": "고시 첨부표" };
 const STATUS = { pending: "대기", approved: "승인", rejected: "반려" };
 
-// 지도 배경: OpenStreetMap 타일을 옅게 깔고 그래프 데이터를 그 위에 그린다
+// 지도 배경: OpenStreetMap 타일을 회색으로 바래게 깔고(다크 모드면 밝기를 뒤집어 어둡게) 그래프 데이터를 그 위에 그린다
+// 배경이 옅어야 건물 상태 색과 질문 답이 묻히지 않는다
+const darkMode = () => matchMedia("(prefers-color-scheme: dark)").matches;
 function baseStyle() {
+  const dark = darkMode();
   return {
     version: 8, sources: {
       osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19,
              attribution: "© OpenStreetMap contributors" },
     },
     layers: [
-      { id: "bg", type: "background", paint: { "background-color": "#eef1f4" } },
-      { id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.6, "raster-opacity": 0.9 } },
+      { id: "bg", type: "background", paint: { "background-color": dark ? "#0e1116" : "#f2f3f5" } },
+      // 밝기 최소값이 최대값보다 크면 밝기가 뒤집힌다 (다크 모드)
+      { id: "osm", type: "raster", source: "osm", paint: dark
+          ? { "raster-saturation": -1, "raster-brightness-min": 0.82, "raster-brightness-max": 0.06, "raster-contrast": -0.15 }
+          : { "raster-saturation": -1, "raster-brightness-min": 0.42, "raster-brightness-max": 1, "raster-contrast": -0.25 } },
     ],
   };
 }
 
-// 'load'는 배경지도 타일을 다 받을 때까지 기다려서 늦다. 스타일만 준비되면 바로 우리 레이어를 얹는다
+// 위 막대의 로고 (지도 핀 안에 그래프 점 셋)
+const BRAND_MARK = `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--brand)"/>
+<path d="M10 21 L16 11 L22 19" fill="none" stroke="var(--panel)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+<circle cx="10" cy="21" r="3" fill="var(--panel)"/><circle cx="16" cy="11" r="3" fill="var(--panel)"/><circle cx="22" cy="19" r="3" fill="#f6a54b"/></svg>`;
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".brand").forEach(b => b.insertAdjacentHTML("afterbegin", BRAND_MARK));
+});
+
+// 'load'와 isStyleLoaded()는 배경지도 타일을 다 받을 때까지 기다려서, 타일 서버가 느리면 우리 데이터가 한참 안 보인다.
+// 스타일(레이어 목록)만 준비되면 바로 우리 레이어를 얹는다 ('style.load'는 타일을 기다리지 않는다)
 function whenStyleReady(map, cb) {
-  if (map.isStyleLoaded()) cb();
-  else setTimeout(() => whenStyleReady(map, cb), 50);
+  if (map.style && map.style._loaded) { cb(); return; }
+  let done = false;
+  const once = () => { if (!done) { done = true; cb(); } };
+  map.once("style.load", once);
+  // 이벤트를 놓친 경우를 위한 확인 (스타일이 이미 준비됐는데 이벤트가 지나갔을 때)
+  const poll = () => { if (done) return; if (map.style && map.style._loaded) once(); else setTimeout(poll, 50); };
+  poll();
 }
 
 function boundsOf(features) {
