@@ -82,4 +82,107 @@
       else map.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 });
     });
   }
+  // 전체 지도: assets/map/의 레이어를 그리고, 누른 객체의 요약과 URI 페이지 링크를 보여 준다
+  const sm = $("sitemap");
+  if (sm && window.maplibregl) {
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const STATUS = [["사용", "--active"], ["주소 연결됨", "--linked"], ["주소 미연결", "--unlinked"], ["폐지", "--retired"]];
+    const KIND = { building: "건물", "building-gis": "건물 (주소 미연결)", entrance: "건물 출입구", station: "역" };
+    const map = new maplibregl.Map({ container: sm, style: baseStyle(), attributionControl: { compact: true },
+      center: [126.8612, 37.5577], zoom: 14.6, maxZoom: 19 });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+    const get = async name => (await fetch(`${root}/assets/map/${name}.geojson`)).json();
+    const data = {};
+    const show = f => {
+      const p = f.properties, kind = KIND[p.u.split("/")[0]] || "객체";
+      const rows = [["상태", p.s], ["용도", p.use], ["도로명주소", p.addr], ["URI", `<code>${esc(p.u)}</code>`]]
+        .filter(r => r[1]).map(([k, v]) => `<tr><td class="k">${k}</td><td>${k === "URI" ? v : esc(v)}</td></tr>`).join("");
+      $("sm-info").innerHTML = `<span class="chip type">${esc(kind)}</span><h3>${esc(p.n)}</h3><table class="kv">${rows}</table>
+        <a class="btn mini" href="${root}/id/${esc(p.u)}/">URI 페이지 열기</a>`;
+      map.getSource("sel").setData({ type: "FeatureCollection", features: [f] });
+    };
+    const focus = f => {
+      show(f);
+      const b = boundsOf([f]);
+      if (f.geometry.type === "Point") map.flyTo({ center: b.getCenter(), zoom: 18 });
+      else map.fitBounds(b, { padding: { top: 60, bottom: 60, left: innerWidth > 700 ? 360 : 40, right: 60 }, maxZoom: 18 });
+    };
+    whenStyleReady(map, async () => {
+      const [area, building, entrance, station] = await Promise.all(["area", "building", "entrance", "station"].map(n => get(n).catch(() => null)));
+      Object.assign(data, { building, entrance, station });
+      const statusColor = ["match", ["get", "s"], ...STATUS.flatMap(([n, v]) => [n, css(v)]), css("--active")];
+      if (area) {
+        map.addSource("area", { type: "geojson", data: area });
+        map.addLayer({ id: "area", type: "line", source: "area", paint: { "line-color": css("--text-2"), "line-width": 1.5, "line-dasharray": [3, 2] } });
+        map.fitBounds(area.bbox, { padding: { top: 30, bottom: 30, left: innerWidth > 700 ? 360 : 30, right: 30 }, duration: 0 });
+      }
+      if (building) {
+        map.addSource("building", { type: "geojson", data: building });
+        map.addLayer({ id: "building", type: "fill", source: "building", paint: { "fill-color": statusColor, "fill-opacity": 0.55 } });
+        map.addLayer({ id: "building-line", type: "line", source: "building", paint: { "line-color": statusColor, "line-width": 0.8 } });
+        // 모양이 점뿐인 건물(내비 중심점만 있는 것)은 작은 점으로
+        map.addLayer({ id: "building-pt", type: "circle", source: "building", filter: ["==", ["geometry-type"], "Point"],
+          paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 2, 18, 6], "circle-color": statusColor,
+                   "circle-stroke-width": 1, "circle-stroke-color": "#fff" } });
+      }
+      if (entrance) {
+        map.addSource("entrance", { type: "geojson", data: entrance });
+        map.addLayer({ id: "entrance", type: "circle", source: "entrance", layout: { visibility: "none" },
+          paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 1.5, 18, 5], "circle-color": css("--accent"),
+                   "circle-stroke-width": 1, "circle-stroke-color": "#fff" } });
+      }
+      if (station) {
+        map.addSource("station", { type: "geojson", data: station });
+        map.addLayer({ id: "station", type: "circle", source: "station",
+          paint: { "circle-radius": 9, "circle-color": css("--station"), "circle-stroke-width": 3, "circle-stroke-color": "#fff" } });
+      }
+      map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "sel-line", type: "line", source: "sel", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": css("--select"), "line-width": 3 } });
+      map.addLayer({ id: "sel-pt", type: "circle", source: "sel", filter: ["==", ["geometry-type"], "Point"],
+        paint: { "circle-radius": 10, "circle-color": "transparent", "circle-stroke-width": 3, "circle-stroke-color": css("--select") } });
+
+      // 건물 상태 범례 (개수)
+      const cnt = {};
+      for (const f of building ? building.features : []) cnt[f.properties.s] = (cnt[f.properties.s] || 0) + 1;
+      $("sm-legend").innerHTML = STATUS.filter(([n]) => cnt[n]).map(([n, v]) =>
+        `<div><i class="sw" style="background:var(${v})"></i>${n}<span class="n">${cnt[n].toLocaleString()}</span></div>`).join("");
+
+      // 레이어 켜고 끄기
+      const ids = { building: ["building", "building-line", "building-pt"], entrance: ["entrance"], station: ["station"] };
+      document.querySelectorAll("input[data-layer]").forEach(cb => {
+        const apply = () => (ids[cb.dataset.layer] || []).forEach(id => map.getLayer(id) && map.setLayoutProperty(id, "visibility", cb.checked ? "visible" : "none"));
+        cb.onchange = apply; apply();
+      });
+
+      // 누르기와 가리키기 (점이 위에 있으면 점 먼저)
+      const clickable = ["station", "entrance", "building-pt", "building"];
+      map.on("click", ev => {
+        const hit = map.queryRenderedFeatures(ev.point, { layers: clickable.filter(id => map.getLayer(id)) })[0];
+        if (!hit) return;
+        const src = data[hit.layer.id.split("-")[0]].features.find(f => f.properties.u === hit.properties.u);
+        if (src) show(src);
+      });
+      map.on("mousemove", ev => {
+        const n = map.queryRenderedFeatures(ev.point, { layers: clickable.filter(id => map.getLayer(id)) }).length;
+        map.getCanvas().style.cursor = n ? "pointer" : "";
+      });
+
+      // 지도에서 찾기
+      const q = $("sm-q"), hits = $("sm-hits");
+      const all = ["station", "building", "entrance"].flatMap(k => (data[k] ? data[k].features : []));
+      q.oninput = () => {
+        const t = tight(q.value);
+        if (t.length < 2) { hits.innerHTML = ""; return; }
+        const found = all.filter(f => tight(f.properties.n + " " + f.properties.addr).includes(t)).slice(0, 10);
+        hits.innerHTML = found.length
+          ? found.map((f, i) => `<button type="button" data-i="${i}"><span>${esc(f.properties.n)}</span><span class="k">${esc(KIND[f.properties.u.split("/")[0]] || "")}</span></button>`).join("")
+          : '<div class="none">맞는 객체가 없습니다.</div>';
+        hits.querySelectorAll("button").forEach(b => b.onclick = () => { focus(found[+b.dataset.i]); hits.innerHTML = ""; });
+      };
+      const want = new URLSearchParams(location.search).get("u");
+      const start = want && all.find(f => f.properties.u === want);
+      if (start) focus(start);
+    });
+  }
 })();
