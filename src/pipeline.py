@@ -34,7 +34,7 @@ def main() -> None:
     ap.add_argument("--unpack", action="store_true", help="_archives의 압축 파일부터 다시 푼다")
     args = ap.parse_args()
 
-    from src.graph import build_graph, check_queries, publish, validate
+    from src.graph import build_graph, check_queries, interop, publish, validate
     from src.ingest import clip_area, unpack
     from src.model import build_objects, build_sensors
 
@@ -49,6 +49,7 @@ def main() -> None:
     step("GeoSPARQL 그래프 만들기", build_graph.main, report)
     step("예시 SPARQL 쿼리 확인", check_queries.main, report)
     step("SHACL 데이터 규칙 검사", validate.main, report)
+    step("상호운용성 검사 (바깥 주소 확인은 python -m src.graph.interop)", lambda: _interop_offline(interop), report)
     step("URI 공개 페이지 만들기", publish.main, report)
     report["seconds"] = round(time.perf_counter() - t0, 1)
 
@@ -69,6 +70,16 @@ def main() -> None:
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))
     print("결과: data/processed/ (그래프 jeungmi_geokg.ttl, 검사 validation_report.md, 쿼리 query_check.md, 페이지 site/)")
+
+
+def _interop_offline(interop_module) -> None:
+    import sys
+    argv = sys.argv
+    sys.argv = [argv[0], "--offline"]
+    try:
+        interop_module.main()
+    finally:
+        sys.argv = argv
 
 
 def _unpack(unpack_module) -> None:

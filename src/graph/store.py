@@ -16,11 +16,12 @@ from src.review.proposals import ProposalStore
 ROOT = Path(__file__).resolve().parents[2]
 TTL = ROOT / "data" / "processed" / "jeungmi_geokg.ttl"
 ONTOLOGY = Path(__file__).resolve().parent / "ontology.ttl"
+ALIGNMENT = Path(__file__).resolve().parent / "alignment.ttl"  # 바깥 표준 어휘와 잇기 (schema.org, INSPIRE, 위키데이터)
 
 
 def load_store(proposals: ProposalStore | None = None) -> ox.Store:
     store = ox.Store()
-    for path in (ONTOLOGY, TTL):
+    for path in (ONTOLOGY, ALIGNMENT, TTL):
         store.load(path=str(path), format=ox.RdfFormat.TURTLE)
     approved = [p for p in (proposals or ProposalStore()).load() if p.status == "approved"]
     for p in sorted(approved, key=lambda p: p.decision.at if p.decision else ""):

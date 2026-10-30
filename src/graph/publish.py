@@ -26,7 +26,7 @@ import shapely
 import yaml
 from shapely.geometry import mapping
 
-from src.graph.store import ONTOLOGY, load_store
+from src.graph.store import ALIGNMENT, ONTOLOGY, load_store
 from src.model.uri import BASE
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -158,6 +158,22 @@ def observation_summary(triples: dict) -> dict:
     return out
 
 
+def align_section() -> str:
+    """어휘 페이지의 '바깥 표준 어휘와 잇기' 표. alignment.ttl을 그대로 읽어 만든다."""
+    from rdflib import Graph
+    g = Graph().parse(ALIGNMENT)
+    kinds = {"http://www.w3.org/2000/01/rdf-schema#subClassOf": "하위 종류", "http://www.w3.org/2000/01/rdf-schema#subPropertyOf": "하위 속성",
+             "http://www.w3.org/2004/02/skos/core#closeMatch": "가까운 개념", "http://www.w3.org/2002/07/owl#sameAs": "같은 실물"}
+    short = lambda u: (u.replace(JGK, "jgk:").replace("https://schema.org/", "schema:").replace("http://www.wikidata.org/entity/", "wd:")
+                       .replace("http://inspire.ec.europa.eu/featureconcept/", "inspire:").replace(BASE + "/", "id:"))
+    rows = sorted((str(s), str(p), str(o)) for s, p, o in g if str(p) in kinds)
+    trs = "".join(f'<tr><td class="mono">{e(short(s))}</td><td>{kinds[p]}</td><td class="mono"><a href="{e(o)}" rel="noopener">{e(short(o))}</a></td></tr>' for s, p, o in rows)
+    return (f'<section class="card sec"><h2>바깥 표준 어휘와 잇기 <span class="muted">{len(rows)}</span></h2>'
+            '<p class="small muted">jgk를 모르는 시스템도 schema.org, INSPIRE 지형지물 개념, 위키데이터 이름으로 이 그래프를 읽을 수 있게 이었습니다. '
+            'schema.org는 하위 종류, 하위 속성으로 이어 RDFS 추론만으로 바깥 이름으로 물을 수 있고, 정의가 꼭 같지 않은 것은 가까운 개념으로만 이었습니다.</p>'
+            f'<div class="tablewrap"><table class="kv vocab">{trs}</table></div></section>')
+
+
 def main() -> None:
     hold = hold_sources()
     store = load_store()
@@ -197,6 +213,8 @@ def main() -> None:
         if u.startswith(BASE):
             k = kind_of(u)
             return f"{KINDS.get(k, (k,))[0]} {u.rsplit('/', 1)[-1]}"
+        if u.startswith("http://www.wikidata.org/entity/"):
+            return "위키데이터 " + u.rsplit("/", 1)[-1]
         return EXT_LABEL.get(u) or u.rsplit("#", 1)[-1]
 
     def link(u: str) -> str:
@@ -388,6 +406,7 @@ def main() -> None:
     d = OUT / "def"
     d.mkdir(parents=True, exist_ok=True)
     shutil.copy(ONTOLOGY, d / "ontology.ttl")
+    shutil.copy(ALIGNMENT, d / "alignment.ttl")
     terms = sorted(s for s in triples if s.startswith(JGK))
     types_of = {s: {o.value for p, o in triples[s] if p.value == RDF_TYPE} for s in terms}
     OWL = "http://www.w3.org/2002/07/owl#"
@@ -405,7 +424,8 @@ def main() -> None:
             sections.append(f'<section class="card sec"><h2>{e(gname)} <span class="muted">{len(rows)}</span></h2><div class="tablewrap"><table class="kv vocab">{trs}</table></div></section>')
     body = (f'<nav class="crumbs"><a href="{SITE_PATH}/">처음</a><span>/</span><span>어휘</span></nav>'
             f'<section class="list-head"><h1>어휘 <span class="muted">jgk</span></h1><p class="muted">이 그래프가 쓰는 객체 종류, 관계, 속성입니다. GeoSPARQL 1.1 위에 세웠고, 국가기본도 지형지물 분류(수치지도 작성 작업규칙 제9조)를 SKOS로 넣었습니다.</p>'
-            f'<p><a class="btn ghost mini" href="ontology.ttl">{ICON["file"]}ontology.ttl 내려받기</a></p></section>' + "".join(sections))
+            f'<p><a class="btn ghost mini" href="ontology.ttl">{ICON["file"]}ontology.ttl 내려받기</a> <a class="btn ghost mini" href="alignment.ttl">{ICON["file"]}alignment.ttl (바깥 어휘 정렬)</a></p></section>'
+            + align_section() + "".join(sections))
     (d / "index.html").write_text(page("어휘", body, nav="/def/"), encoding="utf-8")
 
     # 첫 화면
