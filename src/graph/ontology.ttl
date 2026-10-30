@@ -159,6 +159,15 @@ jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; r
 
 # 변경 제안 (사람이 승인한 것만 그래프에 들어온다)
 
+jgk:Notice a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "고시공고"@ko ;
+    rdfs:comment "구청 고시 한 건. URI는 고시 번호(시군구코드-연도-번호)를 그대로 쓴다. 구역, 사업에는 전국 공통 번호가 없어 고시를 객체로 두고 대상을 잇는다."@ko .
+jgk:noticeNumber a owl:DatatypeProperty ; rdfs:label "고시 번호"@ko ; rdfs:domain jgk:Notice ; rdfs:range xsd:string .
+jgk:zoneKind a owl:DatatypeProperty ; rdfs:label "구역, 사업 종류"@ko ; rdfs:domain jgk:Notice ; rdfs:range xsd:string .
+jgk:zoneDesignatedBy a owl:ObjectProperty ; rdfs:label "구역 지정, 결정 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:zoneReleasedBy a owl:ObjectProperty ; rdfs:label "지정 해제, 실효 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:planApprovedBy a owl:ObjectProperty ; rdfs:label "사업, 계획 인가 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+jgk:completedBy a owl:ObjectProperty ; rdfs:label "준공, 공사완료 고시"@ko ; rdfs:domain geo:Feature ; rdfs:range jgk:Notice .
+
 jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
 jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
 jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko .

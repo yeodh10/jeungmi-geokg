@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 
@@ -56,7 +57,7 @@ def nl_section(rows: list[dict]) -> list[str]:
     return out
 
 
-def notice_section(rows: list[dict]) -> list[str]:
+def notice_section(rows: list[dict], before: list[dict] | None = None) -> list[str]:
     ok = [r for r in rows if "error" not in r]
     quotes = [q for r in ok for q in r["quote_exact"]]
     grounded = [g for r in ok for g in r["grounded"]]
@@ -88,14 +89,22 @@ def notice_section(rows: list[dict]) -> list[str]:
                 parts.append("targets")
             out.append(f"- {r['no']} {r['title']}: {', '.join(parts)}")
         out.append("")
-    from collections import Counter
     kinds = Counter(c["change_type"] for r in ok for c in r["changes"])
     n_changes = sum(kinds.values())
     out += ["운영에서 본 것:", "",
             f"- 문서 {len(ok)}건 중 {sum(r['is_spatial'] for r in ok)}건을 공간 문서로 보고 {sum(bool(r['changes']) for r in ok)}건에서 변경 {n_changes}개를 뽑았다.",
             "- 변경 종류: " + ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + ".",
-            f"- {kinds.get('other', 0)}개({kinds.get('other', 0) / max(1, n_changes):.0%})가 other다. 정비사업 인가, 구역 지정, 계획 결정은 지금 종류(건물 멸실, 용도 변경, 주소 변경 등)에 맞는 칸이 없어서다.",
-            "  other는 제안으로 이어지지 않으므로 사람이 볼 양은 줄지만, 구역(정비구역, 산사태취약지역, 지구단위계획구역)을 객체로 두려면 종류와 어휘를 넓혀야 한다.", ""]
+            f"- other는 {kinds.get('other', 0)}개({kinds.get('other', 0) / max(1, n_changes):.0%})다.", ""]
+    if before:
+        old = Counter(c["change_type"] for r in before if "error" not in r for c in r["changes"])
+        n_old = sum(old.values())
+        names = sorted(set(old) | set(kinds), key=lambda k: -(kinds.get(k, 0) + old.get(k, 0)))
+        out += ["변경 종류를 넓히기 전과 뒤 (2026-10-30, 같은 95건):", "",
+                "| 종류 | 전 | 뒤 |", "|---|---|---|"]
+        out += [f"| {k} | {old.get(k, 0)} | {kinds.get(k, 0)} |" for k in names]
+        out += [f"| 합계 (other 비율) | {n_old} ({old.get('other', 0) / max(1, n_old):.0%}) | {n_changes} ({kinds.get('other', 0) / max(1, n_changes):.0%}) |", "",
+                "넓히기 전에는 정비사업 인가, 구역 지정, 계획 결정에 맞는 칸이 없어 대부분 other였다. zone_designated, zone_released, plan_approved, project_completed를 더했고,",
+                "이 네 종류는 고시를 객체(notice/{시군구코드}-{연도}-{번호})로 만들어 대상 필지나 건물에서 잇는 제안이 된다(범위 안 대상일 때).", ""]
     wrong_quotes = [r["no"] for r in ok if not all(r["quote_exact"])]
     ungrounded = [r["no"] for r in ok if not all(r["grounded"])]
     if wrong_quotes or ungrounded:
@@ -113,7 +122,9 @@ def main() -> None:
     if nl.exists():
         lines += nl_section(json.loads(nl.read_text(encoding="utf-8"))) + [""]
     if nt.exists():
-        lines += notice_section(json.loads(nt.read_text(encoding="utf-8"))) + [""]
+        bf = EVAL / "notice_eval_before.json"
+        lines += notice_section(json.loads(nt.read_text(encoding="utf-8")),
+                                json.loads(bf.read_text(encoding="utf-8")) if bf.exists() else None) + [""]
     lines += ["## 채점을 고친 기록", "",
               "결과를 처음 채점했을 때 틀린 것 5건을 하나씩 보니 모두 채점 쪽 문제여서 고쳤다. 모델을 다시 부르지 않고 저장된 결과를 다시 채점했다.",
               "",

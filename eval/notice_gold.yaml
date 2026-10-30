@@ -3,7 +3,8 @@
 # is_spatial: 공간 객체(건물, 도로, 주소, 공공시설, 하천, 숲길, 구역)가 생기거나 바뀌거나 없어지는 문서인가.
 #             계획 인가, 조합 설립처럼 아직 객체가 바뀌지 않는 문서와 판단이 애매한 문서는 null(재지 않음)로 둔다
 # targets: 본문에 적힌 대상(지번, 이름). 모델이 뽑은 대상 가운데 하나가 이 글자를 담고 있으면 맞다 (띄어쓰기 무시)
-# change_types: 뽑은 변경 종류가 모두 이 안에 있어야 맞다
+# change_types: 뽑은 변경 종류가 모두 이 안에 있어야 맞다. 2026-10-30 종류를 넓히며(zone_designated, zone_released,
+#   plan_approved, project_completed) 맞는 종류가 생긴 문서에서 other를 뺐다
 # effective_date: 본문에 효력 날짜가 적혀 있을 때만 적는다
 # 첨부 파일에만 있는 내용(폐지조서 목록 등)은 본문에 없으므로 정답에 넣지 않는다
 
@@ -12,28 +13,28 @@
   title: 동원주택가로주택정비사업 공사완료 고시
   is_spatial: true
   targets: [내발산동 712-5]
-  change_types: [building_new, other]
+  change_types: [project_completed, building_new]
 - mgt: 55402
   title: 화곡1주택재건축정비사업 공사완료(도로,어린이공원) 고시
   is_spatial: true
   targets: [화곡동 1027-50]
-  change_types: [building_new, other]
+  change_types: [project_completed]
 - mgt: 55545
   title: 경남주택가로주택정비사업 공사완료 고시
   is_spatial: true
   targets: [내발산동 716-20]
-  change_types: [building_new, other]
+  change_types: [project_completed, building_new]
 - mgt: 55560
   title: 까치산경로당 시설물 폐쇄 고시
   is_spatial: true
   targets: [화곡동 359-126]
-  change_types: [facility_closed, other]
+  change_types: [facility_closed]
   effective_date: "2023-10-04"
 - mgt: 67442
   title: 긴등마을 주택재건축정비사업 준공인가 고시
   is_spatial: true
   targets: [소로3-1]
-  change_types: [building_new, other]
+  change_types: [project_completed]
 - mgt: 68668
   title: 도로명주소 폐지 고시
   is_spatial: true
@@ -43,17 +44,17 @@
   title: 소하천의 지정에 관한 고시
   is_spatial: true
   targets: [오곡동 712-2]
-  change_types: [other]
+  change_types: [zone_designated]
 - mgt: 60222
   title: 한강변 명품숲 둘레길 숲길 지정 고시
   is_spatial: true
-  change_types: [other]
+  change_types: [zone_designated]
   effective_date: "2024-10-23"
 - mgt: 49199
   title: 서울특별시 강서구 산사태취약지역 지정 및 해제 고시
   is_spatial: true
   targets: [개화동 산48, 개화동 산81-13]
-  change_types: [other]
+  change_types: [zone_designated, zone_released]
   effective_date: "2022-02-16"
 
 # 판단이 애매한 문서 (공간 판단은 재지 않음)
