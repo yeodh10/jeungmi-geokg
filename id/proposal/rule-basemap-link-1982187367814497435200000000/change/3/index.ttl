@@ -1,0 +1,5 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-1982187367814497435200000000/change/3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200103650210026276> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-1982187367814497435200000000/change/3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <http://www.w3.org/2002/07/owl#sameAs> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-1982187367814497435200000000/change/3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1982187367814497435200000000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-1982187367814497435200000000/change/3> <https://yeodh10.github.io/jeungmi-geokg/def#changeOp> "add" .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-1982187367814497435200000000/change/3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> .

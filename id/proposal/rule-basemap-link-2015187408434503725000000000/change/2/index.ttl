@@ -1,0 +1,5 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-2015187408434503725000000000/change/2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#object> <https://yeodh10.github.io/jeungmi-geokg/def#AddressLinked> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-2015187408434503725000000000/change/2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> <https://yeodh10.github.io/jeungmi-geokg/def#status> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-2015187408434503725000000000/change/2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/2015187408434503725000000000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-2015187408434503725000000000/change/2> <https://yeodh10.github.io/jeungmi-geokg/def#changeOp> "add" .
+<https://yeodh10.github.io/jeungmi-geokg/id/proposal/rule-basemap-link-2015187408434503725000000000/change/2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Statement> .
