@@ -36,7 +36,7 @@ def main() -> None:
 
     from src.graph import build_graph, check_queries, publish, validate
     from src.ingest import clip_area, unpack
-    from src.model import build_objects
+    from src.model import build_objects, build_sensors
 
     report = {"steps": []}
     t0 = time.perf_counter()
@@ -44,6 +44,8 @@ def main() -> None:
         step("원본 압축 풀기", lambda: _unpack(unpack), report)
     step("대상 범위 자르기 (증미역 반경 1km)", clip_area.main, report)
     step("객체 쪼개기와 URI 붙이기", build_objects.main, report)
+    if (ROOT / "data" / "raw" / "sdot" / "location.xlsx").exists():
+        step("센서와 관측 (S-DoT, SOSA)", build_sensors.main, report)
     step("GeoSPARQL 그래프 만들기", build_graph.main, report)
     step("예시 SPARQL 쿼리 확인", check_queries.main, report)
     step("SHACL 데이터 규칙 검사", validate.main, report)
@@ -60,6 +62,10 @@ def main() -> None:
         "국가기본도 건물": objects["basemap"].get("map_buildings", 0), "국가기본도와 이은 건물": objects["basemap"].get("linked", 0),
         "수치지형도 건물": objects["digital_map"].get("map_buildings", 0), "수치지형도와 이은 건물": objects["digital_map"].get("linked", 0),
     }
+    sensors = PROC / "sensors_report.json"
+    if sensors.exists():
+        s = json.loads(sensors.read_text(encoding="utf-8"))
+        report["summary"] |= {"센서": s["sensors_in_area"], "관측": s["observations"]}
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))
     print("결과: data/processed/ (그래프 jeungmi_geokg.ttl, 검사 validation_report.md, 쿼리 query_check.md, 페이지 site/)")

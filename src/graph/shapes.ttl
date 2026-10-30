@@ -5,6 +5,7 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
 
 # 증미역 공간 지식 그래프 데이터 규칙 (SHACL)
 # 원천 그래프 전체와, 승인 전 변경 제안을 이 규칙으로 검사한다 (src/graph/validate.py).
@@ -28,7 +29,7 @@ SELECT $this WHERE { $this jgk:status jgk:Retired . FILTER NOT EXISTS { $this jg
 
 # 모양이 있는 객체(필지, 행정동 제외): 기본 모양이 정확히 하나
 jgks:HasGeometry a sh:NodeShape ;
-    sh:targetClass jgk:Building, jgk:BuildingEntrance, jgk:PublicFacility, jgk:Station ;
+    sh:targetClass jgk:Building, jgk:BuildingEntrance, jgk:PublicFacility, jgk:Station, jgk:Sensor ;
     sh:property [ sh:path geo:hasDefaultGeometry ; sh:minCount 1 ; sh:maxCount 1 ; sh:class geo:Geometry ;
                   sh:message "기본 모양(geo:hasDefaultGeometry)이 정확히 하나 있어야 한다"@ko ] .
 
@@ -104,3 +105,24 @@ jgks:Station a sh:NodeShape ;
 jgks:AdminDong a sh:NodeShape ;
     sh:targetClass jgk:AdminDong ;
     sh:property [ sh:path jgk:admDongCode ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{10}$" ] .
+
+# 센서와 관측 (SOSA): 관측은 센서 하나, 항목 하나, 값 하나, 시각 하나
+jgks:Sensor a sh:NodeShape ;
+    sh:targetClass jgk:Sensor ;
+    sh:property [ sh:path jgk:sensorSerial ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:message "센서는 시리얼이 정확히 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path jgk:addressBuilding ; sh:maxCount 1 ; sh:class jgk:Building ;
+                  sh:message "설치 주소의 건물은 하나까지이고 건물이어야 한다"@ko ] .
+
+jgks:Observation a sh:NodeShape ;
+    sh:targetClass sosa:Observation ;
+    sh:property [ sh:path sosa:madeBySensor ; sh:minCount 1 ; sh:maxCount 1 ; sh:class sosa:Sensor ;
+                  sh:message "관측에는 관측한 센서가 정확히 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path sosa:observedProperty ; sh:minCount 1 ; sh:maxCount 1 ; sh:class sosa:ObservableProperty ;
+                  sh:message "관측 항목이 정확히 하나 있어야 하고 어휘에 정의된 항목이어야 한다"@ko ] ;
+    sh:property [ sh:path sosa:hasSimpleResult ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:decimal ;
+                  sh:message "관측값은 숫자 하나여야 한다"@ko ] ;
+    sh:property [ sh:path sosa:resultTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ;
+                  sh:message "관측 시각이 정확히 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:class jgk:Dataset ;
+                  sh:message "관측에도 출처가 있어야 한다"@ko ] .

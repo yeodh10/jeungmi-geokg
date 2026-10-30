@@ -41,6 +41,8 @@ RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 DCT_SOURCE = "http://purl.org/dc/terms/source"
 GEO = "http://www.opengis.net/ont/geosparql#"
+SOSA = "http://www.w3.org/ns/sosa/"
+UNIT_KO = {"DEG_C": "℃", "PERCENT": "%", "DeciB": "dB", "LUX": "lux", "UNITLESS": ""}
 EXT_LABEL = {
     RDF_TYPE: "종류", RDFS_LABEL: "이름", DCT_SOURCE: "출처", RDFS_COMMENT: "설명",
     GEO + "hasGeometry": "모양", GEO + "hasDefaultGeometry": "기본 모양", GEO + "asWKT": "WKT",
@@ -60,13 +62,16 @@ KINDS = {
     "legal-dong": ("법정동", "법정동코드(10자리)를 그대로 쓴다."),
     "basic-zone": ("기초구역", "국가기초구역번호(5자리, 우편번호와 같다)를 그대로 쓴다."),
     "notice": ("고시공고", "구청 고시 번호(시군구코드-연도-번호)를 그대로 쓴다."),
+    "sensor": ("센서", "서울시 도시데이터 센서(S-DoT)의 모델 시리얼을 그대로 쓴다."),
+    "observation": ("관측", "센서 시리얼, 측정 시각(연월일시분 12자리), 측정 항목을 이었다. 한 센서가 한 시각에 한 항목은 한 번만 잰다."),
     "proposal": ("변경 제안", "변경 제안 번호다. 승인된 제안만 그래프에 들어온다."),
 }
 # 주요 정보에서 앞에 둘 속성 순서 (어휘 이름 끝)
 KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "floorsBelow", "approvalDate", "lineName",
              "facilityType", "agencyName", "agencyCode", "entranceType", "buildingMgtNo", "gisBuildingId", "pnu",
              "roadCode", "legalDongCode", "basicZoneNo", "admDongCode", "siteArea", "totalFloorArea", "households",
-             "mainBuildingCount", "complexMainUse", "retiredOn", "noticeNumber", "zoneKind"]
+             "mainBuildingCount", "complexMainUse", "retiredOn", "noticeNumber", "zoneKind",
+             "sensorSerial", "sensorModel", "installAddress", "installArea", "addressBuildingDistance", "hasSimpleResult", "resultTime"]
 PRINCIPLES = [
     ("객체 원자화", "건물, 출입구, 필지, 도로, 행정구역, 공공시설을 각각 하나의 객체로 쪼개고 모양(Geometry)은 따로 둡니다."),
     ("영구 식별자", "새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드 같은 공식 번호를 그대로 URI에 씁니다. 객체가 없어져도 URI는 남습니다."),
@@ -81,8 +86,8 @@ ICON = {
     "file": '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
 }
 # 전체 지도에 그릴 종류 -> 레이어, 레이어 순서와 처음에 켤지
-MAP_LAYER = {"building": "building", "building-gis": "building", "entrance": "entrance", "station": "station"}
-MAP_LAYERS = [("building", "건물", True), ("entrance", "건물 출입구", False), ("station", "역", True)]
+MAP_LAYER = {"building": "building", "building-gis": "building", "entrance": "entrance", "station": "station", "sensor": "sensor"}
+MAP_LAYERS = [("building", "건물", True), ("entrance", "건물 출입구", False), ("sensor", "센서 (S-DoT)", True), ("station", "역", True)]
 e = html.escape
 
 
@@ -115,7 +120,7 @@ def kind_of(uri: str) -> str:
     return uri[len(BASE) + 1:].split("/")[0]
 
 
-def page(title: str, body: str, *, nav: str = "", head: str = "", desc: str = "", wide: bool = False) -> str:
+def page(title: str, body: str, *, nav: str | None = None, head: str = "", desc: str = "", wide: bool = False) -> str:
     """모든 공개 페이지가 같이 쓰는 틀. 링크는 SITE_PATH로 시작해 GitHub Pages와 같은 경로에서 열린다."""
     navs = [("", "처음"), ("/map/", "지도"), ("/id/building/", "건물"), ("/id/parcel/", "필지"), ("/id/road/", "도로"), ("/def/", "어휘")]
     links = "".join(f'<a href="{SITE_PATH}{p}"{" class=on" if nav == p else ""}>{n}</a>' for p, n in navs)
@@ -129,6 +134,28 @@ def page(title: str, body: str, *, nav: str = "", head: str = "", desc: str = ""
 <main class="page{" wide" if wide else ""}">{body}</main>
 <footer class="foot"><div>증미역 반경 1km 공간 지식 그래프, GeoSPARQL 1.1. 객체마다 공식 번호로 바뀌지 않는 URI를 붙였습니다.</div>
 <div>배경지도 © OpenStreetMap contributors. 이용 조건을 확인 중인 출처의 객체는 이 사이트에 넣지 않았습니다.</div></footer></body></html>"""
+
+
+def sparkline(points: list[tuple[str, float]], w: int = 180, h: int = 34) -> str:
+    """시각 순서의 값을 작은 꺾은선 SVG로. 축과 눈금은 없고, 최솟값과 최댓값이 위아래 끝이 된다."""
+    vals = [v for _, v in points]
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1
+    step = w / max(len(vals) - 1, 1)
+    pts = " ".join(f"{i * step:.1f},{h - 2 - (v - lo) / span * (h - 4):.1f}" for i, v in enumerate(vals))
+    return (f'<svg class="spark" viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="시간별 값 변화">'
+            f'<polyline points="{pts}" fill="none" stroke="var(--sensor)" stroke-width="1.5"/></svg>')
+
+
+def observation_summary(triples: dict) -> dict:
+    """센서 -> 관측 항목 -> [(시각, 값)]. 센서 페이지에 항목별 요약을 붙일 때 쓴다."""
+    out = defaultdict(lambda: defaultdict(list))
+    for s, plist in triples.items():
+        if not any(p.value == RDF_TYPE and o.value == SOSA + "Observation" for p, o in plist):
+            continue
+        d = {p.value: o.value for p, o in plist}
+        out[d[SOSA + "madeBySensor"]][d[SOSA + "observedProperty"]].append((d[SOSA + "resultTime"], float(d[SOSA + "hasSimpleResult"])))
+    return out
 
 
 def main() -> None:
@@ -152,6 +179,7 @@ def main() -> None:
         for p, o in plist:
             if p.value == JGK + "hasEntrance" and s in addrs:
                 addrs.setdefault(o.value, addrs[s] + " 출입구")
+    obs_summary = observation_summary(triples)
     held = {s for s, plist in triples.items() if any(p.value == DCT_SOURCE and o.value in hold for p, o in plist)}
     held |= {f"{s}/geometry" for s in held}
     public = lambda s: s.startswith(BASE + "/") and s not in held and not s.endswith("/geometry")
@@ -242,6 +270,19 @@ def main() -> None:
             + (f' <span class="muted">외 {len(srcs) - 40:,}개</span>' if len(srcs) > 40 else "") + "</td></tr>"
             for p, srcs in sorted(back.items(), key=lambda t: pname(t[0])))
         sources = "".join(f"<li>{e(name_of(o.value))}</li>" for o in by_p.get(DCT_SOURCE, []))
+        # 센서: 관측 항목마다 개수, 평균, 최소, 최대, 시간별 꺾은선
+        obs_rows = ""
+        for prop, pts in sorted(obs_summary.get(s, {}).items(), key=lambda t: name_of(t[0])):
+            pts.sort()
+            vals = [v for _, v in pts]
+            unit_uri = next((o.value for p, o in triples.get(prop, []) if p.value == JGK + "unit"), "")
+            u = UNIT_KO.get(unit_uri.rsplit("/", 1)[-1], "")
+            obs_rows += (f'<tr><td class="k">{link(prop) if prop.startswith(BASE) else e(name_of(prop))}</td><td class="num">{len(vals):,}</td>'
+                         f'<td class="num">{sum(vals) / len(vals):.1f}{e(u)}</td><td class="num">{min(vals):g} ~ {max(vals):g}</td><td>{sparkline(pts)}</td></tr>')
+        if obs_rows:
+            period = min(t for v in obs_summary[s].values() for t, _ in v)[:10] + " ~ " + max(t for v in obs_summary[s].values() for t, _ in v)[:10]
+            obs_rows = (f'<section class="card sec"><h2>관측 요약 <span class="muted">{e(period)}, 1시간 평균값</span></h2><div class="tablewrap"><table class="kv obs">'
+                        f'<thead><tr><th>항목</th><th>개수</th><th>평균</th><th>범위</th><th>시간별</th></tr></thead>{obs_rows}</table></div></section>')
 
         # 모양: 지도에 그릴 GeoJSON (좌표는 소수 6자리)
         geom_json = ""
@@ -256,7 +297,7 @@ def main() -> None:
                     use = next((o.value for o in by_p.get(JGK + "useName", [])), "")
                     map_feats[layer].append({"type": "Feature", "geometry": mapping(g), "properties": {
                         "u": s[len(BASE) + 1:], "n": title, "s": status[0] if status else "", "use": use,
-                        "addr": addrs.get(s, "") if addrs.get(s, "") != title else ""}})
+                        "addr": (lambda a: a if a != title else "")(addrs.get(s) or next((o.value for o in by_p.get(JGK + "installAddress", [])), ""))}})
         all_rows = "".join(f'<tr><td class="k">{e(pname(p.value))}</td><td class="mono">{e(o.value[:300])}</td></tr>'
                            for p, o in sorted(keep, key=lambda t: t[0].value))
         crumbs = (f'<nav class="crumbs"><a href="{SITE_PATH}/">처음</a><span>/</span>'
@@ -272,6 +313,7 @@ def main() -> None:
 <div class="obj-grid">
   <div class="obj-main">
     {f'<section class="card sec"><h2>주요 정보</h2><table class="kv">{info}</table></section>' if info else ""}
+    {obs_rows}
     {f'<section class="card sec"><h2>연결</h2><table class="kv">{out_links}</table></section>' if out_links else ""}
     {f'<section class="card sec"><h2>이 객체를 가리키는 것</h2><table class="kv">{back_rows}</table></section>' if back_rows else ""}
     <details class="card sec"><summary>모든 트리플 ({len(keep)}개)</summary><div class="tablewrap"><table class="kv">{all_rows}</table></div></details>
@@ -286,7 +328,7 @@ def main() -> None:
         head = ('<link rel="alternate" type="text/turtle" href="index.ttl">'
                 + ('<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">'
                    '<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" defer></script>' if geom_json else ""))
-        nav_key = f"/id/{kind}/" if kind in ("building", "parcel", "road") else ""
+        nav_key = f"/id/{kind}/" if kind in ("building", "parcel", "road") else None
         (d / "index.html").write_text(page(title, body, nav=nav_key, head=head, desc=f"{kind_ko} {title}, {s}"), encoding="utf-8")
         n += 1
 
@@ -306,7 +348,7 @@ def main() -> None:
 <div class="empty" id="nohit" hidden>맞는 객체가 없습니다.</div></section>"""
         d = OUT / "id" / kind
         d.mkdir(parents=True, exist_ok=True)
-        nav_key = f"/id/{kind}/" if kind in ("building", "parcel", "road") else ""
+        nav_key = f"/id/{kind}/" if kind in ("building", "parcel", "road") else None
         (d / "index.html").write_text(page(f"{kind_ko} 목록", body, nav=nav_key), encoding="utf-8")
 
     # 전체 지도: 레이어마다 GeoJSON 하나, 대상 범위 원 하나
@@ -368,7 +410,7 @@ def main() -> None:
 
     # 첫 화면
     counts = {k: len(v) for k, v in by_kind.items()}
-    order = ["building", "building-gis", "entrance", "parcel", "road", "legal-dong", "admin-dong", "basic-zone", "station", "notice", "proposal"]
+    order = ["building", "building-gis", "entrance", "parcel", "road", "legal-dong", "admin-dong", "basic-zone", "station", "sensor", "observation", "notice", "proposal"]
     kind_cards = "".join(f'<a class="kcard card" href="{SITE_PATH}/id/{k}/"><span class="kn">{counts[k]:,}</span><span class="kl">{e(KINDS.get(k, (k,))[0])}</span></a>'
                          for k in order + sorted(set(counts) - set(order)) if k in counts)
     principles = "".join(f'<div class="pcard card"><span class="pn">{i}</span><h3>{e(t)}</h3><p>{e(x)}</p></div>' for i, (t, x) in enumerate(PRINCIPLES, 1))

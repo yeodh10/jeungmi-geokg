@@ -56,7 +56,7 @@ def preload() -> None:
         g = store()
         system_prompt()
         # 지도 화면이 처음에 받는 레이어도 미리 만들어 둔다 (처음 화면이 비어 있는 시간을 줄인다)
-        for kind in ("station", "facility", "building", "road"):
+        for kind in ("station", "facility", "sensor", "building", "road"):
             version = state["version"]
             body = layer_body(kind)
             if state["version"] == version:
@@ -544,7 +544,7 @@ def feature(uri: str):
 
 LAYER_QUERY = {
     "building": "jgk:Building", "entrance": "jgk:BuildingEntrance",
-    "facility": "jgk:PublicFacility", "station": "jgk:Station",
+    "facility": "jgk:PublicFacility", "station": "jgk:Station", "sensor": "jgk:Sensor",
     "road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong", "basemap": "jgk:BaseMapFeature",
     "digitalmap": "jgk:DigitalMapFeature",
 }

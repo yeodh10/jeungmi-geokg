@@ -127,3 +127,7 @@ details.sec > summary { cursor: pointer; color: var(--text-2); font-weight: 600;
 }
 .mapcard-link { display: block; padding: 8px 8px 4px; text-decoration: none; }
 .mapcard-link:hover { text-decoration: underline; }
+.sw.sensor { background: var(--sensor); border-radius: 50%; }
+table.obs td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.obs th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; }
+.spark { display: block; max-width: 100%; height: auto; }

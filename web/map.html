@@ -149,6 +149,7 @@
           <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
           <label class="layer"><input type="checkbox" data-l="facility"><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
           <label class="layer"><input type="checkbox" data-l="station"><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
+          <label class="layer" title="서울시 도시데이터 센서(S-DoT). 기온, 습도, 소음 같은 1시간 평균 관측값이 SOSA 관측으로 들어 있다"><input type="checkbox" data-l="sensor"><i class="sw dot" style="background:var(--sensor)"></i>센서<span class="n" id="n-sensor"></span></label>
           <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
           <h4>견주어 볼 지도</h4>
           <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽 (증미역 둘레 약 600m만 받음). 우리 건물과 모양이 1:1로 겹치면 서로 이어져 있다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
@@ -174,10 +175,11 @@ const KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "fl
   "admDongCode", "siteArea", "totalFloorArea", "households", "mainBuildingCount", "complexMainUse", "retiredOn",
   "roadCode", "roadSegmentNo", "roadClass", "roadWidth", "roadLength", "legalDongCode", "basicZoneNo",
   "basemapId", "molitUfid", "ufid", "sheetCode", "mapKind", "mapUse", "mapKindCode", "mapUseCode", "mapFloors",
-  "matchIoU", "pnuAgrees", "addressAgrees", "noticeNumber", "zoneKind"];
+  "matchIoU", "pnuAgrees", "addressAgrees", "noticeNumber", "zoneKind",
+  "sensorSerial", "sensorModel", "installAddress", "installArea", "addressBuildingDistance", "hasSimpleResult", "resultTime"];
 const LINKS = ["within", "inLegalDong", "inBasicZone", "locatedOn", "addressRoad", "housedIn", "hasEntrance", "facesRoad",
   "segmentOf", "basemapFeature", "digitalMapFeature", "zoneDesignatedBy", "zoneReleasedBy", "planApprovedBy", "completedBy",
-  "sameAs", "wasInfluencedBy"];
+  "addressBuilding", "observes", "madeBySensor", "observedProperty", "sameAs", "wasInfluencedBy"];
 // 변경 제안 노드를 열 때 더 보이는 속성과, 어휘 이름표가 길어서 줄여 쓰는 이름
 const PROPOSAL_KEYS = ["description", "proposalAction", "sourceKind", "created", "decidedBy", "decidedAt"];
 const KEY_LABEL = { proposalAction: "제안 종류", sourceKind: "제안 출처" };
@@ -185,9 +187,9 @@ const YES_NO = v => v === "true" ? "예" : v === "false" ? "아니요" : v;
 const KEY_VALUE = { proposalAction: v => ACTION[v] || v, sourceKind: v => SOURCE[v] || v, pnuAgrees: YES_NO, addressAgrees: YES_NO };
 const station = BASE + "station/1150010200106660040000001";
 
-const KINDS = ["building", "entrance", "facility", "station", "road", "legaldong", "basemap", "digitalmap"];
-const KIND_KO = { building: "건물", entrance: "출입구", facility: "공공시설", station: "역", road: "도로 구간", legaldong: "법정동", basemap: "국가기본도 건물", digitalmap: "수치지형도 건물", area: "범위 원" };
-const KIND_RANK = { station: 0, facility: 1, building: 2, legaldong: 3, road: 4, basemap: 5, digitalmap: 6, entrance: 7 };  // 찾기에서 점수가 같을 때 앞에 둘 순서
+const KINDS = ["building", "entrance", "facility", "station", "sensor", "road", "legaldong", "basemap", "digitalmap"];
+const KIND_KO = { building: "건물", entrance: "출입구", facility: "공공시설", station: "역", sensor: "센서", road: "도로 구간", legaldong: "법정동", basemap: "국가기본도 건물", digitalmap: "수치지형도 건물", area: "범위 원" };
+const KIND_RANK = { station: 0, facility: 1, building: 2, legaldong: 3, road: 4, basemap: 5, digitalmap: 6, entrance: 7, sensor: 8 };  // 찾기에서 점수가 같을 때 앞에 둘 순서
 const STATUSES = [
   { name: "사용", color: "--active", tip: "사용: 도로명주소 건물관리번호가 있는, 지금 쓰이는 건물" },
   { name: "주소 미연결", color: "--unlinked", tip: "주소 미연결: 도로명주소에 없는 GIS 건물" },
@@ -197,11 +199,11 @@ const STATUSES = [
 const GEOM_RE = /^(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)/;
 // 레이어 목록의 이름 -> 지도 레이어 id
 const LAYER_IDS = { building: ["building", "building-pt", "building-retired"], entrance: ["entrance"], facility: ["facility"],
-  station: ["station"], road: ["road"], legaldong: ["legaldong-line"], basemap: ["basemap-line"], digitalmap: ["digitalmap-line"], area: ["area-line"], osm: ["osm"] };
+  station: ["station"], sensor: ["sensor"], road: ["road"], legaldong: ["legaldong-line"], basemap: ["basemap-line"], digitalmap: ["digitalmap-line"], area: ["area-line"], osm: ["osm"] };
 // 아래에서 위로 그리는 순서. 늦게 받은 레이어도 beforeId로 이 자리에 끼운다
-const ORDER = ["legaldong-line", "road", "building", "building-pt", "building-retired", "digitalmap-line", "basemap-line", "area-line", "entrance", "facility", "station",
+const ORDER = ["legaldong-line", "road", "building", "building-pt", "building-retired", "digitalmap-line", "basemap-line", "area-line", "entrance", "facility", "sensor", "station",
   "sel-line", "sel-pt", "answer-fill", "answer-line", "answer-pt"];
-const CLICKABLE = ["station", "facility", "entrance", "building-pt", "building", "road", "answer-pt", "answer-fill"];
+const CLICKABLE = ["station", "sensor", "facility", "entrance", "building-pt", "building", "road", "answer-pt", "answer-fill"];
 const $ = id => document.getElementById(id);
 const narrow = () => matchMedia("(max-width: 860px)").matches;
 const emptyFC = () => ({ type: "FeatureCollection", features: [] });
@@ -286,6 +288,8 @@ function layerSpecs(k) {
     paint: { "line-color": css("--digitalmap"), "line-width": 1.2, "line-dasharray": [2, 1] } }];
   if (k === "legaldong") return [{ id: "legaldong-line", type: "line", source: "legaldong",
     paint: { "line-color": css("--legaldong"), "line-width": 2, "line-dasharray": [4, 2] } }];
+  if (k === "sensor") return [{ id: "sensor", type: "circle", source: "sensor",
+    paint: { "circle-radius": 6.5, "circle-color": css("--sensor"), "circle-stroke-width": 2, "circle-stroke-color": "#fff" } }];
   if (k === "facility") return [{ id: "facility", type: "circle", source: "facility",
     paint: { "circle-radius": 6, "circle-color": css("--facility"), "circle-stroke-width": 2, "circle-stroke-color": "#fff" } }];
   return [{ id: "station", type: "circle", source: "station",
@@ -770,7 +774,7 @@ document.querySelectorAll(".ask-note .eg").forEach(b => b.onclick = () => { $("a
 
 // 시작: 역, 공공시설, 건물을 받는 대로 그리고 출입구는 켜 둔 경우에만 받는다
 renderStatus();
-["station", "facility", "building"].forEach(loadKind);
+["station", "facility", "sensor", "building"].forEach(loadKind);
 ["entrance", "road", "legaldong", "basemap", "digitalmap"].filter(k => !off.has(k)).forEach(loadKind);
 loadArea();
 show(focus0 || station, focus0 ? { quiet: !!zc } : { intro: true, quiet: true });

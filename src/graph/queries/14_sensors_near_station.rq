@@ -1,0 +1,19 @@
+# 증미역 500m 안 센서마다 관측 기간의 평균 소음과 기온, 그리고 설치 주소의 건물 (SOSA + GeoSPARQL)
+PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX uom: <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX sosa: <http://www.w3.org/ns/sosa/>
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?sensor ?address ?buildingName (ROUND(?d) AS ?metersFromStation) ?avgNoiseDb ?avgTempC WHERE {
+  <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> geo:hasDefaultGeometry/geo:asWKT ?sw .
+  ?sensor a jgk:Sensor ; jgk:installAddress ?address ; geo:hasDefaultGeometry/geo:asWKT ?w .
+  BIND (geof:distance(?sw, ?w, uom:metre) AS ?d)
+  FILTER (?d <= 500)
+  OPTIONAL { ?sensor jgk:addressBuilding/rdfs:label ?buildingName }
+  OPTIONAL { SELECT ?sensor (ROUND(AVG(?n) * 10) / 10 AS ?avgNoiseDb) WHERE {
+    ?o sosa:madeBySensor ?sensor ; sosa:observedProperty jgk:noise ; sosa:hasSimpleResult ?n } GROUP BY ?sensor }
+  OPTIONAL { SELECT ?sensor (ROUND(AVG(?t) * 10) / 10 AS ?avgTempC) WHERE {
+    ?o sosa:madeBySensor ?sensor ; sosa:observedProperty jgk:temperature ; sosa:hasSimpleResult ?t } GROUP BY ?sensor }
+} ORDER BY ?d

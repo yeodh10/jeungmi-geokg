@@ -22,6 +22,7 @@ OUT_TTL = PROC / "jeungmi_geokg.ttl"
 
 JGK = Namespace("https://yeodh10.github.io/jeungmi-geokg/def#")
 GEO = Namespace("http://www.opengis.net/ont/geosparql#")
+SOSA = Namespace("http://www.w3.org/ns/sosa/")
 
 STATUS = {"Active": JGK.Active, "AddressUnlinked": JGK.AddressUnlinked,
           "AddressLinked": JGK.AddressLinked, "Retired": JGK.Retired}
@@ -33,6 +34,7 @@ DATASET_AGENCY_CODE = JGK["dataset-agency-code"]
 DATASET_EMAP = JGK["dataset-juso-emap"]
 DATASET_NGII = JGK["dataset-ngii-digital-map"]
 DATASET_KBM = JGK["dataset-ngii-basemap"]
+DATASET_SDOT = JGK["dataset-sdot"]
 SOURCE_OF = {"navi": DATASET_NAVI, "emap": DATASET_EMAP, "gis": DATASET_GIS, "register": DATASET_REGISTER}
 
 
@@ -160,6 +162,44 @@ def add_maps(g: Graph, proc: Path) -> None:
                     g.add((m, JGK.addressAgrees, Literal(r.address_same == "True")))
 
 
+def add_sensors(g: Graph, proc: Path) -> None:
+    """S-DoT 센서(src.model.build_sensors 결과)와 1시간 평균 관측값을 SOSA로."""
+    path = proc / "sensor.csv"
+    if not path.exists():
+        return
+    for r in pd.read_csv(path, dtype=str, keep_default_na=False).itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.Sensor, "Active")
+        g.add((s, RDF.type, SOSA.Sensor))
+        add(g, s, RDFS.label, f"S-DoT 센서 {r.serial}", lang="ko")
+        add(g, s, JGK.sensorSerial, r.serial)
+        add(g, s, JGK.sensorModel, r.model)
+        add(g, s, JGK.installAddress, r.address)
+        add(g, s, JGK.installArea, r.area_type)
+        if r.building_uri:
+            g.add((s, JGK.addressBuilding, URIRef(r.building_uri)))
+            add(g, s, JGK.addressBuildingDistance, r.building_dist_m, XSD.decimal)
+        g.add((s, DCTERMS.source, DATASET_SDOT))
+        add_geometry(g, s, shapely.Point(float(r.lon), float(r.lat)))
+    obs = proc / "sensor_obs.csv"
+    if not obs.exists():
+        return
+    observed = set()
+    prop_ko = {"temperature": "기온", "humidity": "습도", "noise": "소음", "illuminance": "조도", "uv": "자외선"}
+    for r in pd.read_csv(obs, dtype=str, keep_default_na=False).itertuples():
+        s, sensor, prop = URIRef(r.uri), URIRef(r.sensor_uri), JGK[r.prop]
+        g.add((s, RDF.type, SOSA.Observation))
+        add(g, s, RDFS.label, f"{r.sensor_uri.rsplit('/', 1)[-1]} {prop_ko[r.prop]} {r.time.replace('T', ' ')[:16]}", lang="ko")
+        g.add((s, SOSA.madeBySensor, sensor))
+        g.add((s, SOSA.observedProperty, prop))
+        g.add((s, SOSA.hasSimpleResult, Literal(r.value, datatype=XSD.decimal)))
+        g.add((s, SOSA.resultTime, Literal(r.time, datatype=XSD.dateTime)))
+        g.add((s, DCTERMS.source, DATASET_SDOT))
+        observed.add((sensor, prop))
+    for sensor, prop in observed:
+        g.add((sensor, SOSA.observes, prop))
+
+
 def build(proc: Path = PROC) -> Graph:
     """proc 폴더의 객체 파일(src.model.build_objects 결과)로 그래프를 만든다."""
     gpkg = proc / "objects.gpkg"
@@ -176,6 +216,7 @@ def build(proc: Path = PROC) -> Graph:
     g.bind("jgk", JGK)
     g.bind("geo", GEO)
     g.bind("dcterms", DCTERMS)
+    g.bind("sosa", SOSA)
 
     dong_uri = {r.adm_dong_code: URIRef(r.uri) for r in dongs.itertuples()}
     for r in dongs.itertuples():
@@ -261,6 +302,7 @@ def build(proc: Path = PROC) -> Graph:
         g.add((URIRef(r.facility_uri), JGK.housedIn, URIRef(r.building_uri)))
     add_emap(g, proc)
     add_maps(g, proc)
+    add_sensors(g, proc)
     return g
 
 

@@ -10,7 +10,7 @@
   /* 지도 객체 색 */
   --active: #4f7bd9; --unlinked: #f08c00; --linked: #12a467; --retired: #d92d20;
   --facility: #7a4fe0; --road: #0e9384; --legaldong: #1d2939; --basemap: #c11574; --digitalmap: #6941c6;
-  --station: #d29b00; --select: #1d4ed8; --answer: #7a5af8;
+  --station: #d29b00; --select: #1d4ed8; --answer: #7a5af8; --sensor: #0284c7;
   --radius: 10px; --radius-sm: 6px;
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   --shadow-2: 0 4px 12px rgba(16, 24, 40, .10), 0 2px 4px rgba(16, 24, 40, .06);

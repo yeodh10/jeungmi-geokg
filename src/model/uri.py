@@ -80,3 +80,16 @@ def digital_map_feature(ufid: str) -> str:
 
 def geometry(feature_uri: str) -> str:
     return f"{feature_uri}/geometry"
+
+
+def sensor(serial: str) -> str:
+    """서울시 도시데이터 센서(S-DoT)의 모델 시리얼. 예: V02Q1940104"""
+    assert serial.isalnum() and 8 <= len(serial) <= 16, serial
+    return f"{BASE}/sensor/{serial}"
+
+
+def observation(serial: str, measured_at: str, prop: str) -> str:
+    """센서 시리얼, 측정 시각(YYYYMMDDHHMM), 측정 항목. 한 센서가 한 시각에 한 항목은 한 번만 잰다."""
+    assert len(measured_at) == 12 and measured_at.isdigit() and prop.isalpha(), (measured_at, prop)
+    assert serial.isalnum(), serial
+    return f"{BASE}/observation/{serial}-{measured_at}-{prop}"
