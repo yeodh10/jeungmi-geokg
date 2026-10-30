@@ -41,6 +41,9 @@ def make_next_snapshot(dst: Path) -> dict:
     zone = pd.read_csv(dst / "building_zone.csv", dtype=str, keep_default_na=False)
     zone = zone[zone["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
     zone.to_csv(dst / "building_zone.csv", index=False)
+    # 없어진 건물과 이어졌던 국가기본도 건물은 확인 결과(pnuAgrees, addressAgrees)가 빠져 '값 변경' 제안이 하나씩 더 나온다
+    bm = pd.read_csv(dst / "building_basemap.csv", dtype=str)
+    map_updates = sorted(bm.loc[bm["building_uri"] == retire, "map_uri"])
     for f in ("building_basemap.csv", "building_digital_map.csv"):
         bm = pd.read_csv(dst / f, dtype=str)
         bm = bm[bm["building_uri"] != retire].replace({"building_uri": {linked_gis: b.loc[link_i, "uri"]}})
@@ -49,7 +52,7 @@ def make_next_snapshot(dst: Path) -> dict:
     for n, g in layers.items():
         g.to_file(dst / "objects.gpkg", layer=n, driver="GPKG", engine="pyogrio")
     return {"retire": retire, "update": update, "link": linked_gis,
-            "create": f"https://yeodh10.github.io/jeungmi-geokg/id/building/{FAKE_MGT}"}
+            "create": f"https://yeodh10.github.io/jeungmi-geokg/id/building/{FAKE_MGT}", "map_updates": map_updates}
 
 
 def run() -> None:
@@ -62,11 +65,16 @@ def run() -> None:
     new_dir = tmp / "next"
     new_dir.mkdir()
     expect = make_next_snapshot(new_dir)
+    map_updates = expect.pop("map_updates")
 
     props = diff(build_graph.build(PROC), build_graph.build(new_dir), "test", "시험용 다음 자료")
     got = {(p.action, p.target) for p in props}
-    want = {(a, u) for a, u in expect.items()}
+    want = {(a, u) for a, u in expect.items()} | {("update", u) for u in map_updates}
     assert got == want, f"\n기대 {sorted(want)}\n결과 {sorted(got)}"
+    for p in props:
+        if p.target in map_updates:
+            assert {c.op for c in p.changes} == {"remove"}, p.changes  # 확인 결과만 빠진다
+    props = [p for p in props if p.target not in map_updates]
     upd = next(p for p in props if p.action == "update")
     assert any("floorsAbove" in c.p and c.op == "add" for c in upd.changes), upd.changes
 

@@ -68,7 +68,12 @@ def unpack_nested_zip(src: Path, dest: Path) -> list[str]:
     with zipfile.ZipFile(src) as outer:
         for info in outer.infolist():
             layer = Path(zip_name(info)).stem
-            with zipfile.ZipFile(io.BytesIO(outer.read(info))) as inner:
+            data = outer.read(info)
+            if not zipfile.is_zipfile(io.BytesIO(data)):
+                # 국토정보플랫폼이 가끔 레이어 압축 대신 오류 XML을 넣어 준다. 그 레이어만 건너뛴다
+                print(f"[건너뜀] {src.name} 안의 {layer}: 압축 파일이 아님 ({data[:60]!r})")
+                continue
+            with zipfile.ZipFile(io.BytesIO(data)) as inner:
                 for f in inner.infolist():
                     if f.is_dir():
                         continue

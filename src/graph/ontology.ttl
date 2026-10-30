@@ -244,8 +244,8 @@ jgk:dataset-juso-emap a jgk:Dataset ;
     rdfs:label "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     dcterms:source <https://business.juso.go.kr> .
 jgk:dataset-ngii-basemap a jgk:Dataset ;
-    dcterms:title "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-29, 증미역 둘레 약 600m 영역)"@ko ;
-    rdfs:label "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-29, 증미역 둘레 약 600m 영역)"@ko ;
+    dcterms:title "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-30, 증미역 반경 1.25km 영역)"@ko ;
+    rdfs:label "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-30, 증미역 반경 1.25km 영역)"@ko ;
     dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-ngii-digital-map a jgk:Dataset ;
     dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
