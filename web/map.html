@@ -114,12 +114,18 @@
 const data = {};  // 레이어 이름 -> 서버에서 받은 FeatureCollection (받은 것만)
 const KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "floorsBelow", "approvalDate", "lineName",
   "facilityType", "agencyName", "agencyCode", "entranceType", "subEntranceSeq", "buildingMgtNo", "gisBuildingId", "pnu",
-  "admDongCode", "siteArea", "totalFloorArea", "households", "mainBuildingCount", "complexMainUse", "retiredOn"];
-const LINKS = ["within", "locatedOn", "housedIn", "hasEntrance", "sameAs", "wasInfluencedBy"];
+  "admDongCode", "siteArea", "totalFloorArea", "households", "mainBuildingCount", "complexMainUse", "retiredOn",
+  "roadCode", "roadSegmentNo", "roadClass", "roadWidth", "roadLength", "legalDongCode", "basicZoneNo",
+  "basemapId", "molitUfid", "ufid", "sheetCode", "mapKind", "mapUse", "mapKindCode", "mapUseCode", "mapFloors",
+  "matchIoU", "pnuAgrees", "addressAgrees", "noticeNumber", "zoneKind"];
+const LINKS = ["within", "inLegalDong", "inBasicZone", "locatedOn", "addressRoad", "housedIn", "hasEntrance", "facesRoad",
+  "segmentOf", "basemapFeature", "digitalMapFeature", "zoneDesignatedBy", "zoneReleasedBy", "planApprovedBy", "completedBy",
+  "sameAs", "wasInfluencedBy"];
 // 변경 제안 노드를 열 때 더 보이는 속성과, 어휘 이름표가 길어서 줄여 쓰는 이름
 const PROPOSAL_KEYS = ["description", "proposalAction", "sourceKind", "created", "decidedBy", "decidedAt"];
 const KEY_LABEL = { proposalAction: "제안 종류", sourceKind: "제안 출처" };
-const KEY_VALUE = { proposalAction: v => ACTION[v] || v, sourceKind: v => SOURCE[v] || v };
+const YES_NO = v => v === "true" ? "예" : v === "false" ? "아니요" : v;
+const KEY_VALUE = { proposalAction: v => ACTION[v] || v, sourceKind: v => SOURCE[v] || v, pnuAgrees: YES_NO, addressAgrees: YES_NO };
 const station = BASE + "station/1150010200106660040000001";
 
 const KINDS = ["building", "entrance", "facility", "station", "road", "legaldong", "basemap", "digitalmap"];
