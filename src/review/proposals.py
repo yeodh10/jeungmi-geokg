@@ -123,6 +123,8 @@ class Proposal(BaseModel):
     evidence: list[str] = Field(default_factory=list)
     changes: list[Change]
     location: tuple[float, float] | None = None  # 경도, 위도 (검토 화면 지도용)
+    # 이 제안의 근거 자료 (어휘의 dataset-* 이름). 비어 있으면 공개 사이트에 얹지 않는다 (src/graph/publish.py)
+    based_on: list[str] = Field(default_factory=list)
     status: Literal["pending", "approved", "rejected"] = "pending"
     decision: Decision | None = None
     corrections: list[Correction] = Field(default_factory=list)

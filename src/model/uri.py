@@ -67,7 +67,7 @@ def basic_zone(zone_no: str) -> str:
 
 
 def basemap_feature(nf_id: str) -> str:
-    """국가기본도 지형지물의 객체ID(nf_id) 17자리. 예: BLD01000000GFQR7T"""
+    """국가기본도 지형지물의 객체ID(nf_id) 17자리."""
     assert len(nf_id) == 17 and nf_id.isalnum(), nf_id
     return f"{BASE}/basemap/{nf_id}"
 

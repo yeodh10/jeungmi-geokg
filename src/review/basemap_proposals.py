@@ -104,7 +104,7 @@ def make(row) -> Proposal:
         ],
         changes=[status("remove", "AddressUnlinked"), status("add", "AddressLinked"),
                  Change(op="add", s=row["gis_uri"], p=OWL_SAMEAS, o=Term(kind="uri", value=row["building_uri"]))],
-        location=row["lonlat"],
+        location=row["lonlat"], based_on=["dataset-ngii-basemap", "dataset-navi-db", "dataset-gis-building"],
     )
 
 
@@ -215,7 +215,7 @@ def make_shape(row) -> Proposal:
                  Change(op="add", s=gu, p=geo + "asWKT", o=wkt(row["polygon"])),
                  Change(op="add", s=gu, p="http://purl.org/dc/terms/source", o=Term(kind="uri", value=JGK + "dataset-ngii-basemap")),
                  Change(op="add", s=row["building_uri"], p=JGK + "basemapFeature", o=Term(kind="uri", value=row["map_uri"]))],
-        location=tuple(row["point"].coords[0]),
+        location=tuple(row["point"].coords[0]), based_on=["dataset-ngii-basemap", "dataset-navi-db"],
     )
 
 

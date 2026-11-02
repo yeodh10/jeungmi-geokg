@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import pyoxigraph as ox
@@ -19,11 +20,12 @@ ONTOLOGY = Path(__file__).resolve().parent / "ontology.ttl"
 ALIGNMENT = Path(__file__).resolve().parent / "alignment.ttl"  # 바깥 표준 어휘와 잇기 (schema.org, INSPIRE, 위키데이터)
 
 
-def load_store(proposals: ProposalStore | None = None) -> ox.Store:
+def load_store(proposals: ProposalStore | None = None, keep: Callable | None = None) -> ox.Store:
+    """keep을 주면 그 조건에 맞는 승인 제안만 얹는다 (공개 사이트는 공개 자료로 만든 제안만 쓴다)."""
     store = ox.Store()
     for path in (ONTOLOGY, ALIGNMENT, TTL):
         store.load(path=str(path), format=ox.RdfFormat.TURTLE)
-    approved = [p for p in (proposals or ProposalStore()).load() if p.status == "approved"]
+    approved = [p for p in (proposals or ProposalStore()).load() if p.status == "approved" and (keep is None or keep(p))]
     for p in sorted(approved, key=lambda p: p.decision.at if p.decision else ""):
         try:
             store.update(p.sparql_update())

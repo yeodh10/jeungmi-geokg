@@ -10,7 +10,7 @@
 
 | 지도 화면 | 변경 제안 검토 화면 |
 |---|---|
-| ![지도 화면: 그래프의 건물을 상태별 색으로 회색 배경지도 위에 보여 주고, 왼쪽에 찾기, 질문, 고른 객체의 속성과 연결을, 오른쪽에 레이어와 범례를 둔다](docs/images/map.png) | ![검토 화면: 강서구 도로명주소 폐지 고시로 만든 건물 폐지 제안을 지금과 바뀐 뒤, SHACL 검사 결과, 위치 지도로 보여 준다](docs/images/review.png) |
+| ![검토 화면: 강서구 도로명주소 폐지 고시로 만든 건물 폐지 제안을 지금과 바뀐 뒤, SHACL 검사 결과, 위치 지도로 보여 준다](docs/images/review.png) |
 
 | 공개 URI 사이트 |
 |---|
@@ -23,7 +23,7 @@
 | 객체 원자화 | 원천 자료 8종을 건물, 출입구, 필지, 도로와 도로 구간, 공공시설, 역, 행정동, 법정동, 기초구역 객체로 쪼갰습니다. 출입구는 면한 도로 구간에 이어집니다. 국가기본도 지형지물 분류(수치지도 작성 작업규칙 제9조)를 어휘에 넣고, 국가기본도 건물을 객체ID 그대로 받아 우리 건물과 이었습니다. 모든 객체는 GeoSPARQL Feature이고 모양(Geometry)은 따로 둡니다. | `src/model/`, `src/graph/ontology.ttl` |
 | 영구 식별자 | 새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드, 도로구간 일련번호, 법정동코드, 행정동코드, 기초구역번호, 행정표준코드 기관코드를 그대로 URI에 씁니다. 객체가 사라져도 URI는 남기고 상태만 폐지로 바꿉니다. 11,831개 URI를 GitHub Pages에 올려 실제로 열리게 했습니다. | [docs/uri-policy.md](docs/uri-policy.md), `src/graph/publish.py` |
 | 자동 갱신 | 새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 비교해 신규, 변경, 폐지, 주소 연결 제안을 만듭니다. | `src/review/diff_proposals.py` |
-| AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 국가기본도 건물의 주소로 주소 미연결 건물을 건물관리번호 건물에 잇는 제안, 점만 있는 건물에 국가기본도 모양을 붙이는 제안도 규칙이 냅니다. 모든 제안은 SHACL 규칙 검사를 거쳐 사람이 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
+| AI 제안 후 사람 승인 | 고시공고 글은 LLM이 바뀌는 내용만 뽑고, 객체 찾기는 코드 규칙이 합니다. 국가기본도 건물의 주소로 주소 미연결 건물을 건물관리번호 건물에 잇는 제안, 점만 있는 건물에 국가기본도 모양을 붙이는 제안도 규칙이 냅니다. 모든 제안은 SHACL 규칙 검사를 거쳐 승인해야 그래프에 들어가고, 누가 언제 승인했는지 PROV-O로 남습니다. 국가기본도 규칙 제안 249건은 사람이 검토자 Claude에게 맡겨, 데이터에서 잰 기준으로 결정했습니다(기록의 검토자 이름에 그대로 남아 있습니다). | `src/llm/`, `src/review/`, `src/graph/shapes.ttl` |
 
 ## 표준과 상호운용성
 
@@ -151,10 +151,11 @@ http://localhost:8000 은 변경 제안 검토, http://localhost:8000/map 은 �
 .venv/Scripts/python -m src.graph.interop                                         # 바깥 주소 확인까지 (인터넷 필요)
 ```
 
-URI 페이지 다시 올리기 (`gh-pages` 브랜치에 `data/processed/site/`를 통째로 올리면 GitHub Pages가 알아서 다시 만듭니다):
+URI 페이지 다시 올리기 (`gh-pages` 브랜치를 비우고 `data/processed/site/`를 통째로 올립니다. 비우지 않으면 지운 페이지가 공개 사이트에 남습니다):
 
 ```bash
 git worktree add ../jeungmi-geokg-pages gh-pages
+find ../jeungmi-geokg-pages -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 cp -r data/processed/site/. ../jeungmi-geokg-pages/ && rm ../jeungmi-geokg-pages/publish_report.json
 cd ../jeungmi-geokg-pages && git add -A && git commit -m "URI 공개 페이지 다시 만듦" && git push && cd -
 git worktree remove ../jeungmi-geokg-pages

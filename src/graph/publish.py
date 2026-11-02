@@ -10,7 +10,7 @@
   def/index.html, def/ontology.ttl  어휘
   assets/  화면 모양(web/style.css를 그대로 씀)과 스크립트, search.json(전체 찾기용 목록)
 
-이용 조건을 아직 확인하지 못한 출처(config/area.yaml의 publish.hold_sources)에서 온 객체는 페이지를 만들지 않고,
+공개 보류 출처(config/area.yaml의 publish.hold_sources)에서 온 객체는 페이지를 만들지 않고,
 다른 페이지에서도 그 객체로 가는 연결을 뺀다.
 """
 from __future__ import annotations
@@ -37,7 +37,6 @@ SITE_PATH = "/" + SITE.split("://", 1)[1].split("/", 1)[1]  # /jeungmi-geokg (�
 REPO = "https://github.com/yeodh10/jeungmi-geokg"
 JGK = SITE + "/def#"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-RDF_SUBJ, RDF_PRED, RDF_OBJ = (f"http://www.w3.org/1999/02/22-rdf-syntax-ns#{x}" for x in ("subject", "predicate", "object"))
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 DCT_SOURCE = "http://purl.org/dc/terms/source"
@@ -134,7 +133,7 @@ def page(title: str, body: str, *, nav: str | None = None, head: str = "", desc:
 <span class="spacer"></span><a class="tb-link" href="{REPO}" target="_blank" rel="noopener">{ICON["code"]}<span>소스 코드</span></a></header>
 <main class="page{" wide" if wide else ""}">{body}</main>
 <footer class="foot"><div>증미역 반경 1km 공간 지식 그래프, GeoSPARQL 1.1. 객체마다 공식 번호로 바뀌지 않는 URI를 붙였습니다.</div>
-<div>배경지도 © OpenStreetMap contributors. 이용 조건을 확인 중인 출처의 객체는 이 사이트에 넣지 않았습니다.</div></footer></body></html>"""
+<div>배경지도 © OpenStreetMap contributors. 공개 보류 자료의 객체는 이 사이트에 넣지 않았습니다.</div></footer></body></html>"""
 
 
 def sparkline(points: list[tuple[str, float]], w: int = 180, h: int = 34) -> str:
@@ -178,7 +177,9 @@ def align_section() -> str:
 
 def main() -> None:
     hold = hold_sources()
-    store = load_store()
+    # 승인 제안은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹는다. 모르면 공개하지 않는다.
+    # 국가기본도로 만든 제안은 그 결론(잇기, 모양)까지 공개 사이트에서 빠진다.
+    store = load_store(keep=lambda p: bool(p.based_on) and not {JGK + d for d in p.based_on} & hold)
 
     triples = defaultdict(list)
     for s, p, o, _ in store.quads_for_pattern(None, None, None, None):
@@ -200,18 +201,6 @@ def main() -> None:
     obs_summary = observation_summary(triples)
     held = {s for s, plist in triples.items() if any(p.value == DCT_SOURCE and o.value in hold for p, o in plist)}
     held |= {f"{s}/geometry" for s in held}
-    # 공개 보류 출처로 바뀐 모양은 바뀌기 전 값(승인 기록의 rdf:Statement, changeOp remove)으로 보여 준다
-    # 예: 점만 있던 건물에 국가기본도 모양을 붙이면, 이용 조건 확인 전까지 공개 사이트에는 내비게이션용DB 점이 남는다
-    earlier_wkt = {}
-    for s, plist in triples.items():
-        if "/change/" in s:
-            d = {p.value: o.value for p, o in plist}
-            if d.get(RDF_PRED) == GEO + "asWKT" and d.get(JGK + "changeOp") == "remove" and d.get(RDF_SUBJ) in held:
-                earlier_wkt[d[RDF_SUBJ]] = d[RDF_OBJ]
-    # 공개 보류 객체나 모양을 바꾼 제안은 제안과 변경 기록 페이지를 통째로 보류한다 (기록에 그 값이 그대로 들어 있다)
-    touched = {s.rsplit("/change/", 1)[0] for s, plist in triples.items() if "/change/" in s
-               and any(p.value in (RDF_SUBJ, RDF_OBJ) and o.value in held for p, o in plist)}
-    held |= touched | {s for s in triples if "/change/" in s and s.rsplit("/change/", 1)[0] in touched}
     public = lambda s: s.startswith(BASE + "/") and s not in held and not s.endswith("/geometry")
     pname = lambda p: labels.get(p) or EXT_LABEL.get(p) or p.rsplit("#", 1)[-1]
 
@@ -319,8 +308,8 @@ def main() -> None:
         # 모양: 지도에 그릴 GeoJSON (좌표는 소수 6자리)
         geom_json = ""
         gnode = s if is_geom else f"{s}/geometry"
-        if gnode not in held or gnode in earlier_wkt:
-            wkt = earlier_wkt.get(gnode) or next((o.value for p, o in triples.get(gnode, []) if p.value == GEO + "asWKT"), None)
+        if gnode not in held:
+            wkt = next((o.value for p, o in triples.get(gnode, []) if p.value == GEO + "asWKT"), None)
             if wkt:
                 g = shapely.set_precision(shapely.from_wkt(wkt), 1e-6)
                 geom_json = json.dumps(mapping(g), separators=(",", ":"))
