@@ -1,0 +1,8 @@
+# 상가정보에 없어 사람이 직접 넣은 장소. 공개된 공식 출처가 있는 곳만 넣는다. 호수는 넣지 않는다.
+# building은 우리 그래프의 건물관리번호다. src/model/build_business.py가 읽는다.
+- name: 지오스토리
+  building: "1150010200106380003000001"  # 강서아이티밸리
+  big: 과학·기술
+  cat: 공간정보
+  source: http://geostory.co.kr
+  checked: 2026-11-02

@@ -174,7 +174,8 @@
   const sm = $("sitemap");
   if (sm && window.maplibregl) {
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-    const KIND = { building: "건물", "building-gis": "건물 (주소 미연결)", entrance: "건물 출입구", station: "역", sensor: "센서" };
+    const KIND = { building: "건물", "building-gis": "건물 (주소 미연결)", entrance: "건물 출입구", station: "역", sensor: "센서", place: "상호" };
+    const PLACE_NOTE = "소상공인 상가정보 2026년 9월 기준입니다. 영업시간, 전화번호는 없습니다.";
     const map = new maplibregl.Map({ container: sm, style: colorStyle(), localIdeographFontFamily: KO_FONT, attributionControl: { compact: true },
       center: [126.8612, 37.5577], zoom: 14.6, maxZoom: 19 });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -183,10 +184,15 @@
     const data = {};
     const show = f => {
       const p = f.properties, kind = KIND[p.u.split("/")[0]] || "객체";
-      const rows = [["상태", p.s], ["용도", p.use], ["도로명주소", p.addr], ["URI", `<code>${esc(p.u)}</code>`]]
+      const isPlace = p.u.startsWith("place/");
+      const floor = p.floor && (/^\d+$/.test(p.floor) ? `${p.floor}층` : p.floor);
+      const rows = (isPlace ? [["업종", p.cat || p.big], ["층", floor], ["도로명주소", p.addr], ["건물", p.bn]]
+        : [["상태", p.s], ["용도", p.use], ["도로명주소", p.addr], ["URI", `<code>${esc(p.u)}</code>`]])
         .filter(r => r[1]).map(([k, v]) => `<tr><td class="k">${k}</td><td>${k === "URI" ? v : esc(v)}</td></tr>`).join("");
-      $("sm-info").innerHTML = `<span class="chip type">${esc(kind)}</span><h3>${esc(p.n)}</h3><table class="kv">${rows}</table>
-        <a class="btn mini" href="${root}/id/${esc(p.u)}/">URI 페이지 열기</a>`;
+      const more = isPlace
+        ? `${p.bu ? `<a class="btn mini" href="${root}/id/${esc(p.bu)}/">건물 페이지 열기</a>` : ""}<p class="small muted">${esc(p.src || PLACE_NOTE)}</p>`
+        : `<a class="btn mini" href="${root}/id/${esc(p.u)}/">URI 페이지 열기</a>`;
+      $("sm-info").innerHTML = `<span class="chip type">${esc(kind)}</span><h3>${esc(p.n)}</h3><table class="kv">${rows}</table>${more}`;
       map.getSource("sel").setData({ type: "FeatureCollection", features: [f] });
     };
     const focus = f => {
@@ -261,7 +267,7 @@
       });
 
       // 누르기와 가리키기 (점이 위에 있으면 점 먼저)
-      const clickable = ["station", "sensor", "entrance", "building-pt", "building"];
+      const clickable = ["station", "sensor", "biz", "entrance", "building-pt", "building"];
       map.on("click", ev => {
         const hit = map.queryRenderedFeatures(ev.point, { layers: clickable.filter(id => map.getLayer(id)) })[0];
         if (!hit) return;
@@ -276,12 +282,38 @@
       // 지도에서 찾기
       const q = $("sm-q"), hits = $("sm-hits");
       const all = ["station", "sensor", "building", "entrance"].flatMap(k => (data[k] ? data[k].features : []));
-      q.oninput = () => {
+      // 상호는 찾기창을 처음 쓰거나 크게 볼 때 받는다 (첫 화면을 가볍게)
+      let places = null;
+      const loadPlaces = () => places || (places = (async () => {
+        const fc = await get("business").catch(() => null);
+        if (!fc) { places = null; return; }
+        data.biz = fc;
+        all.push(...fc.features);
+        map.addSource("biz", { type: "geojson", data: fc });
+        map.addLayer({ id: "biz", type: "circle", source: "biz", minzoom: 16.4,
+          paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 16.4, 2.5, 19, 6], "circle-color": "#c2553a", "circle-stroke-width": 1, "circle-stroke-color": "#fff" } }, "sel-line");
+        map.addLayer({ id: "biz-name", type: "symbol", source: "biz", minzoom: 17.6,
+          layout: { "text-field": ["get", "n"], "text-font": ["Noto Sans Regular"], "text-size": 11, "text-max-width": 8, "text-offset": [0, 0.9], "text-anchor": "top" },
+          paint: { "text-color": pal.text, "text-halo-color": pal.halo, "text-halo-width": 1.4 } }, "sel-line");
+        document.querySelector('input[data-layer="station"]').closest("label").insertAdjacentHTML("afterend",
+          `<label class="lp-row"><input type="checkbox" data-layer="biz" checked><i class="sw" style="background:#c2553a"></i>상호<span class="n">${fc.features.length.toLocaleString()}</span></label>`);
+        const box = document.querySelector('input[data-layer="biz"]');
+        box.onchange = () => ["biz", "biz-name"].forEach(id => map.setLayoutProperty(id, "visibility", box.checked ? "visible" : "none"));
+      })());
+      map.on("zoomend", () => { if (map.getZoom() >= 16) loadPlaces(); });
+      const rank = (f, t) => {
+        const n = tight(f.properties.n);
+        return n === t ? 0 : n.startsWith(t) ? 1 : n.includes(t) ? 2 : 3;
+      };
+      q.oninput = async () => {
         const t = tight(q.value);
         if (t.length < 2) { hits.innerHTML = ""; return; }
-        const found = all.filter(f => tight(f.properties.n + " " + f.properties.addr).includes(t)).slice(0, 10);
+        await loadPlaces();
+        if (tight(q.value) !== t) return;  // 받는 동안 글자가 바뀌었으면 새 입력에 맡긴다
+        const text = f => tight([f.properties.n, f.properties.addr, f.properties.cat].filter(Boolean).join(" "));
+        const found = all.filter(f => text(f).includes(t)).sort((a, b) => rank(a, t) - rank(b, t)).slice(0, 10);
         hits.innerHTML = found.length
-          ? found.map((f, i) => `<button type="button" data-i="${i}"><span>${esc(f.properties.n)}</span><span class="k">${esc(KIND[f.properties.u.split("/")[0]] || "")}</span></button>`).join("")
+          ? found.map((f, i) => `<button type="button" data-i="${i}"><span>${esc(f.properties.n)}</span><span class="k">${esc(f.properties.cat || KIND[f.properties.u.split("/")[0]] || "")}</span></button>`).join("")
           : '<div class="none">맞는 객체가 없습니다.</div>';
         hits.querySelectorAll("button").forEach(b => b.onclick = () => { focus(found[+b.dataset.i]); hits.innerHTML = ""; });
       };
