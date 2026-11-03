@@ -58,7 +58,7 @@ def check_vocabulary() -> None:
     assert not {u for u in above if "skos" in u}, above  # skos:related 아래에 두면 추론이 건물을 skos:Concept으로 만든다
     assert (URIRef(JGK + "bimBuilding"), RDFS.subPropertyOf, RDFS.seeAlso) in g
     title = str(g.value(jgk["dataset-ngii-digital-map"], RDFS.label))
-    assert "37608075" in title and "37608085" in title, title
+    assert "도엽 2장" in title and "도엽 37608075" not in title, title  # 낡은 문구 검사(명세 6절)에 걸리지 않게 도엽 수로 적는다
 
 
 def check_data() -> None:

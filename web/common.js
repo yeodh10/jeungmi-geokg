@@ -1,4 +1,22 @@
-// 검토 화면과 지도 화면이 같이 쓰는 도구
+// 검토 화면, 지도 앱, 공개 장소 페이지가 같이 쓰는 도구 (고전 스크립트, defer 없이 맨 앞에서 읽는다)
+
+// 화면 밝기: 고른 값(localStorage jgk-theme: light, dark)을 첫 그림 전에 넣는다. 없으면 시스템을 따른다.
+// 저장소가 막혀 있어도 오류를 내지 않는다 (기억만 못 한다)
+const THEME_KEY = "jgk-theme";
+(() => {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) { /* 저장소 막힘 */ }
+})();
+
+// 이 스크립트 주소에서 vendor 경로를 얻는다. 공개는 /jeungmi-geokg/assets/vendor/, 로컬은 /static/vendor/.
+// 스크립트 주소를 알 수 없으면(모듈로 읽거나 시험 환경) 로컬 경로를 쓴다
+const VENDOR = (() => {
+  try { return location.origin + new URL("vendor/", document.currentScript.src).pathname; }
+  catch (e) { return "/static/vendor/"; }
+})();
+
 const BASE = "https://yeodh10.github.io/jeungmi-geokg/id/";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -16,24 +34,102 @@ const ACTION = { create: "신규", update: "변경", retire: "폐지", link: "�
 const SOURCE = { "rule-candidate": "규칙 후보", "data-diff": "자료 비교", "llm-notice": "LLM 고시 추출", "notice-table": "고시 첨부표" };
 const STATUS = { pending: "대기", approved: "승인", rejected: "반려" };
 
-// 지도 배경: OpenStreetMap 타일을 회색으로 바래게 깔고(다크 모드면 밝기를 뒤집어 어둡게) 그래프 데이터를 그 위에 그린다
-// 배경이 옅어야 건물 상태 색과 질문 답이 묻히지 않는다
-const darkMode = () => matchMedia("(prefers-color-scheme: dark)").matches;
+// 화면 밝기: darkMode()는 지금 어두운 화면인지 (고른 값이 먼저, 없으면 시스템). themeChoice()는 "light", "dark", "system"
+const themeChoice = () => document.documentElement.dataset.theme || "system";
+const darkMode = () => {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+};
+// 화면 밝기를 바꾸고 기억한다. 바뀌면 "jgk-theme" 이벤트를 보낸다 (지도 색을 바꾸는 곳이 받는다)
+function setTheme(choice) {
+  const root = document.documentElement;
+  const fixed = choice === "light" || choice === "dark";
+  if (fixed) root.dataset.theme = choice;
+  else delete root.dataset.theme;
+  try {
+    if (fixed) localStorage.setItem(THEME_KEY, choice);
+    else localStorage.removeItem(THEME_KEY);
+  } catch (e) { /* 저장소 막힘: 이번 화면에만 적용 */ }
+  dispatchEvent(new CustomEvent("jgk-theme", { detail: { choice: fixed ? choice : "system", dark: darkMode() } }));
+}
+// 밝기가 바뀌면 fn(어두운지)을 부른다. 고른 값이 없을 때는 시스템 설정이 바뀌어도 부른다
+function onThemeChange(fn) {
+  addEventListener("jgk-theme", () => fn(darkMode()));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (!document.documentElement.dataset.theme) fn(darkMode()); });
+}
+
+// 배경 범위: 증미역 중심에서 동서남북 2.5km 사각형 [서, 남, 동, 북]. src/graph/basetiles.py의 bounds()와 같다
+const MAP_BOUNDS = [126.832902, 37.535157, 126.889575, 37.580275];
+const MAP_CENTER = [126.86125, 37.55772];
+// 지도 글자: 한글은 기기 글꼴로 그리고, 라틴 글자와 기호는 구운 글꼴(MapMedium)을 쓴다
+const MAP_FONT = "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
+// MapLibre 기본 영어 문구를 한국어로 (키는 maplibre-gl 4.7.1의 defaultLocale에서 확인)
+const MAP_LOCALE = {
+  "AttributionControl.ToggleAttribution": "지도 자료 표기 펴고 접기", "AttributionControl.MapFeedback": "지도 의견 보내기",
+  "FullscreenControl.Enter": "전체 화면", "FullscreenControl.Exit": "전체 화면 끝내기",
+  "GeolocateControl.FindMyLocation": "내 위치 찾기", "GeolocateControl.LocationNotAvailable": "위치를 알 수 없습니다",
+  "LogoControl.Title": "MapLibre 로고", "Map.Title": "지도", "Marker.Title": "지도 표식",
+  "NavigationControl.ResetBearing": "북쪽이 위로 오게", "NavigationControl.ZoomIn": "확대", "NavigationControl.ZoomOut": "축소",
+  "Popup.Close": "말풍선 닫기", "ScaleControl.Feet": "ft", "ScaleControl.Meters": "m", "ScaleControl.Kilometers": "km",
+  "ScaleControl.Miles": "mi", "ScaleControl.NauticalMiles": "nm",
+  "TerrainControl.Enable": "지형 켜기", "TerrainControl.Disable": "지형 끄기",
+  "CooperativeGesturesHandler.WindowsHelpText": "Ctrl 키를 누른 채 휠을 굴리면 지도가 커지고 작아집니다",
+  "CooperativeGesturesHandler.MacHelpText": "⌘ 키를 누른 채 휠을 굴리면 지도가 커지고 작아집니다",
+  "CooperativeGesturesHandler.MobileHelpText": "두 손가락으로 지도를 움직입니다",
+};
+const MAP_ATTRIBUTION = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> '
+  + '<a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> '
+  + '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 기여자</a>';
+// new maplibregl.Map에 같이 넘길 값: 범위, 배율, 한국어 문구, 한글 글꼴
+const mapOptions = (extra = {}) => ({ minZoom: 13, maxZoom: 19, maxBounds: MAP_BOUNDS, locale: MAP_LOCALE,
+  localIdeographFontFamily: MAP_FONT, ...extra });
+
+// 지도 배경: 저장소에 구운 벡터 타일(vendor/base, z13~14)로 도로, 물, 공원, 철도, 지명, 도로 이름만 그린다.
+// 타일에 건물, 상호(poi), 번지(housenumber) 층은 없다. 색은 style.css의 --map-* 토큰이라 화면 밝기를 따른다.
+// 우리 층(건물 등)을 글자 아래에 넣으려면 beforeId로 "base-road-label"을 준다
 function baseStyle() {
-  const dark = darkMode();
+  const name = ["coalesce", ["get", "name:ko"], ["get", "name"]];
+  const road = (id, cls, color, w) => ({ id, type: "line", source: "base", "source-layer": "transportation",
+    filter: ["in", ["get", "class"], ["literal", cls]], layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": css(color), "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 12, w[0], 18, w[1]] } });
+  const label = (id, layer, color, size, more = {}) => ({ id, type: "symbol", source: "base", "source-layer": layer, ...more,
+    layout: { "text-field": name, "text-font": ["MapMedium"], "text-size": size, ...(more.layout || {}) },
+    paint: { "text-color": css(color), "text-halo-color": css("--map-halo"), "text-halo-width": 1.5 } });
   return {
-    version: 8, sources: {
-      osm: { type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 19,
-             attribution: "© OpenStreetMap contributors" },
-    },
+    version: 8, glyphs: VENDOR + "glyphs/{fontstack}/{range}.pbf",
+    sources: { base: { type: "vector", tiles: [VENDOR + "base/{z}/{x}/{y}.pbf"], minzoom: 13, maxzoom: 14, bounds: MAP_BOUNDS,
+      attribution: MAP_ATTRIBUTION } },
     layers: [
-      { id: "bg", type: "background", paint: { "background-color": dark ? "#0e1116" : "#f2f3f5" } },
-      // 밝기 최소값이 최대값보다 크면 밝기가 뒤집힌다 (다크 모드)
-      { id: "osm", type: "raster", source: "osm", paint: dark
-          ? { "raster-saturation": -1, "raster-brightness-min": 0.82, "raster-brightness-max": 0.06, "raster-contrast": -0.15 }
-          : { "raster-saturation": -1, "raster-brightness-min": 0.42, "raster-brightness-max": 1, "raster-contrast": -0.25 } },
+      { id: "base-bg", type: "background", paint: { "background-color": css("--map-land") } },
+      { id: "base-landuse", type: "fill", source: "base", "source-layer": "landuse",
+        filter: ["in", ["get", "class"], ["literal", ["residential", "suburb", "neighbourhood"]]], paint: { "fill-color": css("--map-residential") } },
+      { id: "base-landcover", type: "fill", source: "base", "source-layer": "landcover",
+        filter: ["in", ["get", "class"], ["literal", ["grass", "wood"]]], paint: { "fill-color": css("--map-wood"), "fill-opacity": 0.8 } },
+      { id: "base-park", type: "fill", source: "base", "source-layer": "park", paint: { "fill-color": css("--map-park") } },
+      { id: "base-water", type: "fill", source: "base", "source-layer": "water", paint: { "fill-color": css("--map-water") } },
+      { id: "base-waterway", type: "line", source: "base", "source-layer": "waterway", paint: { "line-color": css("--map-water"), "line-width": 2 } },
+      road("base-minor-case", ["minor", "service", "track", "path"], "--map-road-line", [0.6, 11]),
+      road("base-road2-case", ["tertiary", "secondary"], "--map-road-line", [2, 19]),
+      road("base-road1-case", ["primary", "trunk"], "--map-road-1-line", [3, 27]),
+      road("base-motorway-case", ["motorway"], "--map-motorway-line", [3.5, 31]),
+      road("base-minor", ["minor", "service", "track"], "--map-road", [0.3, 8.5]),
+      road("base-road2", ["tertiary", "secondary"], "--map-road-2", [1.3, 16]),
+      road("base-road1", ["primary", "trunk"], "--map-road-1", [2, 23]),
+      road("base-motorway", ["motorway"], "--map-motorway", [2.5, 27]),
+      { ...road("base-rail", ["rail", "transit"], "--map-rail", [0.7, 2.4]),
+        paint: { "line-color": css("--map-rail"), "line-width": 1.6, "line-dasharray": [3, 2] } },
+      label("base-road-label", "transportation_name", "--map-text-2", 12, { minzoom: 14, layout: { "symbol-placement": "line" } }),
+      label("base-water-label", "water_name", "--map-water-text", 13),
+      label("base-place-label", "place", "--map-text", 13),
     ],
   };
+}
+// 화면 밝기가 바뀌면 배경 층의 색만 바꾼다 (우리 층은 지우지 않는다)
+function restyleBase(map) {
+  for (const layer of baseStyle().layers) {
+    if (!map.getLayer(layer.id)) continue;
+    for (const [k, v] of Object.entries(layer.paint || {})) map.setPaintProperty(layer.id, k, v);
+  }
 }
 
 // 위 막대의 로고 (지도 핀 안에 그래프 점 셋)

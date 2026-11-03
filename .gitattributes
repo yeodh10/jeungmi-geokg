@@ -1,0 +1,4 @@
+# 이 컴퓨터는 core.autocrlf=true라 줄바꿈 변환이 바이너리 타일과 글꼴을 깨뜨릴 수 있다
+*.pbf binary
+# 받아 온 라이브러리는 받은 바이트 그대로 둔다
+web/vendor/maplibre-gl-4.7.1/* -text

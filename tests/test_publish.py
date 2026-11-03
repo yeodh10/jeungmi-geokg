@@ -100,7 +100,7 @@ def check_real_site() -> None:
     assert site_problems(OUT, hold, set()) == []
     kinds = {p.name for p in (OUT / "id").iterdir() if p.is_dir()}
     assert not kinds & {"basemap", "digital-map", "road-segment", "public-facility"}, kinds
-    page = (OUT / "index.html").read_text(encoding="utf-8")
+    page = (OUT / "about" / "index.html").read_text(encoding="utf-8")  # 첫 화면(/)은 지도 앱이고 공개 범위 글은 소개에 있다
     assert "확인하는 중" not in page and "기본측량성과" in page
     assert re.search(r"id/building/[0-9]{25}", (OUT / "id" / "building" / "index.html").read_text(encoding="utf-8"))
     assert SITE.endswith("/jeungmi-geokg")
