@@ -36,7 +36,7 @@ def main() -> None:
 
     from src.graph import build_graph, check_queries, interop, publish, validate
     from src.ingest import clip_area, unpack
-    from src.model import build_objects, build_sensors
+    from src.model import build_business, build_objects, build_sensors
 
     report = {"steps": []}
     t0 = time.perf_counter()
@@ -46,11 +46,16 @@ def main() -> None:
     step("객체 쪼개기와 URI 붙이기", build_objects.main, report)
     if (ROOT / "data" / "raw" / "sdot" / "location.xlsx").exists():
         step("센서와 관측 (S-DoT, SOSA)", build_sensors.main, report)
+    has_sbiz = any((ROOT / "data" / "raw" / "sbiz").glob("*서울*.csv")) or any((ROOT / "data" / "raw" / "_archives").glob(build_business.ARCHIVE_GLOB))
+    if has_sbiz:
+        step("상호 (소상공인 상가정보, 건물과 필지에 잇기)", lambda: print(build_business.build()), report)
     step("GeoSPARQL 그래프 만들기", build_graph.main, report)
     step("예시 SPARQL 쿼리 확인", check_queries.main, report)
     step("SHACL 데이터 규칙 검사", validate.main, report)
     step("상호운용성 검사 (바깥 주소 확인은 python -m src.graph.interop)", lambda: _interop_offline(interop), report)
     step("URI 공개 페이지 만들기", publish.main, report)
+    if has_sbiz:  # publish가 site 폴더를 새로 만들므로 그 뒤에 쓴다
+        step("공개 지도의 상호 찾기 자료", lambda: print(build_business.write_site()), report)
     report["seconds"] = round(time.perf_counter() - t0, 1)
 
     objects = json.loads((PROC / "objects_report.json").read_text(encoding="utf-8"))
@@ -67,6 +72,11 @@ def main() -> None:
     if sensors.exists():
         s = json.loads(sensors.read_text(encoding="utf-8"))
         report["summary"] |= {"센서": s["sensors_in_area"], "관측": s["observations"]}
+    biz = PROC / "business.csv"
+    if has_sbiz and biz.exists():
+        import pandas as pd
+        b = pd.read_csv(biz, dtype=str, keep_default_na=False)
+        report["summary"] |= {"상호": len(b), "공개 상호": int((b["public"] == "True").sum())}
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))
     print("결과: data/processed/ (그래프 jeungmi_geokg.ttl, 검사 validation_report.md, 쿼리 query_check.md, 페이지 site/)")

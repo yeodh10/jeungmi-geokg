@@ -31,9 +31,9 @@ jgks:Retired a sh:NodeShape ;
         sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 SELECT $this WHERE { $this jgk:status jgk:Retired . FILTER NOT EXISTS { $this jgk:retiredOn ?d } }""" ] .
 
-# 모양이 있는 객체(필지, 행정동 제외): 기본 모양이 정확히 하나
+# 모양이 있는 객체(필지, 행정동 제외. 상호는 원천의 경도, 위도 점): 기본 모양이 정확히 하나
 jgks:HasGeometry a sh:NodeShape ;
-    sh:targetClass jgk:Building, jgk:BuildingEntrance, jgk:PublicFacility, jgk:Station, jgk:Sensor ;
+    sh:targetClass jgk:Building, jgk:BuildingEntrance, jgk:PublicFacility, jgk:Station, jgk:Sensor, jgk:Business ;
     sh:property [ sh:path geo:hasDefaultGeometry ; sh:minCount 1 ; sh:maxCount 1 ; sh:class geo:Geometry ;
                   sh:message "기본 모양(geo:hasDefaultGeometry)이 정확히 하나 있어야 한다"@ko ] .
 
@@ -156,6 +156,33 @@ jgks:Station a sh:NodeShape ;
 jgks:AdminDong a sh:NodeShape ;
     sh:targetClass jgk:AdminDong ;
     sh:property [ sh:path jgk:admDongCode ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{10}$" ] .
+
+# 상호 (소상공인 상가정보): 상가업소번호 하나, 이름 하나, 건물이나 필지 가운데 하나에만 잇고 이은 방법을 적는다
+jgks:Business a sh:NodeShape ;
+    sh:targetClass jgk:Business ;
+    sh:property [ sh:path jgk:businessNo ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9A-Z]{20}$" ;
+                  sh:message "상가업소번호는 숫자와 영문 대문자 20자리 하나여야 한다"@ko ] ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ; sh:maxCount 1 ; sh:message "상호 이름은 정확히 하나여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:categoryLarge ; sh:minCount 1 ; sh:maxCount 1 ; sh:message "상권업종 대분류는 정확히 하나여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:categoryMiddle ; sh:maxCount 1 ] ;
+    sh:property [ sh:path jgk:categorySmall ; sh:maxCount 1 ] ;
+    sh:property [ sh:path jgk:floorInfo ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path jgk:roadAddress ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path jgk:inBuilding ; sh:maxCount 1 ; sh:class jgk:Building ;
+                  sh:message "들어 있는 건물은 하나까지이고 그래프의 건물이어야 한다"@ko ] ;
+    sh:property [ sh:path jgk:onParcel ; sh:maxCount 1 ; sh:class jgk:Parcel ;
+                  sh:message "있는 필지는 하나까지이고 그래프의 필지여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:linkedBy ; sh:maxCount 1 ; sh:in ( "건물관리번호" "PNU" "필지만" ) ;
+                  sh:message "이은 방법은 건물관리번호, PNU, 필지만 가운데 하나여야 한다"@ko ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "이은 방법과 이은 대상이 맞지 않는다 (건물관리번호, PNU는 건물에만, 필지만은 필지에만)"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+SELECT $this WHERE {
+  { $this jgk:inBuilding ?b ; jgk:onParcel ?p }
+  UNION { $this jgk:linkedBy ?how . FILTER (?how IN ("건물관리번호", "PNU")) FILTER NOT EXISTS { $this jgk:inBuilding ?b } }
+  UNION { $this jgk:linkedBy "필지만" . FILTER NOT EXISTS { $this jgk:onParcel ?p } }
+  UNION { $this jgk:inBuilding|jgk:onParcel ?x . FILTER NOT EXISTS { $this jgk:linkedBy ?how } }
+}""" ] .
 
 # 고시: 표제, 고시일, 출처, 구역 종류는 하나씩. 같은 번호의 다른 글이 값을 덧붙이지 못하게 한다
 jgks:Notice a sh:NodeShape ;

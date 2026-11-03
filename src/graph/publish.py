@@ -71,6 +71,8 @@ KINDS = {
     "basic-zone": ("기초구역", "국가기초구역번호(5자리, 우편번호와 같다)를 그대로 쓴다."),
     "notice": ("고시공고", "구청 고시 번호(시군구코드-연도-번호)를 그대로 쓴다."),
     "sensor": ("센서", "서울시 도시데이터 센서(S-DoT)의 모델 시리얼을 그대로 쓴다."),
+    "business": ("상호", "소상공인시장진흥공단 상가업소번호(20자리)를 그대로 쓴다. 2026년 9월 기준 자료라 문을 닫거나 새로 연 가게와 다를 수 있다. "
+                 "영업시간, 전화번호, 리뷰는 이 자료에 없다."),
     "observation": ("관측", "센서 시리얼, 측정 시각(연월일시분 12자리), 측정 항목을 이었다. 한 센서가 한 시각에 한 항목은 한 번만 잰다."),
     "proposal": ("변경 제안", "변경 제안 번호다. 승인된 제안만 그래프에 들어온다."),
 }
@@ -79,6 +81,7 @@ KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "floorsBe
              "facilityType", "agencyName", "agencyCode", "entranceType", "buildingMgtNo", "gisBuildingId", "pnu",
              "roadCode", "legalDongCode", "basicZoneNo", "admDongCode", "siteArea", "totalFloorArea", "households",
              "mainBuildingCount", "complexMainUse", "retiredOn", "noticeNumber", "zoneKind",
+             "businessNo", "branchName", "categoryLarge", "categoryMiddle", "categorySmall", "floorInfo", "linkedBy",
              "sensorSerial", "sensorModel", "installAddress", "installArea", "addressBuildingDistance", "hasSimpleResult", "resultTime"]
 PRINCIPLES = [
     ("객체 원자화", "건물, 출입구, 필지, 도로, 행정구역, 공공시설을 각각 하나의 객체로 쪼개고 모양(Geometry)은 따로 둡니다."),
@@ -157,6 +160,34 @@ def public_nodes(triples: dict, hold: set[str], given: dict[str, set[str]] | Non
         return bool(found) and all(known(s, x) for x in found) and (up is None or allowed(up))
 
     return {s for s in triples if s.startswith(BASE + "/") and allowed(s)}
+
+
+def private_businesses(triples: dict) -> set[str]:
+    """공개 사이트에 내지 않는 상호와 그 모양 노드. 주택 건물 안 업체는 개인 집 주소일 수 있어서다.
+
+    규칙은 config/area.yaml의 publish.business이고 판단은 화면 자료와 같은 함수(src.model.build_business.is_public)로 한다.
+    필지에만 이은 상호는 그 필지 위 모든 건물의 용도를 본다.
+    """
+    from src.model.build_business import is_public, load_rule
+    rule = load_rule()
+
+    def val(s, name):
+        return next((o.value for p, o in triples.get(s, []) if p.value == JGK + name), None)
+
+    lot_uses = defaultdict(list)
+    for s, plist in triples.items():
+        for p, o in plist:
+            if p.value == JGK + "locatedOn":
+                lot_uses[o.value].append(val(s, "useName"))
+    out = set()
+    for s, plist in triples.items():
+        if not any(p.value == RDF_TYPE and o.value == JGK + "Business" for p, o in plist):
+            continue
+        b, lot = val(s, "inBuilding"), val(s, "onParcel")
+        uses = [val(b, "useName")] if b else lot_uses.get(lot, [])
+        if not is_public(uses, val(s, "categoryLarge"), val(s, "floorInfo"), rule, linked=bool(b or lot)):
+            out |= {s, s + "/geometry"}
+    return out
 
 
 def site_problems(out: Path, hold: set[str], held: set[str]) -> list[str]:
@@ -260,7 +291,8 @@ def main() -> None:
             if p.value == JGK + "hasEntrance" and s in addrs:
                 addrs.setdefault(o.value, addrs[s] + " 출입구")
     obs_summary = observation_summary(triples)
-    pub = public_nodes(triples, hold, given)
+    private = private_businesses(triples)
+    pub = public_nodes(triples, hold, given) - private
     held = {s for s in triples if s.startswith(BASE + "/")} - pub
     shown = lambda u: not u.startswith(BASE + "/") or u in pub  # 우리 URI는 공개 목록에 있어야 보인다. 그래프에 없는 URI도 보이지 않는다
     pname = lambda p: labels.get(p) or EXT_LABEL.get(p) or p.rsplit("#", 1)[-1]
@@ -463,7 +495,8 @@ def main() -> None:
                                                  desc="증미역 반경 1km 공간 지식 그래프의 공개 객체 지도"), encoding="utf-8")
 
     # 전체 찾기용 목록 (이름이 있는 객체와 번호)
-    search = [[l or u.rsplit("/", 1)[-1], u[len(BASE) + 1:], KINDS.get(k, (k,))[0]] for k, rows in by_kind.items() for u, l, _ in rows]
+    # 상호는 지도의 상호 찾기(assets/map/business.geojson, src.model.build_business)가 맡아 첫 화면 자료를 가볍게 둔다
+    search = [[l or u.rsplit("/", 1)[-1], u[len(BASE) + 1:], KINDS.get(k, (k,))[0]] for k, rows in by_kind.items() if k != "business" for u, l, _ in rows]
     (assets / "search.json").write_text(json.dumps(search, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     # 어휘
@@ -494,7 +527,7 @@ def main() -> None:
 
     # 첫 화면
     counts = {k: len(v) for k, v in by_kind.items()}
-    order = ["building", "building-gis", "entrance", "parcel", "road", "legal-dong", "admin-dong", "basic-zone", "station", "sensor", "observation", "notice", "proposal"]
+    order = ["building", "building-gis", "entrance", "parcel", "road", "legal-dong", "admin-dong", "basic-zone", "station", "sensor", "observation", "business", "notice", "proposal"]
     kind_cards = "".join(f'<a class="kcard card" href="{SITE_PATH}/id/{k}/"><span class="kn">{counts[k]:,}</span><span class="kl">{e(KINDS.get(k, (k,))[0])}</span></a>'
                          for k in order + sorted(set(counts) - set(order)) if k in counts)
     principles = "".join(f'<div class="pcard card"><span class="pn">{i}</span><h3>{e(t)}</h3><p>{e(x)}</p></div>' for i, (t, x) in enumerate(PRINCIPLES, 1))
@@ -540,7 +573,8 @@ def main() -> None:
 <div><h2>공개 범위</h2><p class="small">{e(HOLD_NOTE)} 출처를 알 수 없는 노드도 넣지 않고, 승인한 변경은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹습니다.</p></div></section>"""
     (OUT / "index.html").write_text(page("처음", body, nav="", desc="증미역 반경 1km 공간 지식 그래프의 URI 사이트"), encoding="utf-8")
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
-    report = {"pages": n, "held": len([h for h in held if not h.endswith('/geometry')]), "by_kind": counts}
+    report = {"pages": n, "held": len([h for h in held if not h.endswith('/geometry')]),
+              "business_not_public": len([h for h in private if not h.endswith("/geometry")]), "by_kind": counts}
     (OUT / "publish_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     problems = site_problems(OUT, hold, held)
     if problems:

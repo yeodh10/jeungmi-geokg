@@ -29,6 +29,10 @@ jgk:LegalDong rdfs:subClassOf schema:Place .
 jgk:BasicZone rdfs:subClassOf schema:Place .
 jgk:PublicFacility rdfs:subClassOf schema:Place .
 jgk:Station rdfs:subClassOf schema:SubwayStation .
+jgk:Business rdfs:subClassOf schema:LocalBusiness .
+jgk:businessNo rdfs:subPropertyOf schema:identifier .
+jgk:inBuilding rdfs:subPropertyOf schema:containedInPlace .
+jgk:onParcel rdfs:subPropertyOf schema:containedInPlace .
 jgk:roadAddress rdfs:subPropertyOf schema:address .
 jgk:installAddress rdfs:subPropertyOf schema:address .
 jgk:buildingMgtNo rdfs:subPropertyOf schema:identifier .
@@ -68,6 +72,7 @@ jgk:Sensor skos:closeMatch wd:Q167676 .
 # 화면에 보일 이름
 schema:Place rdfs:label "장소(schema.org)"@ko .
 schema:SubwayStation rdfs:label "지하철역(schema.org)"@ko .
+schema:LocalBusiness rdfs:label "지역 업소(schema.org)"@ko .
 schema:address rdfs:label "주소(schema.org)"@ko .
 schema:identifier rdfs:label "식별자(schema.org)"@ko .
 schema:containedInPlace rdfs:label "속한 장소(schema.org)"@ko .

@@ -78,6 +78,12 @@ def digital_map_feature(ufid: str) -> str:
     return f"{BASE}/digital-map/{ufid}"
 
 
+def business(store_no: str) -> str:
+    """소상공인시장진흥공단 상가업소번호 20자리. 예: MA0101202310A0001390"""
+    assert len(store_no) == 20 and store_no.isascii() and store_no.isalnum(), store_no
+    return f"{BASE}/business/{store_no}"
+
+
 def geometry(feature_uri: str) -> str:
     return f"{feature_uri}/geometry"
 

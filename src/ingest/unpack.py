@@ -1,6 +1,7 @@
 """data/raw/_archives/에 보관한 원본 압축 파일을 정해진 폴더로 푼다.
 
-실행: python -m src.ingest.unpack
+실행: python -m src.ingest.unpack              (모두)
+      python -m src.ingest.unpack --only sbiz    (풀 폴더 이름이 sbiz로 시작하는 것만)
 다른 컴퓨터에서 이어 할 때 _archives 폴더만 옮겨 오면 이 스크립트로 data/raw/를 다시 만들 수 있다.
 .7z 파일은 7-Zip(7z.exe)이 필요하다. 없으면 `pip install py7zr`로 대신 푼다.
 """
@@ -30,6 +31,8 @@ PLAN = [
     ("(B010)수치지도_*.zip", "ngii_digital_map/{sheet}", None),
     # 국토정보플랫폼 국가기본도 (사용자 정의 영역). 레이어마다 압축이 하나씩 들어 있어 레이어 이름 폴더로 푼다
     ("(B022)국가기본도*.zip", "ngii_basemap", "nested"),
+    # 소상공인시장진흥공단 상가(상권)정보. 시도별 CSV 가운데 서울 것만 푼다 (src/model/build_business.py)
+    ("소상공인시장진흥공단_상가(상권)정보_*.zip", "sbiz", ["*서울*.csv"]),
     # 도로명주소 한글(주소DB)은 보류 중이라 풀지 않는다 (docs/decisions.md)
 ]
 
@@ -109,10 +112,13 @@ def unpack_7z(src: Path, dest: Path, patterns: list[str] | None) -> list[str]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw-dir", type=Path, default=ROOT / "data" / "raw")
+    ap.add_argument("--only", help="풀 폴더 이름이 이 글자로 시작하는 항목만 푼다 (예: sbiz)")
     args = ap.parse_args()
     archives = ROOT / "data" / "raw" / "_archives"
 
     for pattern, folder, files in PLAN:
+        if args.only and not folder.startswith(args.only):
+            continue
         found = sorted(archives.glob(pattern))
         if not found:
             print(f"[없음] {pattern} -> _archives에 넣어 주세요 (docs/data-sources.md)")

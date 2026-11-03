@@ -33,6 +33,8 @@ jgk:Road a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로"@ko ;
 jgk:LegalDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "법정동"@ko .
 jgk:BasicZone a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "기초구역"@ko ;
     rdfs:comment "국가기초구역. 번호 5자리는 우편번호와 같다."@ko .
+jgk:Business a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "상호"@ko ;
+    rdfs:comment "소상공인시장진흥공단 상가(상권)정보의 업소 한 행. 번호는 상가업소번호(20자리)다. 같은 가게가 두 이름으로 두 행일 때도 원천 행을 그대로 둔다. 모양은 원천의 경도, 위도 점이다. 영업시간, 전화, 리뷰는 이 자료에 없다."@ko .
 
 # 국가기본도(수치지도) 지형지물 분류
 # 수치지도 작성 작업규칙(국토교통부령) 제9조 제2항의 대분류 8개. 세분류는 국토지리정보원장이 정한다(같은 조 제3항).
@@ -158,6 +160,22 @@ jgk:floorsAbove a owl:DatatypeProperty ; rdfs:label "지상층수"@ko ; rdfs:ran
 jgk:floorsBelow a owl:DatatypeProperty ; rdfs:label "지하층수"@ko ; rdfs:range xsd:integer .
 jgk:entranceType a owl:DatatypeProperty ; rdfs:label "출입구 유형"@ko ; rdfs:range xsd:string .
 
+# 상호 (소상공인 상가정보). 이름은 rdfs:label, 주소는 jgk:roadAddress를 함께 쓴다. 값의 가운뎃점은 쉼표로 바꿔 넣었다
+
+jgk:businessNo a owl:DatatypeProperty ; rdfs:label "상가업소번호"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string .
+jgk:branchName a owl:DatatypeProperty ; rdfs:label "지점명"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string .
+jgk:categoryLarge a owl:DatatypeProperty ; rdfs:label "상권업종 대분류"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string .
+jgk:categoryMiddle a owl:DatatypeProperty ; rdfs:label "상권업종 중분류"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string .
+jgk:categorySmall a owl:DatatypeProperty ; rdfs:label "상권업종 소분류"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string .
+jgk:floorInfo a owl:DatatypeProperty ; rdfs:label "층 정보"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string ;
+    rdfs:comment "원천 값 그대로('1', '지', 'B1' 등). 값이 없는 행이 많고, 없으면 넣지 않는다."@ko .
+jgk:inBuilding a owl:ObjectProperty ; rdfs:label "들어 있는 건물"@ko ; rdfs:domain jgk:Business ; rdfs:range jgk:Building ;
+    rdfs:comment "상가정보의 건물관리번호가 같은 건물, 그것이 없으면 PNU가 같은 건물이 하나뿐일 때 그 건물. 어떻게 이었는지는 jgk:linkedBy에 적는다."@ko .
+jgk:onParcel a owl:ObjectProperty ; rdfs:label "있는 필지"@ko ; rdfs:domain jgk:Business ; rdfs:range jgk:Parcel ;
+    rdfs:comment "건물을 하나로 정할 수 없을 때(PNU가 같은 건물이 여럿) 상가정보의 PNU로 필지에만 잇는다."@ko .
+jgk:linkedBy a owl:DatatypeProperty ; rdfs:label "이은 방법"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string ;
+    rdfs:comment "'건물관리번호', 'PNU'(필지의 건물이 하나), '필지만' 가운데 하나."@ko .
+
 # 필지에 붙이는 단지 정보 (건축물대장 총괄표제부)
 
 jgk:siteArea a owl:DatatypeProperty ; rdfs:label "대지면적(㎡)"@ko ; rdfs:range xsd:decimal .
@@ -276,6 +294,12 @@ jgk:dataset-sdot a jgk:Dataset ;
     rdfs:label "서울시 스마트서울 도시데이터 센서(S-DoT) 환경정보 (설치 위치 2026-03-11, 관측 2026-10-12~18)"@ko ;
     dcterms:license "공공누리 제1유형 (출처표시)"@ko ;
     dcterms:source <https://data.seoul.go.kr/dataList/OA-15969/S/1/datasetView.do> .
+jgk:dataset-sbiz-store a jgk:Dataset ;
+    dcterms:title "소상공인시장진흥공단 상가(상권)정보 (서울, 2026년 9월 기준)"@ko ;
+    rdfs:label "소상공인시장진흥공단 상가(상권)정보 (서울, 2026년 9월 기준)"@ko ;
+    rdfs:comment "분기마다 바뀐다. 기준일 뒤에 문을 닫거나 새로 연 가게와 다를 수 있다. 주택 건물 안 업체는 1층이나 지하의 손님이 찾아오는 업종만 공개 사이트에 낸다(config/area.yaml)."@ko ;
+    dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
+    dcterms:source <https://www.data.go.kr/data/15083033/fileData.do> .
 jgk:dataset-gangseo-notice a jgk:Dataset ;
     dcterms:title "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;
     rdfs:label "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;

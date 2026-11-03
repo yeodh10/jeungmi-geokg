@@ -1,7 +1,7 @@
 """객체를 GeoSPARQL 1.1 그래프(Turtle)로 만든다.
 
 실행: python -m src.graph.build_graph
-입력: src.model.build_objects 결과 (data/processed/objects.gpkg 등)
+입력: src.model.build_objects 결과 (data/processed/objects.gpkg 등), src.model.build_business 결과 (business.csv)
 출력: data/processed/jeungmi_geokg.ttl (어휘는 src/graph/ontology.ttl에 따로 있다)
 """
 from __future__ import annotations
@@ -35,6 +35,7 @@ DATASET_EMAP = JGK["dataset-juso-emap"]
 DATASET_NGII = JGK["dataset-ngii-digital-map"]
 DATASET_KBM = JGK["dataset-ngii-basemap"]
 DATASET_SDOT = JGK["dataset-sdot"]
+DATASET_SBIZ = JGK["dataset-sbiz-store"]
 SOURCE_OF = {"navi": DATASET_NAVI, "emap": DATASET_EMAP, "gis": DATASET_GIS, "register": DATASET_REGISTER}
 
 
@@ -205,6 +206,34 @@ def add_sensors(g: Graph, proc: Path) -> None:
         g.add((sensor, SOSA.observes, prop))
 
 
+def add_business(g: Graph, proc: Path) -> None:
+    """상호(소상공인 상가정보, src.model.build_business 결과). 원천 행 하나가 객체 하나다.
+
+    공개 여부(주택 건물 안 업체)는 그래프에 적지 않는다. 공개 사이트가 건물 용도, 층, 대분류로 그때 고른다 (src.graph.publish).
+    """
+    path = proc / "business.csv"
+    if not path.exists():
+        return
+    for r in pd.read_csv(path, dtype=str, keep_default_na=False).itertuples():
+        s = URIRef(r.uri)
+        add_feature(g, s, JGK.Business, "Active")
+        add(g, s, JGK.businessNo, r.store_no)
+        add(g, s, RDFS.label, r.name, lang="ko")
+        add(g, s, JGK.branchName, r.branch)
+        add(g, s, JGK.categoryLarge, r.cat_large)
+        add(g, s, JGK.categoryMiddle, r.cat_middle)
+        add(g, s, JGK.categorySmall, r.cat_small)
+        add(g, s, JGK.floorInfo, r.floor)
+        add(g, s, JGK.roadAddress, r.road_address)
+        if r.building_uri:
+            g.add((s, JGK.inBuilding, URIRef(r.building_uri)))
+        if r.parcel_uri:
+            g.add((s, JGK.onParcel, URIRef(r.parcel_uri)))
+        add(g, s, JGK.linkedBy, r.linked_by)
+        g.add((s, DCTERMS.source, DATASET_SBIZ))
+        add_geometry(g, s, shapely.Point(float(r.lon), float(r.lat)))
+
+
 def build(proc: Path = PROC) -> Graph:
     """proc 폴더의 객체 파일(src.model.build_objects 결과)로 그래프를 만든다."""
     gpkg = proc / "objects.gpkg"
@@ -308,6 +337,7 @@ def build(proc: Path = PROC) -> Graph:
     add_emap(g, proc)
     add_maps(g, proc)
     add_sensors(g, proc)
+    add_business(g, proc)
     return g
 
 
