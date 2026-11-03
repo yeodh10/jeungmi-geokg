@@ -74,7 +74,7 @@ def check_uri_injection(c, review_app) -> None:
     try:
         for bad in ["not a uri", BASE + "/x>", "http://a b", service, "ftp://example.com/a", f"{BASE}/x\nSERVICE"]:
             r = c.get("/api/feature", params={"uri": bad})
-            assert r.status_code == 400 and r.json()["detail"] == "올바른 URI가 아니다", (bad, r.text)
+            assert r.status_code == 400 and r.json()["detail"] == "올바른 URI가 아닙니다", (bad, r.text)
         # 형식이 맞는 주소는 그래프에서 찾아볼 뿐 그 주소로 요청하지 않는다
         r = c.get("/api/feature", params={"uri": f"http://127.0.0.1:{port}/sparql"})
         assert r.status_code == 200 and not r.json()["in_graph"], r.text
@@ -186,7 +186,7 @@ def check_concurrency(tmp: Path, review_app) -> str:
     for t in threads:
         t.join()
     assert sorted(code for code, _ in results.values()) == [200, 409], results
-    assert any(d in ("이미 승인된 제안이다", "이미 반려된 제안이다") for _, d in results.values()), results
+    assert any(d in ("이미 승인된 제안입니다", "이미 반려된 제안입니다") for _, d in results.values()), results
     return pid if results["approved"][0] == 200 else ""
 
 
@@ -362,9 +362,9 @@ def check_correction(c, tmp: Path, review_app) -> None:
 
     pending = next(p for p in ps.load() if p.status == "pending")
     r = post(pending.id, to="approved", reason="x")
-    assert r.status_code == 409 and r.json()["detail"] == "아직 결정하지 않은 제안이다", r.text
+    assert r.status_code == 409 and r.json()["detail"] == "아직 결정하지 않은 제안입니다", r.text
     x = next(p for p in ps.load() if p.status == "approved" and p.decision.reviewer == "묶음 검토자")
-    assert post(x.id, to="pending").json()["detail"] == "정정 사유가 필요하다"
+    assert post(x.id, to="pending").json()["detail"] == "정정 사유를 입력해 주세요"
     assert post(x.id, to="approved", reason="x").status_code == 409  # 이미 승인된 제안
 
     # 반려를 승인으로: SHACL을 어기면 막는다 (같은 건물을 다시 사용으로 두는 시험 제안)

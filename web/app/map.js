@@ -18,7 +18,7 @@ export function createMap(container, view) {
   if (typeof maplibregl === "undefined") throw new Error("지도 라이브러리를 받지 못했습니다");
   const map = new maplibregl.Map(mapOptions({
     container, style: baseStyle(), center: view.center, zoom: view.zoom,
-    attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 60,
+    attributionControl: false, dragRotate: false, pitchWithRotate: true, touchPitch: false, maxPitch: 60,   // 회전, 기울이기는 층수 입체 보기에서만 연다 (themes.js)
     fadeDuration: reduced() ? 0 : 200,
   }));
   map.touchZoomRotate.disableRotation();
@@ -199,7 +199,7 @@ export function createMapApi(ctx, map) {
     // 1. 배율 16 미만이면 누른 자리의 글자를 먼저 본다
     if (!cands.length && map.getZoom() < 16) q([...LABEL_LAYERS, "station-label", "station"], box(point, 4)).forEach(f => push(pick(f)));
     // 2. 누른 자리의 건물 면
-    if (!cands.length) q(["bldg-fill"], point).forEach(f => push(pick(f)));
+    if (!cands.length) q(["bldg-3d", "bldg-fill"], point).forEach(f => push(pick(f)));   // 입체 보기면 세운 건물을 먼저 본다
     // 3. 12px 안에서 가장 가까운 점이나 글자
     const near = q(NEAR, box(point, 12)).map(f => {
       const c = f.geometry.type === "Point" ? map.project(f.geometry.coordinates) : point;
@@ -229,10 +229,13 @@ export function createMapApi(ctx, map) {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        const hit = map.queryRenderedFeatures(box(e.point, 3), { layers: has(["marker", "bldg-fill", "bldg-pt", ...LABEL_LAYERS, "station", "station-label"]) }).length;
+        const hit = map.queryRenderedFeatures(box(e.point, 3), { layers: has(["marker", "bldg-3d", "bldg-fill", "bldg-pt", ...LABEL_LAYERS, "station", "station-label"]) }).length;
         map.getCanvas().style.cursor = hit ? "pointer" : "";
+        hover(e);
       });
     });
+    map.on("mouseout", () => tip.remove());
+    map.on("movestart", () => tip.remove());
     let moveTimer = 0;
     map.on("moveend", () => {
       const b = map.getBounds(), c = map.getCenter(), z = map.getZoom();
@@ -240,6 +243,25 @@ export function createMapApi(ctx, map) {
       clearTimeout(moveTimer);   // 주소창 배율과 위치는 움직임이 멎고 300ms 뒤에 한 번 덮어쓴다
       moveTimer = setTimeout(() => ctx.state.set({ z: z.toFixed(2), c: `${c.lng.toFixed(6)},${c.lat.toFixed(6)}` }, { silent: true }), 300);
     });
+  }
+
+  // ---- 마우스를 올린 건물의 말풍선: 누르지 않아도 이름, 종류, 층수를 본다. 마우스가 있는 화면에서만 쓴다
+  const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, maxWidth: "260px", className: "hover-tip" });
+  const canHover = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  let tipPath = null;
+  function hover(e) {
+    if (!canHover || !data) return;
+    const f = map.queryRenderedFeatures(box(e.point, 2), { layers: has(["bldg-3d", "bldg-fill", "bldg-pt"]) })[0];
+    const p = f && typeof f.properties.i === "number" ? data.byIndex[f.properties.i] : null;
+    if (!p) { tip.remove(); tipPath = null; return; }
+    if (tipPath !== p.p) {
+      tipPath = p.p;
+      const use = (data.useGroups || []).find(g => g.key === p.ug);
+      const bits = [use ? use.label : null, p.fa ? `지상 ${p.fa}층` : null, { "주소 미연결": "도로명주소 없는 건물", "폐지": "폐지된 건물" }[p.s] || null].filter(Boolean);
+      tip.setHTML(`<b>${esc(p.n)}</b>${bits.length ? `<span>${esc(bits.join(", "))}</span>` : ""}`);
+    }
+    tip.setLngLat(e.lngLat);
+    if (!tip.isOpen()) tip.addTo(map);
   }
 
   // 고른 장소의 글자(sel-label)를 그릴 때 그 장소의 평소 글자를 숨긴다. 묶음은 묶음 글자(k=g), 장소는 자기 글자(k=p)
@@ -288,8 +310,9 @@ export function createMapApi(ctx, map) {
       const b = new maplibregl.LngLatBounds(c[0], c[0]);
       c.forEach(x => b.extend(x));
       const one = b.getNorthEast().distanceTo(b.getSouthWest()) < 60;
+      // 입체 보기에서 돌려 둔 방위각과 기울기를 지킨다 (fitBounds는 bearing을 주지 않으면 북쪽으로 돌린다)
       if (one) map.easeTo({ center: b.getCenter(), zoom: Math.max(map.getZoom(), minZoom + 1), duration: dur(400) });
-      else map.fitBounds(b, { padding: 48, maxZoom, duration: dur(400) });
+      else map.fitBounds(b, { padding: 48, maxZoom, duration: dur(400), bearing: map.getBearing(), pitch: map.getPitch() });
       return true;
     },
     // style: select(파랑, 고른 장소) 또는 graph(보라, 번짐). label이 {pt, text}면 고른 장소 글자를 늘 보이게 한다.

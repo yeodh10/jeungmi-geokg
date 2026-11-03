@@ -67,24 +67,35 @@ def check_near_same_address() -> None:
 
 
 def check_rules_on_data(df, proc) -> None:
-    """모양 규칙의 넓이와 층수 기준이 주소 잇기에도 걸린다. 모양 붙이기 겹침은 양쪽 모양 기준으로 잰다 (자리표시 모양은 빼고)."""
+    """모양 규칙의 넓이와 층수 기준이 주소 잇기에도 걸린다. 모양 붙이기 겹침은 양쪽 모양 기준으로 잰다.
+    같은 필지의 1㎡ 미만 자리표시만 빼고, 다른 필지의 자리표시는 겹침에 넣는다 (구현 함수를 쓰지 않고 따로 잰다)."""
     import geopandas as gpd
 
-    from src.model.build_objects import GIS_TINY_M2
-    from src.review.basemap_proposals import SHAPE_MAX_OVERLAP, SHAPE_MIN_AREA_M2, floor_gap, real_outlines, shape_candidates
+    from src.review.basemap_proposals import SHAPE_MAX_OVERLAP, SHAPE_MIN_AREA_M2, floor_gap, shape_candidates, worst_overlap
 
     b = gpd.read_file(proc / "objects.gpkg", layer="building").to_crs("EPSG:5186").set_index("uri")
     maps = gpd.read_file(proc / "objects.gpkg", layer="basemap_building").to_crs("EPSG:5186").set_index("uri")
     for r in df.itertuples():
         assert b.at[r.gis_uri, "geometry"].area >= SHAPE_MIN_AREA_M2 and maps.at[r.basemap_uri, "geometry"].area >= SHAPE_MIN_AREA_M2, r
         assert not floor_gap(b.at[r.building_uri, "floors_above"], maps.at[r.basemap_uri, "floors"]), r
-    polys = real_outlines(b).geometry.reset_index(drop=True)
-    assert polys.area.min() >= GIS_TINY_M2 and (b[b.geom_type != "Point"].area < GIS_TINY_M2).sum() > 0  # 실제 자료에 자리표시가 있다
+    polys = b[b.geom_type != "Point"].reset_index()
+    tiny = polys.area < 1
+    assert tiny.sum() > 0  # 실제 자료에 자리표시가 있다
+    skipped_tiny = 0
     for r in shape_candidates(proc)[0].itertuples():
         m = maps.at[r.map_uri, "geometry"]
-        for g in polys.iloc[polys.sindex.query(m, predicate="intersects")]:
+        for i in polys.sindex.query(m, predicate="intersects"):
+            g, same_lot_tiny = polys.geometry.iloc[i], bool(tiny.iloc[i]) and polys["pnu"].iloc[i] == r.pnu
             x = m.intersection(g).area
+            if same_lot_tiny:
+                skipped_tiny += 1
+                continue
             assert x / m.area <= SHAPE_MAX_OVERLAP and x / g.area <= SHAPE_MAX_OVERLAP, (r.map_uri, x, g.area)
+    assert skipped_tiny >= 1  # 같은 필지 자리표시를 빼는 경우가 실제로 있다
+    # 다른 필지의 자리표시는 재므로, 자리표시를 품은 모양은 100% 겹침으로 걸린다
+    from shapely.geometry import box
+    frame = gpd.GeoDataFrame({"uri": ["t"], "pnu": ["1"], "tiny": [True]}, geometry=[box(0, 0, 0.2, 0.2)], crs="EPSG:5186")
+    assert worst_overlap(box(-5, -5, 5, 5), frame, "1") == 0.0 and worst_overlap(box(-5, -5, 5, 5), frame, "2") == 1.0
 
 
 def check_floor_gap() -> None:
@@ -104,7 +115,9 @@ def check_audit(proc) -> None:
     picked = {f"rule-basemap-link-{u.rsplit('/', 1)[-1]}" for u in candidates(proc)["gis_uri"]}
     picked |= {f"rule-basemap-shape-{m}" for m in shape_candidates(proc)[0]["mgt"]}
     out = audit(proc)
-    assert set(out["id"]) == approved - picked and not picked - approved, (set(out["id"]) ^ (approved - picked), picked - approved)
+    outside = set(out.loc[out["reason"] != "지금 규칙으로 뽑으면 바꾸는 내용이 다르다", "id"])
+    assert outside == approved - picked and not picked - approved, (outside ^ (approved - picked), picked - approved)
+    assert out["id"].isin(approved).all(), out  # 내용이 다르다는 줄도 승인한 제안에만 붙는다
     assert not out["reason"].eq("다른 규칙").any(), out  # 까닭을 하나도 대지 못한 줄이 없어야 한다
 
 

@@ -2,7 +2,7 @@
 
 공개 뷰(src.graph.public.public_view)와 전체 뷰(local_view) 어느 쪽을 줘도 동작한다. 보이는 것(view.shown)만 쓰고 각자 보류 판단을 하지 않는다.
   build_places(view, built)      -> places.json 모양 (건물 행, 묶음, 길, 동네, 우편구역, 필지, 센서, 역, 칩, 찾기 낱말)
-  build_shapes(view, places)     -> shapes.geojson 모양 (면 건물만. properties: i, ug, fa, fb, y, yb)
+  build_shapes(view, places)     -> shapes.geojson 모양 (면 건물만. properties: i, ug, fa, fb, h(대장 높이 m), y, yb)
   build_entrances(view)          -> entrances.json 모양 ({건물 경로: [[경도, 위도, 유형, 입구 번호], ...]})
   build_businesses(view, places) -> businesses.json 모양 (상호 줄. 같은 가게는 build_business.merge_same_store로 한 줄)
 
@@ -132,6 +132,9 @@ def building_rows(view: GraphView) -> list[dict]:
             v = view.value(s, prop)
             if v not in (None, "", "0"):
                 r[key] = int(float(v))
+        h = view.value(s, "heightM")
+        if h:
+            r["h"] = round(float(h), 1)
         for key, prop in (("st", "structureName"), ("ad", "approvalDate")):
             v = view.value(s, prop)
             if v:
@@ -420,7 +423,7 @@ def build_shapes(view: GraphView, places: dict) -> dict:
             continue
         g = geometry_json(wkt_of(view, BASE + "/" + r["p"]))
         props = {"i": r["i"], "ug": r["ug"]}
-        for k in ("fa", "fb"):
+        for k in ("fa", "fb", "h"):
             if k in r:
                 props[k] = r[k]
         if r.get("ad"):

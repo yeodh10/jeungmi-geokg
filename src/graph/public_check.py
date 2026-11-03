@@ -13,7 +13,7 @@
                   businesses.json에 나옴 (places.json의 words 칸, 자료 탭은 예외)
   공개하지 않는 상호  그 상가업소번호가 어느 파일에든 나오거나 그 페이지가 있음
   보류 노드 연결  앱 자료의 장소 경로가 공개하지 않는 노드를 가리킴
-  상태 수         places.json의 s로 센 '주소 연결됨', 사용, 주소 미연결이 STATUS_COUNTS와 다름
+  상태 수         places.json의 s로 센 '주소 연결됨', 사용, 주소 미연결이 expected_status_counts()와 다름
   앱 코드         assets/app/의 JS에 /api/, localhost, web/local. 공개 빌드에 local 모듈 파일
   비밀 값         Claude API 키와 키 환경변수 이름 모양 (vendor와 .pbf 바이트 포함)
   낡은 문구       '확인하는 중', '약 600m', '도엽 37608075'
@@ -48,13 +48,29 @@ STALE = ("확인하는 중", "약 600m", "도엽 37608075")
 DOTS = re.compile("[\u00b7\u2027\u30fb\u318d\uff65]")
 LONG_NO = re.compile(r"[0-9]{20,}")
 APP_BANNED = ("/api/", "localhost", "web/local")
-# 공개 근거 제안이 승인되면 바뀌는 숫자 (명세 6절 '상태 수', 0절). 사람이 공개 근거 제안을 승인하면 함께 고친다
-STATUS_COUNTS = {"주소 연결됨": 7, "사용": 2162, "주소 미연결": 621}  # 2026-11-03 자리표시 잇기 7건 (GIS, 내비게이션용DB 근거)
+# 원천 그래프의 건물 상태 수 (명세 6절 '상태 수', 0절). 공개 뷰의 기준은 여기에 공개 근거 승인의 상태 변경을 더해 계산한다
+# (expected_status_counts). 승인 기록은 커밋하지 않아 컴퓨터마다 달라서, 승인 결과를 숫자로 적어 두지 않는다
+SOURCE_STATUS_COUNTS = {"주소 연결됨": 0, "사용": 2162, "주소 미연결": 628}
+STATUS_KO = {"Active": "사용", "AddressUnlinked": "주소 미연결", "AddressLinked": "주소 연결됨", "Retired": "폐지"}
 POINT_BUILDINGS = 324
 NAME_KEYS = {"n", "name"}                 # 앱 자료에서 화면 이름이 든 칸
 PATH_KEYS = {"p", "path", "b", "lot"}     # 앱 자료에서 장소 경로가 든 칸
 PATH_RE = re.compile(r"^(?:station|building|building-gis|entrance|parcel|road|admin-dong|legal-dong|basic-zone|sensor|business|"
                      r"notice|observation|proposal|road-segment|basemap|digital-map|public-facility)/[^\s]+$")
+
+
+def expected_status_counts() -> dict[str, int]:
+    """공개 지도의 건물 상태 수 기준: 원천 수에 공개 근거 승인이 건물 상태를 바꾼 만큼을 더한다."""
+    from src.graph.public import public_approvals
+    jgk = "https://yeodh10.github.io/jeungmi-geokg/def#"
+    counts = Counter(SOURCE_STATUS_COUNTS)
+    for p in public_approvals():
+        for c in p.changes:
+            if c.p == jgk + "status" and "/id/building" in c.s and c.o.value.startswith(jgk):
+                k = STATUS_KO.get(c.o.value[len(jgk):])
+                if k:
+                    counts[k] += 1 if c.op == "add" else -1
+    return {k: n for k, n in counts.items() if n or k in SOURCE_STATUS_COUNTS}
 
 
 def strings(obj, key=None):
@@ -229,7 +245,7 @@ class Checker:
         if [r["i"] for r in rows] != list(range(len(rows))):
             self.add("places.json", "i가 0부터 차례대로가 아니다")
         status = Counter(r.get("s", "사용") for r in rows)
-        for k, n in STATUS_COUNTS.items():
+        for k, n in expected_status_counts().items():
             if status.get(k, 0) != n:
                 self.add("places.json", f"상태 '{k}' {status.get(k, 0)}동 (기준 {n}동)")
 

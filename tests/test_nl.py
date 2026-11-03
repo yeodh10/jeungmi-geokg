@@ -497,7 +497,7 @@ def check_flow(store) -> None:
     refusing.beta.messages.parse = lambda **kw: SimpleNamespace(stop_reason="refusal", parsed_output=None)
     nl.get_client = lambda: refusing
     resp = TestClient(review_app.app, base_url="http://localhost").post("/api/ask", json={"question": "아무거나"})
-    assert resp.status_code == 422 and resp.json()["detail"] == "질문을 처리하지 못했다 (모델이 거절)", resp.text
+    assert resp.status_code == 422 and resp.json()["detail"] == "질문을 처리하지 못했습니다 (모델이 답하지 않음)", resp.text
     assert TestClient(review_app.app, base_url="http://localhost").post("/api/ask", json={"question": "  "}).status_code == 400
 
     # 시간 초과는 다시 쓰게 하지 않고 504로 알린다

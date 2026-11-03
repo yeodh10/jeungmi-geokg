@@ -112,7 +112,7 @@ export function init(ctx) {
       bizP = p;
     }
     if (!bizP.__v) bizP.then(() => { if (st && st.view === content && !st.list) draw(); }).catch(() => {
-      if (st && st.view === content) { const m = content.querySelector(".nb-biz-wait"); if (m) m.textContent = "상호 자료를 받지 못해 건물만 셉니다."; }
+      if (st && st.view === content) { const m = content.querySelector(".nb-biz-wait"); if (m) m.textContent = "상호 자료를 받지 못해 건물 수만 보여 줍니다."; }
     });
   }
 
@@ -151,12 +151,12 @@ export function init(ctx) {
       <fieldset class="nb-pick"><legend>기준</legend><div class="nb-seg">${seg("nb-base", [
         ["place", st.origin ? st.origin.label : "고른 장소", !st.origin], ["center", "지도 가운데"], ["station", "증미역"]], st.base)}</div></fieldset>
       <fieldset class="nb-pick"><legend>반경</legend><div class="nb-seg">${seg("nb-r", RADII.map(x => [x, `${x}m`]), r)}</div></fieldset>
-      <p class="nb-basis" aria-live="polite">${esc(b.label)}에서 <b>직선 거리 ${r}m</b> 안. 걷는 거리가 아니라 건물 대표점까지 곧게 잰 거리입니다.</p>
+      <p class="nb-basis" aria-live="polite">${esc(b.label)}에서 <b>직선 거리 ${r}m</b> 안. 걷는 거리가 아니라 건물 대표점까지의 직선 거리입니다.</p>
       ${all ? `<h3 class="cd-h">종류별 건수</h3><ul class="nb-counts">${cats.map(btn).join("")}</ul>`
-        : `<div class="nb-empty" role="status"><p>맞는 건물이 없습니다. 이 반경 안에는 건물 자료가 없습니다.</p>
+        : `<div class="nb-empty" role="status"><p>이 반경 안에는 건물 자료가 없습니다.</p>
           ${r < 500 ? `<button type="button" class="btn mini nb-wider">반경 500m로 넓히기</button>` : `<button type="button" class="btn mini nb-station">증미역 기준으로 보기</button>`}</div>`}
       ${biz ? `<h3 class="cd-h">상호 <span class="muted">(공공데이터에 등록된 곳만)</span></h3><ul class="nb-counts">${bizCats.map(btn).join("")}</ul>`
-        : `<p class="muted small nb-biz-wait">상호 건수를 받는 중입니다.</p>`}`;
+        : `<p class="muted small nb-biz-wait">상호 건수를 불러오는 중입니다.</p>`}`;
     el.querySelectorAll('input[name="nb-base"]').forEach(x => x.addEventListener("change", () => { st.base = x.value; draw(); }));
     el.querySelectorAll('input[name="nb-r"]').forEach(x => x.addEventListener("change", () => { st.radius = Number(x.value); draw(); }));
     const wider = el.querySelector(".nb-wider");

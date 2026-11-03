@@ -24,12 +24,13 @@ def copy_without(dst: Path, prefixes: tuple[str, ...]) -> None:
 
 
 def check_name_key() -> None:
-    """이름은 대소문자, 띄어쓰기, 괄호 속 글, 끝의 'N동'을 빼고 견준다."""
-    from src.review.placeholder_proposals import name_key
-    assert name_key("루체씨티3동") == name_key("루체씨티") == "루체씨티"
-    assert name_key("PlusTwinvill (B)") == name_key("plusTwinvill")
-    assert name_key("등촌중학교 다목적동") != name_key("등촌중학교")  # 끝이 숫자 동이 아니면 그대로 둔다
-    assert name_key(None) is None and name_key("(B)") is None
+    """이름과 동 표시를 나눠 견준다. 동 표시가 한쪽에만 있으면 같고, 양쪽에 다 있는데 다르면 다르다."""
+    from src.review.placeholder_proposals import same_name
+    assert same_name("루체씨티3동", "루체씨티") and same_name("PlusTwinvill (B)", "plusTwinvill")
+    assert same_name("루체씨티1동", "루체씨티3동") is False and same_name("PlusTwinvill (A)", "PlusTwinvill (B)") is False
+    assert same_name("101동", "102동") is False and same_name("주건축물제2동(B동)", "주건축물제1동(A동)") is False
+    assert same_name("등촌중학교 다목적동", "등촌중학교") is False  # 끝이 숫자 동이 아니면 이름의 일부다
+    assert same_name(None, "x") is None and same_name("  ", "x") is None
 
 
 def check_edge_centers() -> None:
@@ -65,6 +66,75 @@ def check_diff_bundles_entrance() -> None:
     assert any("새 출입구 1개" in v for v in props[0].evidence), props[0].evidence
 
 
+def check_diff_after_approvals() -> None:
+    """승인으로 만든 객체는 다음 갱신에서 옛 값이 있던 것으로 견준다. 있던 건물의 새 출입구도 건물 제안에 함께 든다.
+    한 GIS 모양을 새 건물 둘이 쓰면 실행마다 같은 건물을 고르고 확인 필요로 둔다."""
+    from rdflib import RDF, Graph, Literal, URIRef
+
+    from src.review.diff_proposals import AMBIGUOUS_LINK, DCTERMS, GEO, diff
+    from src.review.proposals import Change, Decision, Proposal, Term
+    J = lambda v: URIRef(JGK + v)
+    ID = "https://yeodh10.github.io/jeungmi-geokg/id/"
+    src = J("dataset-a")
+
+    def building(g, s, floors=None, gis=None):
+        for t in (GEO.Feature, J("Building")):
+            g.add((s, RDF.type, t))
+        g.add((s, DCTERMS.source, src))
+        if floors is not None:
+            g.add((s, J("floorsAbove"), Literal(floors)))
+        if gis:
+            geom = URIRef(f"{s}/geometry")
+            g.add((s, GEO.hasGeometry, geom))
+            g.add((geom, J("sourceGisBuildingId"), Literal(gis)))
+
+    made = URIRef(ID + "building/made")
+    created = Proposal(id="diff-x-create-made", created_at="2026-11-03T00:00:00+09:00", source_kind="data-diff", source_detail="시험",
+                       action="create", target=str(made), target_type="Building", summary="시험", status="approved",
+                       decision=Decision(result="approved", reviewer="시험", at="2026-11-03T00:00:00+09:00", seq=1),
+                       changes=[Change(op="add", s=str(made), p=str(RDF.type), o=Term(kind="uri", value=str(GEO.Feature))),
+                                Change(op="add", s=str(made), p=str(RDF.type), o=Term(kind="uri", value=JGK + "Building")),
+                                Change(op="add", s=str(made), p=str(DCTERMS.source), o=Term(kind="uri", value=str(src))),
+                                Change(op="add", s=str(made), p=JGK + "floorsAbove", o=Term(kind="literal", value="3",
+                                       datatype="http://www.w3.org/2001/XMLSchema#integer"))])
+    old, keep = Graph(), URIRef(ID + "building/keep")
+    building(old, keep)
+    new = Graph()
+    building(new, keep)
+    building(new, made, floors=8)
+    e = URIRef(ID + "entrance/keep-main")
+    new.add((keep, J("hasEntrance"), e))
+    for t in (GEO.Feature, J("BuildingEntrance")):
+        new.add((e, RDF.type, t))
+    props = {p.target: p for p in diff(old, new, "t", "시험", approved=[created])}
+    assert set(props) == {str(made), str(keep)} and props[str(made)].action == "update", {k: p.action for k, p in props.items()}
+    ops = {(c.op, c.o.value) for c in props[str(made)].changes}
+    assert ("remove", "3") in ops and ("add", "8") in ops, ops  # 승인 때 넣은 값을 빼고 새 값을 넣는다
+    assert props[str(keep)].action == "update" and {c.s for c in props[str(keep)].changes} == {str(keep), str(e)}
+
+    gone = Graph()
+    building(gone, keep)
+    assert [p.action for p in diff(old, gone, "t", "시험", approved=[created])] == ["retire"]  # 승인으로 만든 건물도 폐지된다
+
+    # 있던 건물의 update에 함께 넣어 승인한 새 출입구도, 다음 자료에서 빠지면 폐지 제안이 나온다
+    bundle = props[str(keep)].model_copy(update={"status": "approved", "decision": Decision(result="approved", reviewer="시험", at="2026-11-03T00:00:00+09:00", seq=2)})
+    after = Graph()
+    building(after, keep)
+    got = {p.target: p.action for p in diff(old, after, "t", "시험", approved=[bundle])}
+    assert got.get(str(e)) == "retire", got
+
+    gis = URIRef(ID + "building-gis/g")
+    old2 = Graph()
+    building(old2, gis)
+    old2.add((gis, J("gisBuildingId"), Literal("G1")))
+    new2 = Graph()
+    for name in ("b2", "b1"):
+        building(new2, URIRef(ID + f"building/{name}"), gis="G1")
+    runs = {tuple((p.action, p.changes[-1].o.value, tuple(p.flags)) for p in diff(old2, new2, "t", "시험") if p.action == "link")
+            for _ in range(3)}
+    assert runs == {(("link", ID + "building/b1", (AMBIGUOUS_LINK,)),)}, runs
+
+
 def check_rules_on_data(tmp: Path) -> None:
     """실제 자료에서 다시 뽑으면 2026-11-03에 승인한 제안이 그대로 나오고, 차례로 반영해도 SHACL을 지난다."""
     from src.graph.store import load_store
@@ -72,8 +142,12 @@ def check_rules_on_data(tmp: Path) -> None:
     from src.review import emap_proposals, placeholder_proposals, same_building_migration
     from src.review.proposals import ProposalStore
 
-    approved = {r["id"] for r in json.loads(REAL.read_text(encoding="utf-8"))
-                if r["id"].startswith(RULES) and r["status"] == "approved"}
+    def link_of(changes) -> tuple:
+        return tuple(sorted((c["p"] if isinstance(c, dict) else c.p, (c["o"]["value"] if isinstance(c, dict) else c.o.value))
+                            for c in changes if (c["op"] if isinstance(c, dict) else c.op) == "add"))
+
+    rows = json.loads(REAL.read_text(encoding="utf-8")) if REAL.exists() else []
+    approved = {r["id"]: link_of(r["changes"]) for r in rows if r["id"].startswith(RULES) and r["status"] == "approved"}
     os.environ["JGK_PROPOSALS"] = str(tmp)
     store = ProposalStore(tmp)
     ph = placeholder_proposals.candidates()
@@ -83,8 +157,11 @@ def check_rules_on_data(tmp: Path) -> None:
     props += [emap_proposals.make(r) for _, r in em[em["target"].notna()].iterrows()]
     assert not (em["iou"] < 0).any() and (em["target"].notna() <= (em["iou"] >= emap_proposals.MIN_IOU)).all(), em
     props += same_building_migration.candidates(load_store(), store.load())
-    if approved:  # 실제 기록에 승인이 있으면 같은 제안이 다시 나와야 한다
-        assert {p.id for p in props} == approved, sorted({p.id for p in props} ^ approved)
+    if approved:  # 실제 기록에 이 규칙들의 승인이 있으면 같은 제안(같은 대상, 같은 변경)이 다시 나와야 한다
+        got = {p.id: link_of(p.changes) for p in props}
+        assert got == approved, sorted(set(got.items()) ^ set(approved.items()))
+    else:
+        print("실제 기록에 이 규칙들의 승인이 없어 다시 뽑기 대조는 건너뛴다 (다른 컴퓨터의 기록)")
     g = load_store()
     for p in props:
         ok, res = check_proposal(g, p)
@@ -96,7 +173,7 @@ def check_rules_on_data(tmp: Path) -> None:
 
 
 def run() -> None:
-    for fn in (check_name_key, check_edge_centers, check_diff_bundles_entrance):
+    for fn in (check_name_key, check_edge_centers, check_diff_bundles_entrance, check_diff_after_approvals):
         fn()
         print(f"통과 {fn.__name__}")
     tmp = Path(tempfile.mkdtemp()) / "proposals.json"

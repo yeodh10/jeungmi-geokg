@@ -66,11 +66,11 @@ BATCH_SECONDS = 60  # 묶음 검사 한 번의 시간 상한. 넘긴 제안은 �
 SLOT_WAIT = 5  # 검사 자리가 나기를 기다리는 초. 넘으면 429로 답한다
 ASK_PER_MINUTE = 10  # 질문 한 건이 유료 호출 최대 2건이고, 호출마다 SDK가 2번 더 시도한다
 ASK_PER_DAY = 200
-TOO_MANY = "요청이 밀려 있다. 잠시 뒤에 다시 시도해 주세요"
+TOO_MANY = "요청이 밀려 있습니다. 잠시 뒤에 다시 시도해 주세요."
 LOCK_WAIT = 30  # 결정과 정정이 앞 결정이 끝나기를 기다리는 초. 넘으면 503
 FILE_WAIT = 5  # 다른 프로세스가 쥔 제안 파일 잠금을 앱 잠금 밖에서 기다리는 초. 넘으면 503
-FILE_BUSY = "다른 작업이 제안 파일을 쓰고 있다. 잠시 뒤에 다시 시도해 주세요"
-FILE_BROKEN = "제안 파일을 읽지 못했다. 파일은 그대로 두었다. 파일을 고친 뒤 다시 시도해 주세요"
+FILE_BUSY = "다른 작업이 제안 파일을 쓰고 있습니다. 잠시 뒤에 다시 시도해 주세요."
+FILE_BROKEN = "제안 파일을 읽지 못했습니다. 파일은 그대로 두었으니 고친 뒤 다시 시도해 주세요."
 # 화면이 쓰는 바깥 주소. web/review.html, web/map.html의 주소와 같아야 한다
 MAP_LIBRARY = "https://unpkg.com/maplibre-gl@4.7.1/"
 FONT_FILES = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/"
@@ -129,7 +129,7 @@ def refusal(scope: dict, headers: Headers) -> tuple[int, str] | None:
             return 403, "다른 출처에서 온 요청은 받지 않는다"
     length = headers.get("content-length", "0")
     if not length.isdecimal() or int(length) > MAX_BODY:
-        return 413, f"요청 본문은 {MAX_BODY // 1024}KB까지 받는다"
+        return 413, f"요청 본문은 {MAX_BODY // 1024}KB까지만 받습니다"
     return None
 
 
@@ -154,7 +154,7 @@ class RequestGate:
             message = await receive()
             seen += len(message.get("body", b""))
             if seen > MAX_BODY:
-                raise HTTPException(413, f"요청 본문은 {MAX_BODY // 1024}KB까지 받는다")
+                raise HTTPException(413, f"요청 본문은 {MAX_BODY // 1024}KB까지만 받습니다")
             return message
         await self.app(scope, counted, send)
 
@@ -232,11 +232,11 @@ def term(v) -> str | None:
 def check_uri(uri) -> str:
     """SPARQL의 <...> 자리에 넣거나 그래프에서 찾을 URI인지 본다. http(s) 주소만 받는다."""
     if not isinstance(uri, str) or not re.match(r"https?://", uri) or BAD_URI_CHARS.search(uri):
-        raise HTTPException(400, "올바른 URI가 아니다")
+        raise HTTPException(400, "올바른 URI가 아닙니다")
     try:
         ox.NamedNode(uri)
     except ValueError:
-        raise HTTPException(400, "올바른 URI가 아니다")
+        raise HTTPException(400, "올바른 URI가 아닙니다")
     return uri
 
 
@@ -330,15 +330,15 @@ class DecisionIn(BaseModel):
     def problem(self) -> str | None:
         """받을 수 없는 결정이면 그 까닭(400 응답 문장)."""
         if not self.reviewer:
-            return "검토자 이름이 필요하다"
+            return "검토자 이름을 입력해 주세요"
         if len(self.reviewer) > 50 or any(unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp") for ch in self.reviewer):
-            return "검토자 이름은 줄바꿈 없이 50자 이하로 쓴다"
+            return "검토자 이름은 줄바꿈 없이 50자 이하로 입력해 주세요"
         if INVISIBLE.search(self.reviewer):
-            return "검토자 이름에 보이지 않는 글자를 쓸 수 없다"
+            return "검토자 이름에 보이지 않는 글자를 쓸 수 없습니다"
         if len(self.comment) > 1000:
-            return "의견은 1000자 이하로 쓴다"
+            return "의견은 1000자 이하로 입력해 주세요"
         if self.result == "rejected" and not visible(self.comment):
-            return "반려 사유가 필요하다"
+            return "반려 사유를 입력해 주세요"
         return None
 
 
@@ -357,7 +357,7 @@ async def bad_request(request: Request, exc: RequestValidationError):
         why = "본문을 JSON으로 읽지 못했다"
     else:
         why = f"'{where}' 값이 맞지 않는다"
-    return JSONResponse(status_code=422, content={"detail": f"요청 형식이 맞지 않다: {why}", "errors": errors})
+    return JSONResponse(status_code=422, content={"detail": f"요청 형식이 맞지 않습니다: {why}", "errors": errors})
 
 
 @app.exception_handler(ProposalFileError)
@@ -421,7 +421,7 @@ def list_proposals(status: Literal["pending", "approved", "rejected"] | None = N
 def get_proposal(pid: str):
     p = proposals.get(pid)
     if p is None:
-        raise HTTPException(404, "없는 제안")
+        raise HTTPException(404, "없는 제안입니다")
     uris = {p.target} | {c.s for c in p.changes} | {c.p for c in p.changes} \
         | {c.o.value for c in p.changes if c.o.kind == "uri"}
     group, group_label = group_of(p)
@@ -493,7 +493,7 @@ def require_rules(p) -> None:
     """규칙을 어기는 제안은 승인할 수 없다 (반려는 된다)."""
     check = check_now(p)
     if not check["conforms"]:
-        raise HTTPException(409, "데이터 규칙을 어겨 승인할 수 없다: " + "; ".join(sorted({r["message"] for r in check["results"]})))
+        raise HTTPException(409, "데이터 규칙을 어겨 승인할 수 없습니다: " + "; ".join(sorted({r["message"] for r in check["results"]})))
 
 
 @app.get("/api/proposals/{pid}/validate")
@@ -501,7 +501,7 @@ def validate_proposal(pid: str):
     """제안을 반영했을 때 대상 객체가 SHACL 규칙(src/graph/shapes.ttl)을 지키는지."""
     p = proposals.get(pid)
     if p is None:
-        raise HTTPException(404, "없는 제안")
+        raise HTTPException(404, "없는 제안입니다")
     with slot(validate_slots, SLOT_WAIT):
         return check_now(p)
 
@@ -520,7 +520,7 @@ def graph_with(ps) -> ox.Store:
             new.update(p.sparql_update())
     except (SyntaxError, OSError, RuntimeError, ValueError) as e:
         log.warning("제안을 그래프에 반영하지 못했다: %s", e)
-        raise HTTPException(409, f"제안을 그래프에 반영하지 못했다: {e}")
+        raise HTTPException(409, f"제안을 그래프에 반영하지 못했습니다: {e}")
     return new
 
 
@@ -545,7 +545,7 @@ def decide(pid: str, body: DecisionIn):
     with writing():  # 검사, 그래프 반영, 저장을 한 번에 해서 같은 제안이 두 번 결정되거나 반영이 빠지지 않게 한다
         p = proposals.get(pid)
         if p is None:
-            raise HTTPException(404, "없는 제안")
+            raise HTTPException(404, "없는 제안입니다")
         if body.result == "approved" and p.status == "pending":
             require_rules(p)
         made = []
@@ -556,7 +556,7 @@ def decide(pid: str, body: DecisionIn):
         try:
             p = proposals.decide(pid, body.result, body.reviewer, body.comment, before_save=reflect)
         except KeyError:
-            raise HTTPException(404, "없는 제안")
+            raise HTTPException(404, "없는 제안입니다")
         except ValueError as e:
             raise HTTPException(409, str(e))
         if made:
@@ -572,9 +572,9 @@ def group_pending(group: str) -> list:
 def hold_reason(p) -> str | None:
     """묶음 승인에서 뺄 까닭. 모델이 읽어 낸 제안과 경고가 붙은 제안은 사람이 하나씩 본다."""
     if p.source_kind == "llm-notice":
-        return "LLM이 고시에서 뽑은 제안이라 하나씩 승인한다"
+        return "LLM이 고시에서 뽑은 제안이라 하나씩 승인합니다"
     if p.flags:
-        return "경고가 있어 하나씩 승인한다"
+        return "경고가 있어 하나씩 승인합니다"
     return None
 
 
@@ -605,7 +605,7 @@ def batch_plan(ps) -> tuple[list, list[dict], bool]:
                 trial.update(p.sparql_update())
                 ok.append(p)
             except (SyntaxError, OSError, RuntimeError, ValueError) as e:
-                row["conforms"], row["messages"] = False, [f"제안을 그래프에 반영하지 못했다: {e}"]
+                row["conforms"], row["messages"] = False, [f"제안을 그래프에 반영하지 못했습니다: {e}"]
     return ok, rows, late
 
 
@@ -623,7 +623,7 @@ def check_group(group: str):
     """묶음의 대기 제안을 차례로 반영해 가며 SHACL로 검사한다. 묶어 승인하기 전에 화면이 보여 준다."""
     ps = group_pending(group)
     if not ps:
-        raise HTTPException(404, "대기 중인 제안이 없는 묶음")
+        raise HTTPException(404, "대기 중인 제안이 없는 묶음입니다")
     with slot(batch_slots, 1):
         ok, rows, late = batch_plan(ps)
     return {"group": group, "group_label": group_of(ps[0])[1], "items": rows, "passing": len(ok), "timed_out": late}
@@ -641,7 +641,7 @@ def decide_group(body: GroupDecisionIn):
         raise HTTPException(400, problem)
     ps = group_pending(body.group)
     if not ps:
-        raise HTTPException(404, "대기 중인 제안이 없는 묶음")
+        raise HTTPException(404, "대기 중인 제안이 없는 묶음입니다")
     skipped, held, version = [], [], None
     if body.result == "approved":
         store()
@@ -651,11 +651,11 @@ def decide_group(body: GroupDecisionIn):
         held = [r for r in rows if r["held"]]
         skipped = [r for r in rows if not r["held"] and not r["conforms"]]
         if not ps:
-            raise HTTPException(409, "묶어 승인할 제안이 없다: " + (
-                "데이터 규칙을 통과한 제안이 없어 승인하지 않았다" if skipped else "남은 제안은 하나씩 승인한다"))
+            raise HTTPException(409, "묶어 승인할 제안이 없습니다: " + (
+                "데이터 규칙을 통과한 제안이 없어 승인하지 않았습니다" if skipped else "남은 제안은 하나씩 승인해 주세요"))
     with writing():
         if version not in (None, state["version"]):
-            raise HTTPException(409, "검사하는 동안 그래프가 바뀌었다. 다시 검사해 주세요")
+            raise HTTPException(409, "검사하는 동안 그래프가 바뀌었습니다. 다시 검사해 주세요.")
         made = []
 
         def reflect(changed, _all):
@@ -664,7 +664,7 @@ def decide_group(body: GroupDecisionIn):
         try:
             done = proposals.decide_many([p.id for p in ps], body.result, body.reviewer, body.comment, before_save=reflect)
         except KeyError:
-            raise HTTPException(404, "없는 제안")
+            raise HTTPException(404, "없는 제안입니다")
         except ValueError as e:
             raise HTTPException(409, str(e))
         if made:
@@ -689,7 +689,7 @@ class CorrectionIn(BaseModel):
 
     def problem(self) -> str | None:
         p = DecisionIn(result="rejected", reviewer=self.reviewer, comment=self.reason).problem()
-        return "정정 사유가 필요하다" if p == "반려 사유가 필요하다" else p
+        return "정정 사유를 입력해 주세요" if p == "반려 사유를 입력해 주세요" else p
 
 
 def subjects(p) -> set[str]:
@@ -741,7 +741,7 @@ def require_clean_withdrawal(old: ox.Store, new: ox.Store, p) -> None:
                       if q.predicate not in HISTORY_LINKS and isinstance(q.subject, ox.NamedNode)}
     fresh = broken_rules(new, p, nodes) - broken_rules(old, p, nodes)
     if fresh:
-        raise HTTPException(409, "승인을 거두면 데이터 규칙을 어긴다: " + "; ".join(sorted({m for _, m in fresh})))
+        raise HTTPException(409, "승인을 철회하면 데이터 규칙을 어깁니다: " + "; ".join(sorted({m for _, m in fresh})))
 
 
 def rebuilt_without(p, everything: list) -> tuple[ox.Store, ReplayReport]:
@@ -753,7 +753,7 @@ def rebuilt_without(p, everything: list) -> tuple[ox.Store, ReplayReport]:
         new, report = build_store(everything)
     except (SyntaxError, OSError, RuntimeError, ValueError):
         log.exception("그래프를 다시 만들지 못했다")
-        raise HTTPException(500, "그래프를 다시 만들지 못해 정정을 저장하지 않았다")
+        raise HTTPException(500, "그래프를 다시 만들지 못해 정정을 저장하지 않았습니다")
     require_clean_withdrawal(store(), new, p)
     return new, report
 
@@ -772,11 +772,11 @@ def correct(pid: str, body: CorrectionIn):
     with writing():
         p = proposals.get(pid)
         if p is None:
-            raise HTTPException(404, "없는 제안")
+            raise HTTPException(404, "없는 제안입니다")
         if p.status == "approved" and body.to != "approved":
             later = approved_after(p)
             if later:
-                raise HTTPException(409, "뒤에 승인된 제안이 같은 객체를 바꾸거나 가리킨다. 그 제안부터 정정해야 한다: "
+                raise HTTPException(409, "나중에 승인된 제안이 같은 객체를 바꾸거나 가리킵니다. 그 제안부터 정정해 주세요: "
                                     + ", ".join(q.id for q in later))
         if body.to == "approved" and p.status == "rejected":
             require_rules(p)
@@ -791,7 +791,7 @@ def correct(pid: str, body: CorrectionIn):
         try:
             p = proposals.correct(pid, body.to, body.reviewer, body.reason, before_save=reflect)
         except KeyError:
-            raise HTTPException(404, "없는 제안")
+            raise HTTPException(404, "없는 제안입니다")
         except ValueError as e:
             raise HTTPException(409, str(e))
         if made:
@@ -925,7 +925,7 @@ def edition_as_of(uri: str, at: str):
         iri(uri)
         when = moment(at)
     except ValueError as e:
-        raise HTTPException(400, f"URI나 시각이 올바르지 않다: {e}") from None
+        raise HTTPException(400, f"URI나 시각이 올바르지 않습니다: {e}") from None
     g = store()
     rows = diff_states(as_of(g, uri, when), as_of(g, uri, "2999-12-31T00:00:00+09:00"))
     uris = [u for r in rows for u in [*r["p"].split(" "), *r["before"], *r["after"]] if u.startswith("http")]
@@ -939,7 +939,7 @@ def edition_changes(since: str = "1900-01-01", until: str = "2999-12-31"):
     try:
         since, until = moment(since), moment(until, end=True)
     except ValueError as e:
-        raise HTTPException(400, f"시각이 올바르지 않다: {e}") from None
+        raise HTTPException(400, f"시각이 올바르지 않습니다: {e}") from None
     rows = changes_between(store(), since, until)
     uris = [r[k] for r in rows for k in ("target", "s", "p", "o") if r[k].startswith("http")]
     return {"since": since, "until": until, "changes": rows, "names": names(uris)}
@@ -951,7 +951,7 @@ LAYER_QUERY = {
     "road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong", "basemap": "jgk:BaseMapFeature",
     "digitalmap": "jgk:DigitalMapFeature",
 }
-LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "baddr", "bkind")
+LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "baddr", "bkind", "fa", "h")
 layer_cache: dict = {}  # (레이어, 그래프 판 번호) -> 응답 본문(bytes)
 layer_locks = {kind: threading.Lock() for kind in LAYER_QUERY}  # 같은 레이어를 동시에 달라고 해도 한 번만 만든다
 
@@ -968,6 +968,7 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
   OPTIONAL {{ ?f rdfs:label ?label0 }} OPTIONAL {{ ?f jgk:useName ?use0 }}
   OPTIONAL {{ ?f jgk:roadAddress ?addr0 }} OPTIONAL {{ ?f jgk:entranceType ?type0 }} OPTIONAL {{ ?f jgk:mapKind ?bkind0 }}
   OPTIONAL {{ ?f jgk:within ?d . ?d a jgk:AdminDong ; rdfs:label ?dong0 }}
+  OPTIONAL {{ ?f jgk:floorsAbove ?fa0 }} OPTIONAL {{ ?f jgk:heightM ?h0 }}
   {entrance}
 }} GROUP BY ?f"""
     feats, skipped = [], 0
@@ -984,7 +985,8 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
         props["addr"] = props["addr"] or baddr  # 출입구는 그 출입구를 가진 건물의 도로명주소
         feats.append({"type": "Feature", "geometry": geometry,
                       "properties": {k: props[k] for k in ("label", "status", "use", "addr", "type")}
-                      | {"uri": term(s["f"]), "kind": kind, "dong": props["dong"]}})
+                      | {"uri": term(s["f"]), "kind": kind, "dong": props["dong"]}
+                      | {k: float(props[k]) for k in ("fa", "h") if props.get(k)}})   # 입체 보기 높이 (지상 층수, 대장 높이 m)
     return json.dumps({"type": "FeatureCollection", "features": feats, "skipped": skipped},
                       ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
@@ -1009,7 +1011,7 @@ def layer(kind: str, request: Request):
     서버를 켠 때의 값과 그래프 판 번호로 ETag를 붙여, 그래프가 그대로면 브라우저가 가진 것을 다시 쓰게(304) 한다.
     """
     if kind not in LAYER_QUERY:
-        raise HTTPException(404, "없는 레이어")
+        raise HTTPException(404, "없는 레이어입니다")
     store()
     version = state["version"]
     etag = f'W/"{kind}-{state["boot"]}-{version}"'
@@ -1079,7 +1081,7 @@ def spend_ask() -> None:
         if wait is None:
             ask_times.append(t)
             return
-    raise HTTPException(429, "질문이 너무 많다. 잠시 뒤에 다시 물어 주세요", headers={"Retry-After": str(math.ceil(wait))})
+    raise HTTPException(429, "질문이 너무 많습니다. 잠시 뒤에 다시 물어 주세요.", headers={"Retry-After": str(math.ceil(wait))})
 
 
 @app.post("/api/ask")
@@ -1090,21 +1092,21 @@ def ask_question(body: AskIn):
     from src.llm.client import LLMRefused, MissingAPIKey
     from src.query.nl import QueryBusy, QueryTimeout, ask
     if not body.question.strip():
-        raise HTTPException(400, "질문이 비었다")
+        raise HTTPException(400, "질문이 비어 있습니다")
     spend_ask()
     try:
         r = ask(body.question.strip(), store=store(), system=system_prompt())
     except MissingAPIKey:
-        raise HTTPException(503, "Claude API를 쓸 수 없다 (.env의 ANTHROPIC_API_KEY 확인)")
+        raise HTTPException(503, "Claude API를 쓸 수 없습니다 (.env의 ANTHROPIC_API_KEY를 확인해 주세요)")
     except LLMRefused:
-        raise HTTPException(422, "질문을 처리하지 못했다 (모델이 거절)")
+        raise HTTPException(422, "질문을 처리하지 못했습니다 (모델이 답하지 않음)")
     except QueryTimeout as e:
         raise HTTPException(504, str(e))
     except QueryBusy as e:
         raise HTTPException(503, str(e))
     except anthropic.APIError as e:  # 오류 본문에는 조직 번호나 잘못 넣은 키가 들어 있을 수 있어 로그로만 남긴다
         log.warning("Claude API 오류: %s", API_KEY.sub("sk-ant-(가림)", str(e)))
-        raise HTTPException(502, "Claude API를 부르지 못했다. 잠시 뒤에 다시 물어 주세요")
+        raise HTTPException(502, "Claude API를 부르지 못했습니다. 잠시 뒤에 다시 물어 주세요.")
     except ValueError as e:
         raise HTTPException(422, str(e))
     r["names"] = names(v for row in r["rows"] for v in row if isinstance(v, str) and v.startswith(BASE))
@@ -1122,7 +1124,7 @@ def context(pid: str):
     p = proposals.get(pid)
     where = None if p is None else place(p)
     if where is None:
-        raise HTTPException(404, "위치가 없는 제안")
+        raise HTTPException(404, "위치가 없는 제안입니다")
     circle = gpd.GeoSeries([Point(where)], crs="EPSG:4326").to_crs("EPSG:5186") \
         .buffer(CONTEXT_RADIUS_M).to_crs("EPSG:4326").iloc[0]
     linked = {c.o.value for c in p.changes if c.p.endswith("#housedIn")}

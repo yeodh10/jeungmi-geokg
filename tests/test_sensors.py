@@ -18,7 +18,7 @@ def run() -> None:
     from pyshacl import validate
     from rdflib import Graph
 
-    from src.graph.build_graph import add_sensors
+    from src.graph.build_graph import add_catalog, add_sensors
     from src.graph.publish import hold_sources
     from src.graph.store import load_store
     from src.model import uri
@@ -45,6 +45,7 @@ def run() -> None:
         obs[obs.sensor_uri == one.uri.iloc[0]].to_csv(tmp / "sensor_obs.csv", index=False)
         g = Graph()
         add_sensors(g, tmp)
+        add_catalog(g)  # 원천 자료 목록은 그래프를 만들 때 늘 함께 들어간다 (build_graph.build)
     g.parse(ROOT / "src" / "graph" / "ontology.ttl")
     shapes = Graph().parse(ROOT / "src" / "graph" / "shapes.ttl")
     _, _, text = validate(g, shacl_graph=shapes, inference="none", allow_warnings=True)

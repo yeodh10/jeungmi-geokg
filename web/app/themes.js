@@ -1,4 +1,5 @@
-// 지도 보기 (명세 4.2절 있으면 좋음 1, 5, 9, 7.2절 색): 건물 종류, 층수, 지은 때, 행정동 소속 주제와 범례, 연도 슬라이더, 층수 입체 보기.
+// 지도 보기 (명세 4.2절 있으면 좋음 1, 5, 9, 7.2절 색): 건물 종류, 층수, 지은 때, 행정동 소속 주제와 범례, 연도 슬라이더,
+// 입체 보기(LoD1: 건축물대장 높이, 없으면 층수로 추정. 켜면 회전과 기울이기를 열고 시점을 주소창 d3에 적는다), 화면과 지도 밝기.
 // 켜면 범례가 함께 열리고 자료 없음은 회색이다. 끄면 기본 색(옅은 용도별 색)으로 돌아간다. 주소창 theme은 덮어쓴다.
 // 건물 색은 mapApi.setBuildingPaint로만 바꾸고 다른 묶음의 층은 건드리지 않는다. 입체는 이 묶음의 층 bldg-3d다.
 
@@ -9,6 +10,8 @@ const USE = { home: "#e69f00", shop: "#d55e00", office: "#0072b2", edu: "#009e73
 const FLOORS = { light: ["#7fa9d8", "#5f90c8", "#4577b4", "#2d5e9c", "#174a83"], dark: ["#2d5e9c", "#4577b4", "#5f90c8", "#7fa9d8", "#a9c8ea"] };
 const FLOOR_LABEL = ["1~2층", "3~5층", "6~10층", "11~20층", "21층 이상"];
 const YEARS = [2010, 2000, 1990, 1980, 1970, 1960];
+const FLOOR_H = 3.26;   // 높이가 없는 건물의 층당 높이(m). 반경 1km에서 대장 높이와 층수가 둘 다 있는 1,437동의 가운데값
+const BRIGHT_KEY = "jgk-map-brightness";
 const YEAR_C = { light: ["#5fb8a3", "#46a48e", "#30907a", "#1f7b67", "#106654", "#065142"], dark: ["#075748", "#106c5a", "#20836e", "#359a83", "#4fae97", "#6fc2ad"] };
 
 export async function init(ctx) {
@@ -26,6 +29,10 @@ export async function init(ctx) {
   let key = null;          // use, floors, year, dong:{이름}
   let upto = yMax;         // 연도 슬라이더
   let threeD = false;
+  let brightness = 100;    // 지도 밝기(%). 이 화면에만 기억한다
+  try { brightness = Math.min(140, Math.max(60, Number(localStorage.getItem(BRIGHT_KEY)) || 100)); } catch (e) { /* 저장소 막힘 */ }
+  const applyBrightness = () => { map.getCanvas().style.filter = brightness === 100 ? "" : `brightness(${brightness / 100})`; };
+  applyBrightness();
 
   // 장소 번호(i)를 묶음별로 모아 match 식을 만든다. 면과 점 모두 i를 가진다
   function matchExpr(classOf, colorOf, fallback) {
@@ -59,7 +66,7 @@ export async function init(ctx) {
       const legend = FLOOR_LABEL.map((l, j) => ({ color: pal[j], label: `지상 ${l}`, n: n.get(j) || 0 }));
       legend.push({ color: GRAY, label: "층수 자료 없음", n: n.get(null) || 0, faint: true });
       return { title: "층수", legend, color: matchExpr(floorClass, j => pal[j], GRAY), opacity: matchExpr(p => (floorClass(p) == null ? 0 : null), () => 0.45, 0.92),
-        note: "층수 0은 값이 없는 것으로 보았습니다." };
+        note: "층수가 0인 건물은 값이 없는 것으로 보았습니다." };
     }
     if (k === "year") {
       const n = count(yearClass), pal = YEAR_C[dark()];
@@ -103,22 +110,40 @@ export async function init(ctx) {
     if (announce) ui.live(key ? `지도 보기: ${themeSpec(key).title}. 범례를 열었습니다` : "지도 보기를 기본 색으로 돌렸습니다");
   }
 
-  // ---- 층수 입체 보기 (면 건물만)
-  function setThreeD(on) {
+  // ---- 입체 보기 (면 건물만). 높이는 건축물대장 높이(h), 없으면 지상 층수 x FLOOR_H. 둘 다 없으면 세우지 않는다
+  const HEIGHT = ["coalesce", ["get", "h"], ["*", ["max", ["coalesce", ["get", "fa"], 0], 0], FLOOR_H]];
+  const allowTurn = on => {
+    for (const h of [map.dragRotate, map.touchPitch]) on ? h.enable() : h.disable();
+    on ? map.touchZoomRotate.enableRotation() : map.touchZoomRotate.disableRotation();
+    on ? map.keyboard.enableRotation() : map.keyboard.disableRotation();
+  };
+  function setThreeD(on, { view = null, write = true, announce = true } = {}) {
     threeD = !!on;
     if (threeD && !map.getLayer("bldg-3d")) {
       map.addLayer({ id: "bldg-3d", type: "fill-extrusion", source: "bldg", minzoom: 14,
         paint: { "fill-extrusion-color": key ? themeSpec(key).color : mapApi.defaultBuildingColor(),
-          "fill-extrusion-height": ["*", ["max", ["coalesce", ["get", "fa"], 0], 0], 3], "fill-extrusion-base": 0, "fill-extrusion-opacity": 0.85 } },
-      map.getLayer("spread-fill") ? "spread-fill" : undefined);
+          "fill-extrusion-height": HEIGHT, "fill-extrusion-base": 0, "fill-extrusion-opacity": 0.88,
+          "fill-extrusion-vertical-gradient": true } },
+        map.getLayer("spread-fill") ? "spread-fill" : undefined);
     }
     if (!threeD && map.getLayer("bldg-3d")) map.removeLayer("bldg-3d");
+    allowTurn(threeD);
+    north.hidden = !threeD;
+    const pitch = view ? view[0] : 55, bearing = view ? view[1] : -20;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    map.easeTo({ pitch: threeD ? 50 : 0, duration: reduce ? 0 : 400 });
+    map.easeTo({ pitch: threeD ? pitch : 0, bearing: threeD ? bearing : 0, duration: reduce ? 0 : 500 });
     btn.classList.toggle("on", !!key || threeD);
+    if (write) state.set({ d3: threeD ? `${Math.round(pitch)},${Math.round(bearing)}` : null }, { silent: true });
     renderPop();
-    ui.live(threeD ? "층수 입체 보기를 켰습니다. 층수로 만든 모형이고 실제 높이가 아닙니다" : "층수 입체 보기를 껐습니다");
+    if (announce) ui.live(threeD ? "입체 보기를 켰습니다. 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌면 지도를 돌리거나 기울일 수 있습니다" : "입체 보기를 껐습니다");
   }
+  // 입체 보기의 시점을 주소창에 적어, 링크로 같은 시점을 나눌 수 있게 한다
+  map.on("moveend", () => { if (threeD) state.set({ d3: `${Math.round(map.getPitch())},${Math.round(map.getBearing())}` }, { silent: true }); });
+  // 북쪽으로: 입체 보기에서만 보인다. 아이콘은 지도의 방위각만큼 돌아 북쪽을 가리킨다
+  const north = ui.toolButton({ id: "tool-north", icon: "compass", label: "북쪽을 위로", group: "view", order: 1,
+    onClick: () => map.easeTo({ bearing: 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 }) });
+  north.hidden = true;
+  map.on("rotate", () => { const svg = north.querySelector("svg"); if (svg) svg.style.transform = `rotate(${-map.getBearing()}deg)`; });
 
   // ---- 도구 단추와 고르는 창
   const btn = ui.toolButton({ id: "tool-view", icon: "layers", label: "지도 보기", group: "view", order: 0, onClick: () => openPop(pop.hidden) });
@@ -153,12 +178,18 @@ export async function init(ctx) {
       </fieldset>
       ${adminDongs.length ? `<div class="dong-pick"${key && key.startsWith("dong:") ? "" : " hidden"}><label for="theme-dong">행정동</label>
         <select id="theme-dong">${adminDongs.map(d => `<option${d.n === dongSel ? " selected" : ""}>${esc(d.n)}</option>`).join("")}</select></div>` : ""}
-      ${key === "year" ? `<div class="year-pick"><label for="theme-year">이 해까지 사용승인된 건물만 진하게: <b>${upto}년</b></label>
+      ${key === "year" ? `<div class="year-pick"><label for="theme-year">이 해까지 사용승인된 건물만 진하게 표시: <b>${upto}년</b></label>
         <input id="theme-year" type="range" min="${yMin}" max="${yMax}" step="1" value="${upto}">
-        <p class="small muted">그해 실제 있던 건물이 아닙니다. 철거 자료가 없습니다.</p></div>` : ""}
+        <p class="small muted">철거 자료가 없어 그해에 실제로 있던 건물과는 다를 수 있습니다.</p></div>` : ""}
       <div class="pop-legend">${spec ? legendRows(spec) + (spec.note ? `<p class="small muted">${esc(spec.note)}</p>` : "") : baseLegend()}</div>
-      <label class="pick pick-3d"><input type="checkbox" id="theme-3d"${threeD ? " checked" : ""}>층수 입체 보기</label>
-      ${threeD ? `<p class="small muted">층수로 만든 모형이고 실제 높이가 아닙니다. 점만 있는 건물과 층수 값이 없는 건물은 세우지 않습니다.</p>` : ""}`;
+      <label class="pick pick-3d"><input type="checkbox" id="theme-3d"${threeD ? " checked" : ""}>입체 보기 (LoD1 높이)</label>
+      ${threeD ? `<p class="small muted">높이는 건축물대장 높이(GIS건물통합정보)이고, 없으면 지상 층수 × ${FLOOR_H}m로 추정합니다. 측량한 높이는 아닙니다. 점으로만 표시된 건물과 높이, 층수가 모두 없는 건물은 입체로 세우지 않습니다.</p>
+        <p class="small muted">돌리기와 기울이기: 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌기(휴대폰은 두 손가락). 오른쪽 위 나침반 버튼을 누르면 북쪽이 위로 돌아옵니다.</p>` : ""}
+      <fieldset class="pick-set bright-set"><legend>화면 모드</legend>
+        <div class="seg">${[["system", "시스템"], ["light", "밝게"], ["dark", "어둡게"]].map(([v, l]) => `<label class="pick"><input type="radio" name="theme-pick2" value="${v}"${themeChoice() === v ? " checked" : ""}>${l}</label>`).join("")}</div>
+        <label for="map-bright" class="small">지도 밝기 <b>${brightness}%</b></label>
+        <input id="map-bright" type="range" min="60" max="140" step="5" value="${brightness}">
+      </fieldset>`;
     pop.querySelector(".pop-close").onclick = () => { openPop(false); btn.focus(); };
     pop.querySelectorAll('input[name="theme-k"]').forEach(r => r.onchange = () => {
       const v = r.value === "dong" ? "dong:" + pop.querySelector("#theme-dong").value : r.value || null;
@@ -178,6 +209,19 @@ export async function init(ctx) {
     };
     const d3 = pop.querySelector("#theme-3d");
     d3.onchange = () => { setThreeD(d3.checked); const x = pop.querySelector("#theme-3d"); if (x) x.focus(); };
+    pop.querySelectorAll('input[name="theme-pick2"]').forEach(r => r.onchange = () => {
+      setTheme(r.value);
+      const again = pop.querySelector(`input[name="theme-pick2"][value="${r.value}"]`);
+      if (again) again.focus();
+    });
+    const br = pop.querySelector("#map-bright");
+    br.oninput = () => {
+      brightness = Number(br.value);
+      applyBrightness();
+      const b = br.parentElement.querySelector("b");
+      if (b) b.textContent = `${brightness}%`;
+      try { localStorage.setItem(BRIGHT_KEY, String(brightness)); } catch (e) { /* 저장소 막힘 */ }
+    };
   }
 
   function renderLegend(spec) {
@@ -196,9 +240,14 @@ export async function init(ctx) {
   pop.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); openPop(false); btn.focus(); } });
   document.addEventListener("pointerdown", e => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) openPop(false); });
 
-  mapApi.onTheme(() => { if (key) paint(); else renderPop(); });
+  mapApi.onTheme(() => {
+    if (key) paint();
+    else { renderPop(); if (map.getLayer("bldg-3d")) map.setPaintProperty("bldg-3d", "fill-extrusion-color", mapApi.defaultBuildingColor()); }
+  });
   state.onChange((changed, s, source) => { if (source === "pop" && changed.includes("theme")) apply(s.theme || null, { write: false, announce: false }); });
   const t0 = state.get("theme");
   if (t0) mapApi.whenReady(() => apply(t0, { write: true, announce: false }));
   else renderPop();
+  const v0 = state.get("d3");
+  if (v0) mapApi.whenReady(() => setThreeD(true, { view: v0.split(",").map(Number), write: false, announce: false }));
 }

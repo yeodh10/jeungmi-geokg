@@ -112,7 +112,7 @@ def make(row) -> Proposal:
         summary=f"주소 미연결 건물을 '{name}'(건물관리번호 {row['mgt']})과 같은 건물로 잇는다",
         evidence=[
             f"국가기본도 건물 {row['nf_id']}" + (f" '{row['basemap_name']}'" if isinstance(row["basemap_name"], str) else "")
-            + f"과 모양이 겹친다 (IoU {row['iou']:.3f}), 그 건물의 도로명주소는 {row['address']}",
+            + f"과 모양이 겹친다 (IoU {row['iou']:.3f}). 그 건물의 도로명주소: {row['address']}",
             f"같은 주소의 내비게이션용DB 건물 {row['mgt']}은(는) 모양 없이 점만 있고, 그 점이 이 건물 모양에서 {row['distance_m']}m 떨어져 있다 ({MAX_DISTANCE_M}m 안에 하나뿐)",
             f"PNU: {pnu}" + ("" if same_pnu else " (서로 다르다, 확인 필요)"),
             "기존 URI는 남기고 상태를 '주소 연결됨'으로 바꾼다 (docs/uri-policy.md 건물 규칙 4)",
@@ -131,15 +131,23 @@ def near_same_address(outside: gpd.GeoDataFrame, map_cols: gpd.GeoDataFrame, key
     return near.sort_values(["distance_m", "map_uri"]).drop_duplicates("uri")
 
 
-def real_outlines(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """겹침을 잴 우리 건물 모양 (EPSG:5186). 넓이 GIS_TINY_M2 미만의 자리표시 마름모는 실제 외곽이 아니라 뺀다.
-
-    자리표시는 같은 실물의 점 건물 바로 옆에 찍혀 있어, 넣으면 그 점 건물에 붙일 국가기본도 모양이 '우리 다른 건물과 100% 겹침'으로
-    걸러진다 (2026-11-03 감사에서 5건). 자리표시는 src.review.placeholder_proposals가 같은 건물로 잇는다.
-    """
+def outlines(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """겹침을 잴 우리 건물 모양 (EPSG:5186, uri, pnu, 자리표시 여부 tiny). 순서를 0부터 다시 매긴다."""
     from src.model.build_objects import GIS_TINY_M2
-    polys = buildings[buildings.geom_type != "Point"].to_crs("EPSG:5186")
-    return polys[polys.area >= GIS_TINY_M2]
+    polys = buildings[buildings.geom_type != "Point"].to_crs("EPSG:5186")[["uri", "pnu", "geometry"]].reset_index(drop=True)
+    return polys.assign(tiny=polys.area < GIS_TINY_M2)
+
+
+def worst_overlap(poly, polys: gpd.GeoDataFrame, pnu) -> float:
+    """poly가 우리 다른 건물 모양과 겹치는 비율의 최댓값 (새 면 기준과 그 건물 기준 가운데 큰 값).
+
+    PNU가 pnu와 같은 자리표시 마름모(넓이 GIS_TINY_M2 미만)는 재지 않는다. 같은 필지의 같은 실물을 가리키는 자리표시라
+    재면 그 건물에 붙일 국가기본도 모양이 '100% 겹침'으로 걸러진다 (2026-11-03 감사에서 5건, 모두 이름과 층수도 같았다).
+    다른 필지의 자리표시는 다른 건물일 수 있어 그대로 잰다.
+    """
+    hits = polys.iloc[polys.sindex.query(poly, predicate="intersects")]
+    hits = hits[~(hits["tiny"] & (hits["pnu"] == pnu))] if isinstance(pnu, str) else hits
+    return max((poly.intersection(g).area / min(poly.area, g.area) for g in hits.geometry), default=0.0)
 
 
 def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
@@ -153,7 +161,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     5. 점이 어느 모양에도 들지 않으면(중심점이 외곽선 바로 밖에 찍힌 경우), SHAPE_NEAR_M 안의 모양 가운데
        도로명주소까지 같은 것에서 가장 가까운 모양으로 2, 3을 따져 제안한다. 이때는 주소가 없는 모양은 쓰지 않는다.
     6. 국가기본도 모양과 우리 다른 건물 모양이 어느 쪽 넓이로 재도 SHAPE_MAX_OVERLAP보다 많이 겹치지 않는다.
-       새 면 기준으로만 재면 작은 건물이 통째로 들어간 경우를 놓친다. 자리표시 모양은 재지 않는다 (real_outlines).
+       새 면 기준으로만 재면 작은 건물이 통째로 들어간 경우를 놓친다. 같은 필지의 자리표시 모양은 재지 않는다 (worst_overlap).
     7. 국가기본도 PNU가 점 건물과 다르면, 그 PNU가 점 건물의 관련 지번 가운데 하나여야 한다.
     8. 국가기본도 모양이 SHAPE_MIN_AREA_M2㎡ 이상이고, 층수가 부속 구조물로 보이지 않는다 (floor_gap).
        아파트 동 중심점이 경비실 같은 작은 부속 구조물 모양에 떨어진 경우를 거른다.
@@ -181,13 +189,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     per_map = j.groupby("map_uri").size()
     poly_of = basemap.set_index("uri").geometry.to_crs(stored_crs)
     metric_of = bm.set_index("map_uri").geometry
-    ours = real_outlines(buildings).geometry.reset_index(drop=True)
-
-    def overlap(map_uri: str) -> float:
-        """우리 다른 건물과 겹치는 비율. 새 면 기준과 그 건물 기준 가운데 큰 값이다."""
-        poly = metric_of[map_uri]
-        return max((poly.intersection(g).area / min(poly.area, g.area) for g in ours.iloc[ours.sindex.query(poly, predicate="intersects")]),
-                   default=0.0)
+    ours = outlines(buildings)
 
     rows = []
     for r in j.itertuples():
@@ -200,7 +202,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
                   and r.pnu != r.map_pnu and r.map_pnu not in lots.get(r.bldg_mgt_no, set())
                   else "국가기본도 모양이 너무 작음" if metric_of[r.map_uri].area < SHAPE_MIN_AREA_M2
                   else "층수 차이로 부속 구조물로 보임" if floor_gap(r.floors_above, r.map_floors)
-                  else "우리 다른 건물 모양과 많이 겹침" if overlap(r.map_uri) > SHAPE_MAX_OVERLAP
+                  else "우리 다른 건물 모양과 많이 겹침" if worst_overlap(metric_of[r.map_uri], ours, r.pnu) > SHAPE_MAX_OVERLAP
                   else None)
         if reason:
             skipped[reason] = skipped.get(reason, 0) + 1
@@ -255,19 +257,27 @@ def make_shape(row) -> Proposal:
 def audit(proc: Path = PROC) -> pd.DataFrame:
     """지금 승인이 지금 규칙으로 다시 뽑히는지 본다. 규칙 밖이 된 승인과 그 까닭을 돌려준다. 승인 기록은 고치지 않는다.
 
-    모양 붙이기 규칙 3은 주소 잇기 후보에 들었는지를 보므로, 까닭은 모양 규칙을 건별로 다시 재어 적는다.
+    id만이 아니라 바꾸는 내용(넣고 빼는 트리플)까지 견준다. 옛 승인의 owl:sameAs는 jgk:sameBuildingAs와 같은 것으로 본다
+    (fix-same-building 제안으로 옮겼다). 모양 붙이기 규칙 3은 주소 잇기 후보에 들었는지를 보므로, 까닭은 모양 규칙을 건별로 다시 재어 적는다.
     """
     links, (shapes, _) = candidates(proc), shape_candidates(proc)
-    kept = {f"rule-basemap-link-{u.rsplit('/', 1)[-1]}" for u in links["gis_uri"]} | {f"rule-basemap-shape-{m}" for m in shapes["mgt"]}
+    now_props = {p.id: p for p in [make(r) for _, r in links.iterrows()] + [make_shape(r) for _, r in shapes.iterrows()]}
+    kept = set(now_props)
+    owl_same = "http://www.w3.org/2002/07/owl#sameAs"
+    content = lambda prop: sorted((c.op, c.s, SAME_BUILDING if c.p == owl_same else c.p, c.o.value) for c in prop.changes)
     gpkg = proc / "objects.gpkg"
     ours = gpd.read_file(gpkg, layer="building").to_crs("EPSG:5186")
     by_uri = ours.set_index("uri")
     maps = gpd.read_file(gpkg, layer="basemap_building").to_crs("EPSG:5186").set_index("uri")
-    polys = real_outlines(ours).reset_index(drop=True)
+    polys = outlines(ours)
     map_of = dict(zip(*(pd.read_csv(proc / "building_basemap.csv", dtype=str)[c] for c in ("building_uri", "map_uri"))))
     rows = []
     for p in ProposalStore().load():
-        if p.status != "approved" or not p.id.startswith("rule-basemap-") or p.id in kept:
+        if p.status != "approved" or not p.id.startswith("rule-basemap-"):
+            continue
+        if p.id in kept:
+            if content(p) != content(now_props[p.id]):
+                rows.append({"id": p.id, "summary": p.summary, "reason": "지금 규칙으로 뽑으면 바꾸는 내용이 다르다"})
             continue
         reasons = []
         if "-link-" in p.id:
@@ -277,8 +287,7 @@ def audit(proc: Path = PROC) -> pd.DataFrame:
         else:
             m = maps.loc[next(c.o.value for c in p.changes if c.p.endswith("basemapFeature"))]
             floors, area = by_uri.at[p.target, "floors_above"], m.geometry.area
-            hits = polys.geometry.iloc[polys.sindex.query(m.geometry, predicate="intersects")]
-            worst = max((m.geometry.intersection(g).area / min(m.geometry.area, g.area) for g in hits), default=0.0)
+            worst = worst_overlap(m.geometry, polys, by_uri.at[p.target, "pnu"])
             if worst > SHAPE_MAX_OVERLAP:
                 reasons.append(f"우리 다른 건물과 겹침 {worst:.0%}")
         if m is None:

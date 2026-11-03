@@ -120,7 +120,7 @@ export function createPanel(ctx) {
     syncStack();
     body.scrollTop = 0;
     if (view.render) {
-      try { view.render(content, ctx); } catch (e) { console.error(e); content.innerHTML = `<p class="muted">이 내용을 그리지 못했습니다.</p>`; }
+      try { view.render(content, ctx); } catch (e) { console.error(e); content.innerHTML = `<p class="muted">이 내용을 표시하지 못했습니다.</p>`; }
     }
     if (view.focus) {
       const h = content.querySelector("h2, h1, [data-focus]") || wrap.querySelector(".view-back");

@@ -110,4 +110,4 @@ def build_questions(view: GraphView, qstore: ox.Store) -> dict:
     ids = [x["id"] for x in items]
     if len(set(ids)) != len(ids):
         raise QuestionError("질문 id가 겹친다")
-    return {"v": 1, "note": "미리 실행한 답입니다. 자유 질문은 이 저장소의 로컬 서버에서 됩니다.", "items": items}
+    return {"v": 1, "note": "미리 실행한 답입니다. 자유 질문은 이 저장소의 로컬 서버에서만 할 수 있습니다.", "items": items}

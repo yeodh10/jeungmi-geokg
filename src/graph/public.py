@@ -248,15 +248,25 @@ def _view(store: ox.Store, held: set[str] | None = None, private: set[str] | Non
     return GraphView(store, triples, held or set(), labels, addrs, comments, private or set(), unfit_floors(triples))
 
 
+def publishable(p) -> bool:
+    """공개 뷰에 얹는 제안인가: 근거 자료가 적혀 있고 모두 공개 자료다. 모르면 공개하지 않는다."""
+    return bool(p.based_on) and not {JGK + d for d in p.based_on} & hold_sources()
+
+
+def public_approvals() -> list:
+    """공개 뷰에 얹히는 승인 제안 (제안 기록 순서)."""
+    from src.review.proposals import ProposalStore
+    return [p for p in ProposalStore().load() if p.status == "approved" and publishable(p)]
+
+
 def public_view() -> GraphView:
     """공개 사이트용 뷰. 승인 제안은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹는다. 모르면 공개하지 않는다.
     국가기본도로 만든 제안은 그 결론(잇기, 모양)까지 공개 사이트에서 빠진다."""
     from src.graph.store import load_store
     from src.review.proposals import ProposalStore
     hold = hold_sources()
-    usable = lambda p: bool(p.based_on) and not {JGK + d for d in p.based_on} & hold
-    store = load_store(keep=usable)
-    given = {p.uri: {JGK + d for d in p.based_on} for p in ProposalStore().load() if usable(p)}
+    store = load_store(keep=publishable)
+    given = {p.uri: {JGK + d for d in p.based_on} for p in ProposalStore().load() if publishable(p)}
     view = _view(store)
     private = private_businesses(view.triples)
     pub = public_nodes(view.triples, hold, given) - private

@@ -14,6 +14,7 @@ const P = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M12 5l3 7h-6l3-7z" fill="currentColor"/><path d="M12 19l-3-7h6l-3 7z"/>',
   layers: '<path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/>',
   ruler: '<rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
@@ -55,7 +56,7 @@ export function createUI() {
   function copyFallback(text) {
     clearTimeout(toastTimer);
     toastEl.innerHTML = `<div class="toast-box copy-fallback" role="group" aria-label="복사할 값">
-      <label class="small" for="copy-fallback-input">자동 복사가 막혀 있습니다. 선택된 값을 직접 복사해 주세요.</label>
+      <label class="small" for="copy-fallback-input">자동 복사를 쓸 수 없습니다. 선택된 값을 직접 복사해 주세요.</label>
       <div class="row"><input id="copy-fallback-input" class="field" readonly value="${esc(text)}">
       <button type="button" class="btn ghost mini" data-close>닫기</button></div></div>`;
     toastEl.classList.add("on");

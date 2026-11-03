@@ -284,7 +284,7 @@ def check_real_site() -> None:
     assert made == {p.rsplit("/", 1)[-1] for p in shown}, (len(made), len(shown))
     assert not made & {p.rsplit("/", 1)[-1] for p in hidden}, "공개하지 않는 상호의 페이지가 있다"
     page = (pages / olive[0]["p"].rsplit("/", 1)[-1] / "index.html").read_text(encoding="utf-8")
-    assert "상가업소번호" in page and "들어 있는 건물" in page and "영업시간, 전화번호, 리뷰는 이 자료에 없다" in page
+    assert "상가업소번호" in page and "들어 있는 건물" in page and "영업시간, 전화번호, 리뷰는 이 자료에 없습니다" in page
     # 층 값을 뺀 상호는 페이지와 기계용 원본에 그 값이 없고, 뺀 까닭이 적혀 있다
     withheld = sorted(s.rsplit("/id/", 1)[-1] for s in view.unfit_floor if view.shown(s))
     assert withheld, "층 값을 뺀 상호가 없다 (검토 때 93곳)"

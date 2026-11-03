@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import date
 from pathlib import Path
@@ -67,6 +68,19 @@ def to_int(v) -> int | None:
         return int(float(s))
     except ValueError:
         return None
+
+
+def height_m(v) -> float | None:
+    """GIS건물통합정보 A16(건축물대장 높이, m). 0이나 빈 값은 값이 없는 것으로 본다."""
+    s = text(v)
+    try:
+        h = float(s) if s is not None else None
+    except ValueError:
+        return None
+    if h is None or not math.isfinite(h):
+        return None
+    h = round(h, 2)
+    return h if h > 0 else None
 
 
 def floor_counts(above, below) -> tuple[int | None, int | None]:
@@ -302,10 +316,18 @@ def make_basemap_objects(area_gpkg: Path, buildings, centers, metric: str, stora
     return {"layer": layer, "links": links, "review": review, "unmatched": unmatched, "report": report}
 
 
+# 지목 부호 -> 정식 명칭 (공간정보의 구축 및 관리 등에 관한 법률 제67조, 지적도의 지목 부호). 연속지적도는 부호만 적는다
+LAND_CATEGORY = {"전": "전", "답": "답", "과": "과수원", "목": "목장용지", "임": "임야", "광": "광천지", "염": "염전", "대": "대",
+                 "장": "공장용지", "학": "학교용지", "차": "주차장", "주": "주유소용지", "창": "창고용지", "도": "도로", "철": "철도용지",
+                 "제": "제방", "천": "하천", "구": "구거", "유": "유지", "양": "양어장", "수": "수도용지", "공": "공원",
+                 "체": "체육용지", "원": "유원지", "종": "종교용지", "사": "사적지", "묘": "묘지", "잡": "잡종지"}
+
+
 def make_parcel_shapes(area_gpkg: Path, parcels: pd.DataFrame, storage: str) -> gpd.GeoDataFrame:
     """필지마다 연속지적도에서 PNU(A1)가 같은 경계, 지목, 기준일. 필지 집합은 늘리지 않는다 (건물과 대장에 나온 PNU만).
 
-    A5는 '지번+지목' 꼴('52-104도', '산12임')이라 끝의 글자를 지목으로 쓴다. 한 PNU에 폴리곤이 여럿이면 합친다.
+    A5는 '지번+지목 부호' 꼴('52-104도', '산12임')이라 끝의 글자를 정식 지목 이름으로 바꿔 쓴다(LAND_CATEGORY).
+    모르는 부호면 비운다. 한 PNU에 폴리곤이 여럿이면 합친다. A6은 파일 전체의 데이터 기준일이다.
     """
     cols = ["uri", "pnu", "land_category", "cadastral_date"]
     if "cadastral_parcel" not in set(pyogrio.list_layers(area_gpkg)[:, 0]):
@@ -318,7 +340,7 @@ def make_parcel_shapes(area_gpkg: Path, parcels: pd.DataFrame, storage: str) -> 
     shapes["geometry"] = shapely.set_precision(shapes.geometry.values, 1e-7)
     return gpd.GeoDataFrame({
         "uri": shapes["A1"].map(uri.parcel), "pnu": shapes["A1"],
-        "land_category": shapes["A5"].str.extract(r"([^\d\-\s]+)$")[0].replace({"산": None}),
+        "land_category": shapes["A5"].str.extract(r"([^\d\-\s])$")[0].map(LAND_CATEGORY),
         "cadastral_date": shapes["A6"].astype(str).str[:10],
     }, geometry=shapes.geometry, crs=storage)
 
@@ -472,7 +494,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
                 label=text(c["sigungu_bldg_name"]) or gis_label(g),
                 use_name=text(g["A9"]), structure_name=text(g["A11"]),
                 approval_date=to_date(g["A13"]),
-                pnu=text(g["A2"]), attr_source="gis", geometry=g.geometry,
+                pnu=text(g["A2"]), attr_source="gis", geometry=g.geometry, height_m=height_m(g["A16"]),
             )
             row["floors_above"], row["floors_below"] = floor_counts(g["A26"], g["A27"])
         else:
@@ -496,7 +518,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
             "bldg_mgt_no": None, "gis_building_id": a1, "road_address": None, "adm_dong_code": None,
             "label": gis_label(g), "use_name": text(g["A9"]), "structure_name": text(g["A11"]),
             "approval_date": to_date(g["A13"]), "floors_above": above, "floors_below": below,
-            "pnu": text(g["A2"]), "attr_source": "gis", "geometry": g.geometry,
+            "pnu": text(g["A2"]), "attr_source": "gis", "geometry": g.geometry, "height_m": height_m(g["A16"]),
         })
     buildings = gpd.GeoDataFrame(rows, geometry="geometry", crs=storage)
     assert buildings["uri"].is_unique
@@ -608,6 +630,8 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     parcels.to_csv(proc / "parcel.csv", index=False, encoding="utf-8")
     if len(parcel_shapes):
         parcel_shapes.to_file(out_gpkg, layer="parcel_shape", driver="GPKG", engine="pyogrio")
+        parcels.loc[~parcels["pnu"].isin(parcel_shapes["pnu"]), ["uri", "pnu", "sources"]].to_csv(
+            proc / "review_parcel_no_boundary.csv", index=False, encoding="utf-8")  # 연속지적도에 없는 PNU (docs/uri-policy.md 필지 규칙)
     dongs.to_csv(proc / "admin_dong.csv", index=False, encoding="utf-8")
     links.to_csv(proc / "building_entrance.csv", index=False, encoding="utf-8")
     conflicts.to_csv(proc / "review_gis_id_conflict.csv", index=False, encoding="utf-8")

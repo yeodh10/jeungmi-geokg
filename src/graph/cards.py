@@ -186,7 +186,7 @@ class CardMaker:
                 missing.append(label)
         if kind == "sensor" and "sensor" not in c:
             missing.append("관측값")
-            lead.append("받은 기간에 이 센서의 관측값이 없습니다.")
+            lead.append("자료를 받은 기간에 이 센서의 관측값이 없습니다.")
         absent = [x for x in ABSENT.get(kind, []) if not (x == "경계 모양" and w)]
         c["facts"] = facts
         if lead:
@@ -220,6 +220,9 @@ class CardMaker:
             facts.append({"k": "지상 층수", "v": f"{int(float(fa))}층"})
         if fb not in (None, "", "0"):
             facts.append({"k": "지하 층수", "v": f"{int(float(fb))}층"})
+        h = v.value(uri, "heightM")
+        if h:
+            facts.append({"k": "높이", "v": f"{float(h):,.1f}m", "note": "건축물대장에 적힌 높이입니다"})
         self._num_fact(uri, "structureName", "구조", facts)
         ad = v.value(uri, "approvalDate")
         if ad:
@@ -313,6 +316,9 @@ class CardMaker:
         self._num_fact(uri, "households", "세대수", facts, lambda x: f"{num(x):,}세대")
         self._num_fact(uri, "mainBuildingCount", "주건축물 수", facts, lambda x: f"{num(x):,}동")
         self._num_fact(uri, "complexMainUse", "단지 주용도", facts)
+        lc = v.value(uri, "landCategory")
+        if lc:
+            facts.append({"k": "지목", "v": lc, "note": "연속지적도(참조용 도면)의 값입니다"})
         pnu = uri.rsplit("/", 1)[-1]
         on = [p for p, s in self.inbound.get(uri, []) if p == JGK + "locatedOn"]
         if on:
@@ -329,7 +335,7 @@ class CardMaker:
         if r:
             facts.append({"k": "이 길을 주소로 쓰는 건물", "v": f"{r['b']:,}동"})
             if r["side"]:
-                facts.append({"k": "곁길까지 합친 건물", "v": f"{r['b'] + r['side']:,}동", "note": f"{c['name']}+번호+길 꼴의 곁길 {r['side']:,}동을 더한 값입니다"})
+                facts.append({"k": "곁길까지 합친 건물", "v": f"{r['b'] + r['side']:,}동", "note": f"{c['name']}+번호+길 꼴 곁길의 건물 {r['side']:,}동을 더한 값입니다"})
             if r["b"]:
                 links.append({"rel": "이 길을 주소로 쓰는 건물", "kind": "spread", "name": f"건물 {r['b']:,}동",
                               "spread": {"by": "road", "value": uri.rsplit("/", 1)[-1]}})

@@ -626,7 +626,7 @@ class ProposalStore:
                 if p is None:
                     raise KeyError(pid)
                 if p.status != "pending":
-                    raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다" + (f" ({pid})" if len(pids) > 1 else ""))
+                    raise ValueError(f"이미 {DONE_KO[p.status]} 제안입니다" + (f" ({pid})" if len(pids) > 1 else ""))
             at = now()
             chosen = [p for p in proposals if p.id in set(pids)]
             for n, p in enumerate(chosen, next_seq(proposals)):
@@ -649,9 +649,9 @@ class ProposalStore:
             if p is None:
                 raise KeyError(pid)
             if p.status == "pending":
-                raise ValueError("아직 결정하지 않은 제안이다")
+                raise ValueError("아직 결정하지 않은 제안입니다")
             if p.status == to_status:
-                raise ValueError(f"이미 {DONE_KO[p.status]} 제안이다")
+                raise ValueError(f"이미 {DONE_KO[p.status]} 제안입니다")
             at, n = now(), next_seq(proposals)
             p.corrections.append(Correction(from_status=p.status, to_status=to_status, reviewer=reviewer,
                                             at=at, reason=reason, replaced=p.decision, seq=n))

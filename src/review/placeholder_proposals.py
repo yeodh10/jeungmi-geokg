@@ -9,7 +9,8 @@ GIS건물통합정보의 자리표시 모양은 실제 외곽이 아니어서 �
 대신 건축물대장 속성(이름, 층수)과 지번으로 잇는다. 규칙 (모두 맞아야 제안한다):
 1. 자리표시와 PNU가 같은 건물관리번호 건물이 자리표시에서 MAX_DISTANCE_M 안에 하나뿐이다.
 2. 이름이나 지상 층수 가운데 하나 이상이 같고, 두 값이 모두 있는데 다른 것은 없다.
-   이름은 대소문자, 띄어쓰기, 괄호 속 글, 끝의 'N동'을 빼고 견준다 ('루체씨티3동'과 '루체씨티', 'PlusTwinvill (B)'와 'plusTwinvill').
+   이름은 대소문자와 띄어쓰기를 빼고 '이름'과 '동 표시'(끝의 'N동', 괄호 속 글)로 나눠 견준다 (same_name).
+   이름이 같고 동 표시가 한쪽에만 있으면 같다고 본다('루체씨티3동'과 '루체씨티'). 양쪽에 다 있는데 다르면 다르다('1동'과 '3동').
 3. 그 건물을 다른 주소 미연결 건물이 이미 가리키지 않는다 (같은 건물 잇기는 대상마다 하나다, src/graph/shapes.ttl).
 승인하면 basemap_proposals의 주소 잇기와 같은 꼴로 바뀐다 (상태를 '주소 연결됨'으로, jgk:sameBuildingAs로 대상을 가리킨다).
 """
@@ -25,22 +26,38 @@ from src.graph.store import load_store
 from src.review.basemap_proposals import JGK, PROC, SAME_BUILDING
 from src.review.proposals import Change, Proposal, ProposalStore, Term, now
 
+OWL_SAME = "http://www.w3.org/2002/07/owl#sameAs"  # 2026-11-02 앞의 승인이 쓴 관계. SHACL은 두 관계를 함께 본다
 MAX_DISTANCE_M = 10  # 자리표시와 대상 건물 모양(또는 점) 사이 (EPSG:5186)
 
 
-def name_key(v) -> str | None:
-    """견주기용 이름. 대소문자, 띄어쓰기, 괄호 속 글, 끝의 'N동'을 뺀다."""
-    if not isinstance(v, str):
+def name_parts(v) -> tuple[str, str | None] | None:
+    """견주기용 (이름, 동 표시). 대소문자와 띄어쓰기를 빼고, 괄호 속 글과 끝의 'N동'을 동 표시로 뗀다. 이름이 없으면 None."""
+    if not isinstance(v, str) or not v.strip():
         return None
-    v = re.sub(r"\([^)]*\)", "", v.lower())
-    v = re.sub(r"\s+", "", v)
-    return re.sub(r"\d+동$", "", v) or None
+    v = re.sub(r"\s+", "", v.lower())
+    marks = re.findall(r"\(([^)]*)\)", v)
+    v = re.sub(r"\([^)]*\)", "", v)
+    m = re.search(r"(\d+동)$", v)
+    if m:
+        marks.append(m.group(1))
+        v = v[: m.start()]
+    return v, "".join(marks) or None
+
+
+def same_name(a, b) -> bool | None:
+    """두 이름이 같은 건물을 가리키는지. 한쪽이라도 이름이 없으면 None(모름)."""
+    pa, pb = name_parts(a), name_parts(b)
+    if pa is None or pb is None:
+        return None
+    if pa[0] != pb[0]:
+        return False
+    return pa[1] is None or pb[1] is None or pa[1] == pb[1]
 
 
 def link_state() -> tuple[set[str], set[str]]:
     """승인을 얹은 그래프에서 같은 건물로 가리켜진 대상과, 이미 주소가 이어진 주소 미연결 건물."""
     store = load_store()
-    taken = {r["t"].value for r in store.query(f"SELECT DISTINCT ?t WHERE {{ ?s <{SAME_BUILDING}> ?t }}")}
+    taken = {r["t"].value for r in store.query(f"SELECT DISTINCT ?t WHERE {{ ?s <{SAME_BUILDING}>|<{OWL_SAME}> ?t FILTER(CONTAINS(STR(?s), '/building')) }}")}
     linked = {r["s"].value for r in store.query(f"SELECT ?s WHERE {{ ?s <{JGK}status> <{JGK}AddressLinked> }}")}
     return taken, linked
 
@@ -67,9 +84,8 @@ def candidates(proc: Path = PROC) -> pd.DataFrame:
             row["reason"] = f"같은 PNU 건물이 {MAX_DISTANCE_M}m 안에 {len(near)}개"
             continue
         c = near.iloc[0]
-        names = (name_key(me["label"]), name_key(c["label"]))
         floors = (me["floors_above"], c["floors_above"])
-        name_same = None if None in names else names[0] == names[1]
+        name_same = same_name(me["label"], c["label"])
         floor_same = None if any(pd.isna(v) for v in floors) else floors[0] == floors[1]
         if False in (name_same, floor_same) or True not in (name_same, floor_same):
             row["reason"] = f"이름 {'같음' if name_same else '다름' if name_same is False else '모름'}, 층수 {'같음' if floor_same else '다름' if floor_same is False else '모름'}"
@@ -88,6 +104,9 @@ def make(row) -> Proposal:
     gis_id = row["uri"].rsplit("/", 1)[-1]
     name = row["target_label"] if isinstance(row["target_label"], str) else row["target_address"]
     show = lambda v: "없음" if pd.isna(v) else str(int(v)) if isinstance(v, float) else str(v)
+    area = "없음" if pd.isna(row["register_area_m2"]) else f"{float(row['register_area_m2']):,.1f}"
+    marks = [name_parts(row["label"]), name_parts(row["target_label"])]
+    name_note = (" (같다)" if marks[0] == marks[1] else " (이름이 같고, 동 표시는 한쪽에만 있다)") if row["name_same"] else ""
     status = lambda op, v: Change(op=op, s=row["uri"], p=JGK + "status", o=Term(kind="uri", value=JGK + v))
     return Proposal(
         id=f"rule-placeholder-link-{gis_id}", created_at=now(), source_kind="rule-candidate",
@@ -95,9 +114,9 @@ def make(row) -> Proposal:
         action="link", target=row["uri"], target_type="Building",
         summary=f"자리표시 모양뿐인 주소 미연결 건물을 '{name}'(건물관리번호 {row['mgt']})과 같은 건물로 잇는다",
         evidence=[
-            f"이 건물의 모양은 넓이 1㎡ 미만의 자리표시다 (건축물대장 건축면적 {show(row['register_area_m2'])}㎡)",
+            f"이 건물의 모양은 넓이 1㎡ 미만의 자리표시다 (건축물대장 건축면적 {area}㎡)",
             f"PNU {row['pnu']}가 같은 건물관리번호 건물은 {MAX_DISTANCE_M}m 안에 이것 하나다 ({row['distance_m']}m)",
-            f"이름: 이 건물 {show(row['label'])}, 대상 {show(row['target_label'])}" + (" (같다)" if row["name_same"] else ""),
+            f"이름: 이 건물 {show(row['label'])}, 대상 {show(row['target_label'])}" + name_note,
             f"지상 층수: 이 건물 {show(row['floors'])}, 대상 {show(row['target_floors'])}" + (" (같다)" if row["floor_same"] else ""),
             "기존 URI는 남기고 상태를 '주소 연결됨'으로 바꾼다 (docs/uri-policy.md 건물 규칙 4)",
         ],

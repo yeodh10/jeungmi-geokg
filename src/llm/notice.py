@@ -275,9 +275,9 @@ def checked_summary(summary: str | None, fallback: str) -> tuple[str, list[str]]
     if not text:
         return fallback, []
     if len(text) > MAX_SUMMARY:
-        return fallback, [f"모델 요약이 {MAX_SUMMARY}자를 넘어 버리고 코드가 만든 요약을 썼다 (확인 필요)"]
+        return fallback, [f"모델 요약이 {MAX_SUMMARY}자를 넘어서 쓰지 않고 코드가 만든 요약을 썼다 (확인 필요)"]
     if any(unicodedata.category(ch) in BAD_CHARS for ch in text):
-        return fallback, ["모델 요약에 보이지 않는 글자가 있어 버리고 코드가 만든 요약을 썼다 (확인 필요)"]
+        return fallback, ["모델 요약에 보이지 않는 글자가 있어서 쓰지 않고 코드가 만든 요약을 썼다 (확인 필요)"]
     flags = []
     plain = " ".join(URL_LIKE.sub(" ", MD_LINK.sub(lambda m: f" {m.group(1)} ", text)).split())
     if plain != text:
@@ -289,7 +289,7 @@ def checked_summary(summary: str | None, fallback: str) -> tuple[str, list[str]]
         flags.append("모델 요약에 검토자에게 결정을 권하는 말이 있다. 요약이 아니라 원문과 변경 내용으로 판단해야 한다 (확인 필요)")
     verdict = check(text, document=True)
     if verdict.blocked:
-        return fallback, flags + [f"모델 요약을 입력 가드가 막아 버렸다: {', '.join(verdict.reasons) or verdict.score} (확인 필요)"]
+        return fallback, flags + [f"입력 가드가 모델 요약을 막아 코드가 만든 요약을 썼다: {', '.join(verdict.reasons) or verdict.score} (확인 필요)"]
     if verdict.decision == "검토":
         flags.append(f"모델 요약에 입력 가드 경고 {verdict.score}점: {', '.join(verdict.reasons) or '숨은 글자나 인코딩'} (확인 필요)")
     text, kinds = screen_output(text, ("pii", "secret"))
@@ -460,7 +460,7 @@ class Resolver:
             if home is None:
                 return set(), "시군구를 정할 말이 없고 고시를 낸 시군구도 모른다"
             allowed &= {home}
-        return allowed, None if allowed else "주소에 적힌 시군구, 동, 우편번호가 서로 맞지 않다"
+        return allowed, None if allowed else "주소에 적힌 시군구, 동, 우편번호가 서로 맞지 않는다"
 
     def by_road(self, text: str, home: tuple[str, str] | None = None) -> list[str]:
         # '강서구 양천로 550' -> 시도, 시군구가 맞고 '양천로 550'까지 같은 건물
@@ -636,11 +636,11 @@ def change_flags(c: ExtractedChange, action: str, meta: dict, notice: str | None
     """승인 전에 사람이 봐야 하는 경고."""
     flags = []
     if meta.get("숨김의심"):  # 수집기가 흉내 내지 못하는 숨김(class, 글자색 등)을 본 문서다
-        flags.append(f"숨김 의심: {meta['숨김의심'][:200]}. 화면에 안 보이는 글이 모델에 들어갔을 수 있어 원본 쪽을 브라우저로 봐야 한다")
+        flags.append(f"숨김 의심: {meta['숨김의심'][:200]}. 화면에 보이지 않는 글이 모델에 들어갔을 수 있으니 원본 페이지를 브라우저로 확인해야 한다")
     title = meta.get("제목", "")
     kinds = set().union(*(k for pattern, k in TITLE_KINDS if re.search(pattern, title)))
     if kinds and c.change_type not in kinds:
-        flags.append(f"제목과 변경 종류가 맞지 않다: '{title}' 고시에서 {c.change_type}")
+        flags.append(f"제목과 변경 종류가 맞지 않는다: '{title}' 고시에서 {c.change_type}")
     if action == "retire":
         flags.append("두 번째 출처 없음: 고시 한 건만으로 폐지한다. 건축물대장이나 현장으로 확인해야 한다")
     scope = MANY_PARCELS.search(" ".join(filter(None, (c.target.jibun_address, c.target.road_address, c.quote))))

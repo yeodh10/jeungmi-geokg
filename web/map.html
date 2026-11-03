@@ -123,15 +123,15 @@
         </div>
         <div id="hits" aria-live="polite"></div>
       </div>
-      <form id="askf" class="ask"><input id="ask" class="field" aria-label="그래프에 물어볼 질문" placeholder="그래프에 묻기 (예: 증미역 300m 안 학교)"><button class="btn" id="askb">묻기</button></form>
+      <form id="askf" class="ask"><input id="ask" class="field" aria-label="그래프에 물어볼 질문" placeholder="그래프에 묻기 (예: 증미역 300m 이내 학교)"><button class="btn" id="askb">묻기</button></form>
       <div class="ask-note small muted">
-        <span>질문을 SPARQL로 바꿔 묻습니다 (Claude API 필요).</span>
+        <span>질문을 SPARQL로 바꿔 그래프에 묻습니다(Claude API 필요).</span>
         <button type="button" class="eg" data-q="증미역 500m 안 교육연구시설 건물을 지도에 보여줘">교육연구시설 500m</button>
         <button type="button" class="eg" data-q="양천로에 면한 출입구를 가진 건물을 보여줘">양천로에 면한 건물</button>
         <button type="button" class="eg" data-q="지상 20층 이상인 건물을 보여줘">20층 이상</button>
       </div>
     </div>
-    <div class="info" id="info" aria-live="polite"><div class="muted">지도에서 객체를 누르거나 찾기로 고르면 그래프에 담긴 내용이 여기에 나옵니다.</div></div>
+    <div class="info" id="info" aria-live="polite"><div class="muted">지도에서 객체를 누르거나 검색해서 고르면 그래프에 담긴 내용이 여기에 표시됩니다.</div></div>
   </aside>
   <div class="mapbox">
     <div id="map"></div>
@@ -148,26 +148,36 @@
           <div class="status-legend" id="st-legend"></div>
           <div class="quick">
             <button type="button" class="btn ghost mini" id="only-retired" disabled>폐지만 보기</button>
-            <button type="button" class="btn ghost mini" id="all-status" disabled>모든 상태</button>
+            <button type="button" class="btn ghost mini" id="all-status" disabled>모든 상태 보기</button>
           </div>
           <label class="layer"><input type="checkbox" data-l="entrance"><i class="sw dot" style="background:var(--accent)"></i>출입구<span class="n" id="n-entrance"></span></label>
           <label class="layer"><input type="checkbox" data-l="facility"><i class="sw dot" style="background:var(--facility)"></i>공공시설<span class="n" id="n-facility"></span></label>
           <label class="layer"><input type="checkbox" data-l="station"><i class="sw dot" style="background:var(--station)"></i>역<span class="n" id="n-station"></span></label>
-          <label class="layer" title="서울시 도시데이터 센서(S-DoT). 기온, 습도, 소음 같은 1시간 평균 관측값이 SOSA 관측으로 들어 있다"><input type="checkbox" data-l="sensor"><i class="sw dot" style="background:var(--sensor)"></i>센서<span class="n" id="n-sensor"></span></label>
-          <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
-          <h4>견주어 볼 지도</h4>
-          <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽 (증미역 둘레 약 600m만 받음). 우리 건물과 모양이 1:1로 겹치면 서로 이어져 있다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
-          <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000)의 건물 외곽"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
+          <label class="layer" title="서울시 도시데이터 센서(S-DoT). 기온, 습도, 소음 등 1시간 평균 관측값을 SOSA 관측으로 담았습니다"><input type="checkbox" data-l="sensor"><i class="sw dot" style="background:var(--sensor)"></i>센서<span class="n" id="n-sensor"></span></label>
+          <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명에서 가장 가까운 구간과 연결되어 있습니다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
+          <h4>비교용 지도</h4>
+          <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽선 (증미역 반경 1.25km 영역). 그래프의 건물과 모양이 1:1로 겹치면 서로 연결되어 있습니다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
+          <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000)의 건물 외곽선"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
           <label class="layer" title="도로명주소 전자지도의 법정동 경계"><input type="checkbox" data-l="legaldong"><i class="sw area" style="border-color:var(--legaldong)"></i>법정동 경계<span class="n" id="n-legaldong"></span></label>
           <h4>바탕</h4>
-          <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
+          <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원입니다"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
           <label class="layer"><input type="checkbox" data-l="osm"><i class="sw" style="background:var(--line-2)"></i>배경지도 (OpenStreetMap)</label>
-          <div class="layer"><i class="sw answer" style="margin-left:21px"></i>질문 답<span class="n" id="n-answer"></span><button type="button" class="btn ghost mini" id="clear-answer" disabled>답 지우기</button></div>
+          <div class="layer"><i class="sw answer" style="margin-left:21px"></i>질문 결과<span class="n" id="n-answer"></span><button type="button" class="btn ghost mini" id="clear-answer" disabled>결과 지우기</button></div>
         </div>
+        <h4>입체와 밝기</h4>
+        <label class="layer" title="건축물대장 높이(GIS건물통합정보)로 세운 LoD1 입체. 높이가 없으면 지상 층수 × 3.26m로 추정합니다"><input type="checkbox" id="lp-3d">입체 보기 (LoD1 높이)</label>
+        <div class="small muted" id="lp-3d-note" hidden>마우스 오른쪽 버튼이나 Ctrl을 누른 채 끌면 지도를 돌리고 기울일 수 있습니다. 나침반을 누르면 북쪽이 다시 위로 옵니다.</div>
+        <div class="layer seg" role="radiogroup" aria-label="화면 모드">
+          <label><input type="radio" name="lp-theme" value="system">시스템</label>
+          <label><input type="radio" name="lp-theme" value="light">밝게</label>
+          <label><input type="radio" name="lp-theme" value="dark">어둡게</label>
+        </div>
+        <label class="small" for="lp-bright">지도 밝기 <b id="lp-bright-v">100%</b></label>
+        <input type="range" id="lp-bright" min="60" max="140" step="5" value="100" style="width:100%">
         <h4>행정동</h4>
-        <label for="dong" class="sr-only">행정동 고르기</label>
+        <label for="dong" class="sr-only">행정동 선택</label>
         <select id="dong" class="field" disabled><option value="">전체 (강조 안 함)</option></select>
-        <div class="small muted" id="dong-note" style="margin-top:4px">건물을 받으면 고를 수 있습니다.</div>
+        <div class="small muted" id="dong-note" style="margin-top:4px">건물 자료를 불러오면 선택할 수 있습니다.</div>
       </div>
     </section>
   </div>
@@ -195,14 +205,14 @@ const KINDS = ["building", "entrance", "facility", "station", "sensor", "road", 
 const KIND_KO = { building: "건물", entrance: "출입구", facility: "공공시설", station: "역", sensor: "센서", road: "도로 구간", legaldong: "법정동", basemap: "국가기본도 건물", digitalmap: "수치지형도 건물", area: "범위 원" };
 const KIND_RANK = { station: 0, facility: 1, building: 2, legaldong: 3, road: 4, basemap: 5, digitalmap: 6, entrance: 7, sensor: 8 };  // 찾기에서 점수가 같을 때 앞에 둘 순서
 const STATUSES = [
-  { name: "사용", color: "--active", tip: "사용: 도로명주소 건물관리번호가 있는, 지금 쓰이는 건물" },
+  { name: "사용", color: "--active", tip: "사용: 도로명주소 건물관리번호가 있고 현재 쓰이는 건물" },
   { name: "주소 미연결", color: "--unlinked", tip: "주소 미연결: 도로명주소에 없는 GIS 건물" },
-  { name: "주소 연결됨", color: "--linked", tip: "주소 연결됨: 주소 미연결이던 GIS 건물을 승인을 거쳐 도로명주소 건물에 이은 것" },
-  { name: "폐지", color: "--retired", tip: "폐지: 없어진 것이 확인된 건물 (URI는 남는다, 굵은 테두리로도 보인다)" },
+  { name: "주소 연결됨", color: "--linked", tip: "주소 연결됨: 주소 미연결이던 GIS 건물을 승인을 거쳐 도로명주소 건물과 연결한 것" },
+  { name: "폐지", color: "--retired", tip: "폐지: 없어진 것이 확인된 건물 (URI는 유지되며 굵은 테두리로 표시된다)" },
 ];
 const GEOM_RE = /^(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)/;
 // 레이어 목록의 이름 -> 지도 레이어 id
-const LAYER_IDS = { building: ["building", "building-pt", "building-retired"], entrance: ["entrance"], facility: ["facility"],
+const LAYER_IDS = { building: ["building", "building-pt", "building-retired", "building-3d"], entrance: ["entrance"], facility: ["facility"],
   station: ["station"], sensor: ["sensor"], road: ["road"], legaldong: ["legaldong-line"], basemap: ["basemap-line"], digitalmap: ["digitalmap-line"], area: ["area-line"], osm: ["osm"] };
 // 아래에서 위로 그리는 순서. 늦게 받은 레이어도 beforeId로 이 자리에 끼운다
 const ORDER = ["legaldong-line", "road", "building", "building-pt", "building-retired", "digitalmap-line", "basemap-line", "area-line", "entrance", "facility", "sensor", "station",
@@ -316,6 +326,79 @@ styleReady.then(() => {
     if (hit) show(hit.properties.uri, { push: true });
   });
   map.on("moveend", saveQuery);
+  bindHover();
+});
+
+// ---- 마우스를 올린 건물의 말풍선: 누르지 않아도 이름, 용도, 층수, 높이, 상태를 본다 (마우스가 있는 화면만)
+function bindHover() {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const tip = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, maxWidth: "260px", className: "hover-tip" });
+  let raf = 0, cur = null;
+  map.on("mousemove", e => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const layers = ["building-3d", "building", "building-pt"].filter(id => map.getLayer(id));
+      const f = map.queryRenderedFeatures([[e.point.x - 2, e.point.y - 2], [e.point.x + 2, e.point.y + 2]], { layers })[0];
+      if (!f) { tip.remove(); cur = null; return; }
+      const p = f.properties;
+      if (cur !== p.uri) {
+        cur = p.uri;
+        const bits = [p.use, p.fa ? `지상 ${Math.round(p.fa)}층` : null, p.h ? `높이 ${Number(p.h).toFixed(1)}m` : null, { "주소 미연결": "도로명주소 없는 건물", "폐지": "폐지된 건물" }[p.status] || null].filter(Boolean);
+        tip.setHTML(`<b>${esc(p.label || p.addr || "이름 없는 건물")}</b>${bits.length ? `<span>${esc(bits.join(", "))}</span>` : ""}`);
+      }
+      tip.setLngLat(e.lngLat);
+      if (!tip.isOpen()) tip.addTo(map);
+    });
+  });
+  map.on("mouseout", () => tip.remove());
+  map.on("movestart", () => tip.remove());
+}
+
+// ---- 입체 보기 (LoD1): 건축물대장 높이, 없으면 지상 층수 x 3.26m (반경 1km 대장 높이/층수 가운데값)
+// 입체 층의 투명도는 건물마다 다르게 줄 수 없어, 행정동을 고르면 그 밖의 건물을 회색으로 칠한다
+function building3dColor() {
+  const status = ["match", ["get", "status"], "주소 미연결", css("--unlinked"), "주소 연결됨", css("--linked"), "폐지", css("--retired"), css("--active")];
+  const c = !dongSel ? null : dongSel === "none" ? ["==", ["coalesce", ["get", "dong"], ""], ""] : ["==", ["get", "dong"], dongSel];
+  return c ? ["case", c, status, darkMode() ? "#3a3f47" : "#c9ced6"] : status;
+}
+function add3dLayer() {
+  if (map.getLayer("building-3d") || !map.getSource("building")) return;
+  map.addLayer({ id: "building-3d", type: "fill-extrusion", source: "building", filter: buildingFilter("fill"),
+    layout: { visibility: off.has("building") ? "none" : "visible" },
+    paint: { "fill-extrusion-color": building3dColor(),
+      "fill-extrusion-height": ["coalesce", ["get", "h"], ["*", ["coalesce", ["get", "fa"], 0], 3.26]], "fill-extrusion-opacity": 0.88,
+      "fill-extrusion-vertical-gradient": true } }, map.getLayer("sel-line") ? "sel-line" : undefined);
+}
+let compass = null;
+function setThreeD(on) {
+  if (on && !map.getSource("building")) { $("lp-3d").checked = false; return; }   // 건물을 받지 못했으면 켜지 않는다
+  if (on) add3dLayer(); else if (map.getLayer("building-3d")) map.removeLayer("building-3d");
+  if (on && !compass) { compass = new maplibregl.NavigationControl({ showZoom: false, visualizePitch: true }); map.addControl(compass, "bottom-right"); }
+  if (!on && compass) { map.removeControl(compass); compass = null; }
+  map.easeTo({ pitch: on ? 55 : 0, bearing: on ? -20 : 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500 });
+  $("lp-3d-note").hidden = !on;
+}
+$("lp-3d").onchange = e => styleReady.then(() => loadKind("building")).then(() => setThreeD(e.target.checked), () => setThreeD(false));
+
+// ---- 화면 밝기와 지도 밝기
+const BRIGHT_KEY = "jgk-map-brightness";
+let bright = 100;
+try { bright = Math.min(140, Math.max(60, Number(localStorage.getItem(BRIGHT_KEY)) || 100)); } catch (e) { /* 저장소 막힘 */ }
+const applyBright = () => { map.getCanvas().style.filter = bright === 100 ? "" : `brightness(${bright / 100})`; $("lp-bright").value = bright; $("lp-bright-v").textContent = bright + "%"; };
+applyBright();
+$("lp-bright").oninput = e => { bright = Number(e.target.value); applyBright(); try { localStorage.setItem(BRIGHT_KEY, String(bright)); } catch (er) { /* 저장소 막힘 */ } };
+document.querySelectorAll('input[name="lp-theme"]').forEach(r => { r.checked = r.value === themeChoice(); r.onchange = () => setTheme(r.value); });
+// 밝기가 바뀌면 배경과 우리 레이어 색을 다시 칠한다 (색은 css 토큰에서 읽는다)
+onThemeChange(() => {
+  if (!map.style || !map.style._loaded) return;
+  restyleBase(map);
+  for (const k of Object.keys(LAYER_IDS)) {
+    if (!map.getSource(k)) continue;
+    for (const spec of layerSpecs(k)) if (map.getLayer(spec.id)) for (const [prop, v] of Object.entries(spec.paint || {})) map.setPaintProperty(spec.id, prop, v);
+  }
+  if (map.getLayer("building-3d")) map.setPaintProperty("building-3d", "fill-extrusion-color", building3dColor());
+  applyDong();   // 다시 칠하며 덮인 행정동 강조를 되살린다 (시점은 그대로 둔다)
 });
 
 // 자료 받기: 레이어마다 따로 받아서 받는 대로 그린다. 실패하면 지도 위에 '다시 시도'를 띄운다
@@ -324,8 +407,8 @@ function renderLoad() {
   const busy = Object.keys(load).filter(k => load[k].state === "loading");
   const bad = Object.keys(load).filter(k => load[k].state === "error");
   const box = $("loadbox");
-  box.innerHTML = (busy.length ? `<div class="banner wait small">${busy.map(k => KIND_KO[k]).join(", ")} 받는 중...</div>` : "")
-    + bad.map(k => `<div class="banner no" role="alert">${esc(KIND_KO[k])}${josa(KIND_KO[k])} 받지 못했습니다: ${esc(load[k].msg)}`
+  box.innerHTML = (busy.length ? `<div class="banner wait small">${busy.map(k => KIND_KO[k]).join(", ")} 불러오는 중...</div>` : "")
+    + bad.map(k => `<div class="banner no" role="alert">${esc(KIND_KO[k])}${josa(KIND_KO[k])} 불러오지 못했습니다: ${esc(load[k].msg)}`
       + `<button type="button" class="btn mini" data-retry="${k}">다시 시도</button></div>`).join("");
   box.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => (b.dataset.retry === "area" ? loadArea() : loadKind(b.dataset.retry)));
 }
@@ -340,7 +423,7 @@ function loadKind(k) {
       data[k] = fc;
       if (map.getSource(k)) map.getSource(k).setData(fc);
       else { map.addSource(k, { type: "geojson", data: fc }); layerSpecs(k).forEach(addLayerAt); }
-      $("n-" + k).textContent = fc.features.length.toLocaleString() + "개" + (fc.skipped ? `, 모양을 못 읽은 ${fc.skipped.toLocaleString()}개 뺌` : "");
+      $("n-" + k).textContent = fc.features.length.toLocaleString() + "개" + (fc.skipped ? ` (모양 오류로 ${fc.skipped.toLocaleString()}개 제외)` : "");
       applyVis(k);
       if (k === "building") { renderStatus(); renderDongs(); applyDong(); }
       item.state = "ok";
@@ -410,7 +493,7 @@ function renderStatus() {
   $("st-legend").innerHTML = STATUSES.map(s => {
     const n = feats ? cnt[s.name] || 0 : null;
     const zero = n === 0;
-    return `<label class="st${zero ? " zero" : ""}" title="${esc(s.tip + (zero ? " (0개라 끌 수 없음)" : ""))}">`
+    return `<label class="st${zero ? " zero" : ""}" title="${esc(s.tip + (zero ? " (해당 건물이 없어 선택할 수 없음)" : ""))}">`
       + `<input type="checkbox" data-st="${esc(s.name)}"${st.has(s.name) ? " checked" : ""}${zero || !feats ? " disabled" : ""}>`
       + `<i class="sw${s.name === "폐지" ? " retired" : ""}" style="background:var(${s.color})"></i>${esc(s.name)}`
       + `<span class="n">${n === null ? "" : n.toLocaleString()}</span></label>`;
@@ -432,6 +515,7 @@ function applyFilter() {
   map.setFilter("building", buildingFilter("fill"));
   map.setFilter("building-pt", buildingFilter("pt"));
   map.setFilter("building-retired", buildingFilter("retired"));
+  if (map.getLayer("building-3d")) map.setFilter("building-3d", buildingFilter("fill"));
 }
 $("only-retired").onclick = () => {
   setStatuses(["폐지"]);
@@ -447,7 +531,7 @@ const dongFeatures = name => (data.building ? data.building.features : [])
 function renderDongs() {
   const feats = data.building.features, sel = $("dong");
   if (!feats.some(f => "dong" in f.properties)) {
-    $("dong-note").textContent = "서버가 아직 건물의 행정동을 주지 않습니다.";
+    $("dong-note").textContent = "서버가 건물의 행정동 정보를 제공하지 않습니다.";
     dongSel = "";
     return;
   }
@@ -456,11 +540,11 @@ function renderDongs() {
   for (const f of feats) { const d = f.properties.dong; if (d) n[d] = (n[d] || 0) + 1; else none++; }
   sel.innerHTML = '<option value="">전체 (강조 안 함)</option>'
     + Object.keys(n).sort((a, b) => a.localeCompare(b, "ko")).map(d => `<option value="${esc(d)}">${esc(d)} 건물 ${n[d].toLocaleString()}개</option>`).join("")
-    + (none ? `<option value="none">행정동 미연결 ${none.toLocaleString()}</option>` : "");
+    + (none ? `<option value="none">행정동 미연결 건물 ${none.toLocaleString()}개</option>` : "");
   sel.disabled = false;
   if (dongSel && ![...sel.options].some(o => o.value === dongSel)) dongSel = "";
   sel.value = dongSel;
-  $("dong-note").textContent = "고른 동의 건물을 진하게 칠합니다. 경계가 아니라 소속 관계(jgk:within)로 칠한 것입니다.";
+  $("dong-note").textContent = "선택한 동에 속한 건물을 진하게 칠합니다. 경계가 아니라 소속 관계(jgk:within)를 기준으로 합니다.";
 }
 function applyDong() {
   if (!map.getLayer("building")) return;
@@ -469,6 +553,7 @@ function applyDong() {
   map.setPaintProperty("building-pt", "circle-opacity", c ? ["case", c, 1, 0.2] : 1);
   map.setPaintProperty("building-pt", "circle-stroke-opacity", c ? ["case", c, 1, 0.2] : 1);
   map.setPaintProperty("building-retired", "line-opacity", c ? ["case", c, 1, 0.3] : 1);
+  if (map.getLayer("building-3d")) map.setPaintProperty("building-3d", "fill-extrusion-color", building3dColor());
 }
 function selectDong(name, fit = true) {
   dongSel = name || "";
@@ -492,7 +577,7 @@ function link(names, u, fallback) {
 // 정보 패널 위의 이동 링크: 앞 객체로(브라우저 뒤로), 질문 결과로 돌아가기
 function topLinks() {
   const a = [];
-  if (history.state && history.state.prev) a.push('<a href="#" id="go-prev">← 앞 객체로</a>');
+  if (history.state && history.state.prev) a.push('<a href="#" id="go-prev">← 이전 객체로</a>');
   if (lastAnswer) a.push('<a href="#" id="go-answer">질문 결과로 돌아가기</a>');
   return a.length ? `<div class="navlinks">${a.join("")}</div>` : "";
 }
@@ -510,17 +595,17 @@ function bindInfo() {
     ev.preventDefault();
     const out = a.closest("li").querySelector(".asof-out");
     const at = new Date(Date.parse(a.dataset.at) - 1000).toISOString();
-    out.innerHTML = '<div class="small muted">되살리는 중...</div>';
+    out.innerHTML = '<div class="small muted">승인 전 값을 되살리는 중...</div>';
     try {
       const r = await fetchJSON(`/api/editions/as-of?uri=${encodeURIComponent(current)}&at=${encodeURIComponent(at)}`);
       const nm = v => (r.names[v] && r.names[v].label) || ext(v) || (String(v).startsWith("http") ? localName(v) : v);
       const cell = vs => vs.length ? vs.map(v => esc(nm(v))).join("<br>") : '<span class="muted">없음</span>';
       // 모양의 값은 속성 이름이 'hasGeometry asWKT'처럼 공백으로 이어져 온다
       out.innerHTML = r.diff.length
-        ? `<table class="kv asof-t"><tr><th>속성</th><th>승인 전</th><th>지금</th></tr>${r.diff.map(d =>
+        ? `<table class="kv asof-t"><tr><th>속성</th><th>승인 전</th><th>현재</th></tr>${r.diff.map(d =>
             `<tr><td class="k">${esc(d.p.split(" ").map(nm).join(" "))}</td><td>${cell(d.before)}</td><td>${cell(d.after)}</td></tr>`).join("")}</table>
-           <div class="small muted">승인과 정정의 사건 기록(jgk:changeOf)으로 ${esc(new Date(r.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }))} 시점의 값을 트리플마다 찾아 되살렸습니다.</div>`
-        : '<div class="small muted">그 시점과 지금 값이 같습니다.</div>';
+           <div class="small muted">승인·정정 사건 기록(jgk:changeOf)을 바탕으로 ${esc(new Date(r.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }))} 시점의 값을 트리플별로 되살렸습니다.</div>`
+        : '<div class="small muted">그 시점의 값과 현재 값이 같습니다.</div>';
     } catch (e) { out.innerHTML = `<div class="banner no">${esc(e.message)}</div>`; }
   });
   const copy = $("copy-uri");
@@ -588,33 +673,33 @@ async function show(uri, opts = {}) {
   const counts = f.inbound_counts || {};
   const back = Object.entries(inbound).map(([p, list]) => {
     const shown = list.slice(0, 30), total = Math.max(counts[p] || 0, list.length);
-    return `<tr><td class="k">${esc(list[0].p_label || ext(p) || localName(p))} (이 객체를)</td><td class="links">${shown.map(t => link(names, t.s, t.s_label)).join(" ")}`
+    return `<tr><td class="k">${esc(list[0].p_label || ext(p) || localName(p))} (이 객체를 가리킴)</td><td class="links">${shown.map(t => link(names, t.s, t.s_label)).join(" ")}`
       + `${total > shown.length ? ` 외 ${(total - shown.length).toLocaleString()}개` : ""}</td></tr>`;
   }).join("");
   const sources = (by.source || []).map(t => esc(t.o_label || t.o)).join("<br>");
   const pub = `<div class="pub">${f.public === true
       ? `<a href="${esc(uri)}" target="_blank" rel="noopener">공개 페이지</a><a href="${esc(uri)}/index.ttl" target="_blank" rel="noopener">Turtle</a>`
-      : f.public === false ? '<span class="muted">공개 페이지 없음(공개 보류 중이거나 변경 제안)</span>' : ""}`
+      : f.public === false ? '<span class="muted">공개 페이지 없음 (공개 보류 중이거나 변경 제안임)</span>' : ""}`
     + `<button type="button" class="btn ghost mini" id="copy-uri" data-u="${esc(uri)}">URI 복사</button></div>`;
   const hist = (f.history || []).map(h => `<li><span class="small muted">${esc((h.decided_at || h.created || "").slice(0, 10))}</span>
       <span class="chip ${esc(h.action)}">${esc(ACTION[h.action] || h.action)}</span> ${esc(h.summary)}
       <div class="small muted">${h.decided_by ? `승인 ${esc(h.decided_by)}, ` : ""}<a href="/?id=${encodeURIComponent(h.id)}">검토 화면에서 보기</a>
-      ${h.decided_at ? `, <a href="#" class="asof" data-at="${esc(h.decided_at)}">승인 바로 전 값과 견주기</a>` : ""}</div><div class="asof-out"></div></li>`).join("");
+      ${h.decided_at ? `, <a href="#" class="asof" data-at="${esc(h.decided_at)}">승인 직전 값과 비교</a>` : ""}</div><div class="asof-out"></div></li>`).join("");
   const proposalId = isProposal ? uri.slice((BASE + "proposal/").length) : null;
   let mapNote = "";
   if (isDong) {
     const n = dongFeatures(me.label).length;
-    mapNote = `<div class="banner wait" style="margin-top:8px">이 동에 속한 건물${data.building ? ` ${n.toLocaleString()}개` : ""}를 진하게 칠했습니다. 행정동 경계가 아니라 소속 관계(jgk:within)로 칠한 것입니다.</div>`;
+    mapNote = `<div class="banner wait" style="margin-top:8px">이 동에 속한 건물${data.building ? ` ${n.toLocaleString()}개를` : "을"} 진하게 칠했습니다. 행정동 경계가 아니라 소속 관계(jgk:within)를 기준으로 했습니다.</div>`;
   } else if (!feat && f.in_graph) {
     mapNote = '<div class="small muted" style="margin-top:6px">지도에 모양이 없는 객체입니다.</div>';
   }
   info.innerHTML = topLinks()
     + (opts.intro ? `<div class="intro card" style="padding:14px 16px;margin-bottom:14px">
         <p><b>증미역 반경 1km</b>의 건물, 출입구, 필지, 도로, 공공시설을 공식 번호 그대로 URI로 엮은 지식 그래프입니다.</p>
-        <p class="small muted" style="margin:0">지도에서 객체를 누르거나 위에서 찾으면 그래프에 담긴 속성과 연결이 여기에 나옵니다. 아래는 증미역입니다.</p>
-        <div class="keys"><i class="sw" style="background:var(--active)"></i><span>건물 (색은 상태: 사용, 주소 미연결, 폐지)</span>
+        <p class="small muted" style="margin:0">지도에서 객체를 누르거나 위 검색 칸에서 찾으면 그래프에 담긴 속성과 연결 관계가 여기에 표시됩니다. 아래는 증미역 정보입니다.</p>
+        <div class="keys"><i class="sw" style="background:var(--active)"></i><span>건물 (색으로 상태 구분: 사용, 주소 미연결, 폐지)</span>
           <i class="sw dot" style="background:var(--station)"></i><span>역</span>
-          <i class="sw area"></i><span>자료 범위 1km (원에 걸친 건물까지 넣음)</span></div></div>` : "")
+          <i class="sw area"></i><span>자료 범위 1km (원에 걸친 건물도 포함)</span></div></div>` : "")
     + `<div><span class="chip type">${esc(me.type || "객체")}</span> ${status ? `<span class="chip ${status.o.endsWith("Retired") ? "retire" : "src"}">${esc(status.o_label || localName(status.o))}</span>` : ""}</div>
     <h2 tabindex="-1">${esc(title)}</h2><div class="uri">${esc(uri)}</div>${pub}
     ${proposalId ? `<div class="small" style="margin-top:4px"><a href="/?id=${encodeURIComponent(proposalId)}">검토 화면에서 이 제안 보기</a></div>` : ""}
@@ -676,10 +761,10 @@ function refreshHits() {
     || nameOf(a.feats[0].properties, a.kind).localeCompare(nameOf(b.feats[0].properties, b.kind), "ko"));
   const busy = KINDS.filter(k => load[k] && load[k].state === "loading").map(k => KIND_KO[k]);
   const total = hitRows.length, shown = hitRows.slice(0, HIT_MAX);
-  box.innerHTML = (busy.length ? `<div class="small muted">자료를 받는 중 (${busy.join(", ")})</div>` : "")
+  box.innerHTML = (busy.length ? `<div class="small muted">자료를 불러오는 중 (${busy.join(", ")})</div>` : "")
     + (total ? `<div class="small muted">${total > HIT_MAX ? `${total.toLocaleString()}개 중 ${HIT_MAX}개` : `${total}개`}</div>`
-             : busy.length ? "" : '<div class="small muted" style="padding:6px">찾은 것이 없습니다</div>')
-    + (!data.entrance ? '<div class="small muted">출입구는 레이어를 켜면 함께 찾습니다</div>' : "")
+             : busy.length ? "" : '<div class="small muted" style="padding:6px">검색 결과가 없습니다</div>')
+    + (!data.entrance ? '<div class="small muted">출입구는 레이어를 켜야 검색됩니다</div>' : "")
     + `<ul>${shown.map((g, i) => {
       const p = g.feats[0].properties, n = g.feats.length;
       const sub = [p.label && p.addr ? p.addr : "", p.status, p.use].filter(Boolean).join(", ");
@@ -734,17 +819,17 @@ function renderAnswer(a, refit) {
     return s.startsWith(BASE) ? `<a href="#" data-u="${esc(s)}">${esc((names[s] && names[s].label) || s.replace(BASE, ""))}</a>` : esc(s);
   };
   let body;
-  if (typeof a.boolean === "boolean") body = `<div class="answer-yn">답: ${a.boolean ? "예" : "아니오"}</div>`;
+  if (typeof a.boolean === "boolean") body = `<div class="answer-yn">답: ${a.boolean ? "예" : "아니요"}</div>`;
   else if (!rows.length) body = '<div class="empty">결과가 없습니다</div>';
   else {
     const shown = rows.slice(0, 50);
     const count = a.truncated || rows.length > 50
-      ? `결과 ${rows.length.toLocaleString()}행${a.truncated ? "(더 있지만 잘림)" : ""} 중 ${shown.length}행 표시` : `결과 ${rows.length}행`;
-    body = `<div class="small muted">${count}${fc.features.length ? `, 지도에 보라색 테두리로 ${fc.features.length.toLocaleString()}개 표시` : ""}${a.cut_cells ? `, 너무 길어 잘린 칸 ${a.cut_cells.toLocaleString()}개` : ""}</div>
+      ? `결과 ${rows.length.toLocaleString()}행${a.truncated ? "(이후 생략)" : ""} 중 ${shown.length}행 표시` : `결과 ${rows.length}행`;
+    body = `<div class="small muted">${count}${fc.features.length ? `, 지도에 보라색 테두리로 ${fc.features.length.toLocaleString()}개 표시` : ""}${a.cut_cells ? `, 내용이 길어 잘린 칸 ${a.cut_cells.toLocaleString()}개` : ""}</div>
       <div class="tablewrap"><table class="kv"><thead><tr>${cols.map(v => `<th>${esc(v)}</th>`).join("")}</tr></thead>
       <tbody>${shown.map(r => `<tr>${cols.map(v => `<td>${cell(r[vars.indexOf(v)])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
-  $("info").innerHTML = (current ? '<div class="navlinks"><a href="#" id="go-current">보던 객체로</a></div>' : "")
+  $("info").innerHTML = (current ? '<div class="navlinks"><a href="#" id="go-current">← 보던 객체로 돌아가기</a></div>' : "")
     + `<h2 tabindex="-1">${esc(a.question || "")}</h2><p>${esc(a.explanation || "")}</p>${body}
     <details><summary>실행한 SPARQL</summary><pre>${esc(a.sparql || "")}</pre></details>`;
   afterRender({ focus: refit });

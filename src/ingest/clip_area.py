@@ -84,7 +84,7 @@ def edge_centers(nb: pd.DataFrame, centers: gpd.GeoDataFrame, gis: gpd.GeoDataFr
     """중심점은 범위 밖이지만 범위에 걸친 GIS 건물 모양 안에 든 내비게이션용DB 건물.
 
     GIS 건물은 걸치기만 해도 넣고(intersects) 중심점은 안에 있어야 넣어서(within), 경계에 걸친 건물은 모양만 들어오고
-    건물관리번호를 잃어 주소 미연결로 보였다 (반경 1km에서 32동, docs/decisions.md 2026-11-03).
+    건물관리번호를 잃어 주소 미연결로 보였다 (반경 1km에서 새 건물 36동, 그중 34동이 주소 미연결 건물과 짝. docs/decisions.md 2026-11-03).
     """
     shapes = gis[["geometry"]].to_crs(metric)
     x0, y0, x1, y1 = shapes.total_bounds

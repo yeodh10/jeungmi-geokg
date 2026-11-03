@@ -105,7 +105,7 @@ export function init(ctx) {
     try {
       const card = await ctx.source.card(path);
       bus.emit("select", { path, card, from, fit: true });
-    } catch (e) { ui.toast("이 장소를 열지 못했습니다. 잠시 뒤에 다시 해 보세요."); }
+    } catch (e) { ui.toast("이 장소를 열지 못했습니다. 잠시 후 다시 시도해 주세요."); }
   }
 
   // ---- 카드 그리기 (panel이 장소 화면을 열 때 부른다)
@@ -192,7 +192,7 @@ export function init(ctx) {
     const LIMIT = 30;
     const row = t => {
       const name = t.path ? `<button type="button" class="linkish cd-open" data-path="${esc(t.path)}">${esc(t.name)}</button>` : `<span class="cd-tn">${esc(t.name)}</span>`;
-      const bits = [t.floor || "층 정보 없음", t.cat, t.by ? `${t.by}로 이음` : "", t.rows > 1 ? `원천 ${t.rows}행을 한 줄로` : "", t.src || ""].filter(Boolean);
+      const bits = [t.floor || "층 정보 없음", t.cat, t.by ? (t.by === "필지만" ? "필지에만 연결" : `${t.by}로 연결`) : "", t.rows > 1 ? `원천 ${t.rows}행을 합침` : "", t.src || ""].filter(Boolean);
       return `<li>${name}<span class="cd-tmeta">${esc(bits.join(", "))}</span></li>`;
     };
     return `<section class="cd-sec"><h3 class="cd-h">입점 상호 <span class="muted">${nf(list.length)}곳</span></h3>
@@ -213,7 +213,7 @@ export function init(ctx) {
     };
     const body = items.length ? items.map(it => `<div class="cd-sensor">
         <p class="cd-sname"><b>${esc(it.name)}</b> <span class="muted">평균 ${esc(it.avg)}${esc(it.unit)}, 범위 ${esc(it.min)} ~ ${esc(it.max)}${esc(it.unit)}, 값 ${nf(it.n || it.series.length)}개</span></p>
-        ${chart(it)}</div>`).join("") : `<p class="muted">관측값 없음. 이 센서의 관측값이 원천 자료에 없습니다.</p>`;
+        ${chart(it)}</div>`).join("") : `<p class="muted">원천 자료에 이 센서의 관측값이 없습니다.</p>`;
     return `<section class="cd-sec"><h3 class="cd-h">관측값 <span class="muted">${esc(s.period || "")}</span></h3>${body}
       <p class="cd-note">${esc(s.note || "실시간 값이 아닙니다.")}</p></section>`;
   }
@@ -225,7 +225,7 @@ export function init(ctx) {
     for (const l of links || []) {
       if (l.kind === "entrance") continue;
       const n = l.spread ? spreadPaths(l.spread).length : 0;
-      const sp = l.spread && n ? `<button type="button" class="g-spread" data-by="${esc(l.spread.by)}" data-value="${esc(l.spread.value)}" data-label="${esc(l.rel === "같은 단지" ? l.name.replace(/\s*\(\d+동\)$/, "") : l.name)}">${l.kind === "spread" ? esc(l.name) : `${nf(n)}동`} 번지기</button>` : "";
+      const sp = l.spread && n ? `<button type="button" class="g-spread" data-by="${esc(l.spread.by)}" data-value="${esc(l.spread.value)}" data-label="${esc(l.rel === "같은 단지" ? l.name.replace(/\s*\(\d+동\)$/, "") : l.name)}">${l.kind === "spread" ? esc(l.name) : `${nf(n)}동`} 표시</button>` : "";
       const main = l.kind === "spread" ? `<span class="g-name muted">지도에서 보기</span>`
         : `<button type="button" class="linkish g-open" data-path="${esc(l.path)}"${l.kind === "group" ? ` data-group="${esc(l.spread && l.spread.value)}"` : ""}>${esc(l.name)}</button>`;
       rows.push(`<li><span class="g-rel">${esc(l.rel)}</span><span class="g-main">${main}</span>${sp}</li>`);
@@ -267,7 +267,7 @@ export function init(ctx) {
       ${uri ? `<div class="cd-uri"><p class="cd-label">고유 주소 (URI)</p><p class="uri">${esc(uri)}</p>
         <button type="button" class="btn ghost mini cd-copy-uri">${ui.icon("copy", 14)}고유 주소 복사</button></div>` : ""}
       ${card.officialNo ? `<p class="cd-off"><span class="cd-label">${esc(card.officialNo.label)}</span> <span class="mono">${esc(card.officialNo.value)}</span></p>` : ""}
-      ${card.factCount ? `<p class="cd-count">그래프의 사실 ${nf(card.factCount)}개에서 왔습니다.</p>` : ""}
+      ${card.factCount ? `<p class="cd-count">그래프의 사실 ${nf(card.factCount)}개로 만든 카드입니다.</p>` : ""}
       <p class="cd-pagelinks">${page ? `<a href="${esc(page)}">장소 페이지 열기</a>` : ""}
       ${issue && showPage ? `<a href="${esc(issue)}" target="_blank" rel="noopener">${icon("flag", 14)}틀린 곳 알리기</a>` : ""}</p>
     </footer>`;
@@ -340,7 +340,7 @@ export function init(ctx) {
     if (!rest) return;
     const addr = p.a ? short(p.a) : p.j ? `${p.j} (지번)` : null;
     rest.innerHTML = `${addrBlock(p.a, p.j, p.d)}
-      ${actions({ pt: sel.pt, label: sel.name, link: true, addr, ttl: null, why: { ttl: "자세한 정보를 받지 못해 원본 주소를 확인하지 못했습니다" } })}
+      ${actions({ pt: sel.pt, label: sel.name, link: true, addr, ttl: null, why: { ttl: "자세한 정보를 받지 못해 원본 링크를 확인하지 못했습니다" } })}
       <div class="cd-fail" role="alert"><p>이 장소의 자세한 정보를 받지 못했습니다.</p>
         <button type="button" class="btn mini cd-retry">${ui.icon("refresh", 14)}다시 시도</button></div>`;
     bindActions(rest, { pt: sel.pt, label: sel.name, link: () => viewUrl({ focus: sel.path, unit: null }), addr, ttl: null });
@@ -354,7 +354,7 @@ export function init(ctx) {
         fill(el, sel, card);
         afterOpen(sel, card);
         ui.live("장소 정보를 다시 받았습니다");
-      }).catch(() => { if (el.__card === token && el.isConnected) { reduced(el, sel); ui.toast("아직 받지 못했습니다. 잠시 뒤에 다시 해 보세요."); } });
+      }).catch(() => { if (el.__card === token && el.isConnected) { reduced(el, sel); ui.toast("아직 정보를 받지 못했습니다. 잠시 후 다시 시도해 주세요."); } });
     });
   }
 
@@ -382,17 +382,17 @@ export function init(ctx) {
     }).join("");
     el.innerHTML = `<article class="cd">${head(sel, { kindLabel: "단지" })}<div class="cd-rest">
       ${addrBlock(rep.a ? `${rep.a} (대표 동)` : null, null, g.pt && data.station && data.station.pt ? Math.round(meters(g.pt, data.station.pt)) : null)}
-      ${actions({ pt: g.pt, label: g.n, link, addr, ttl: null, why: { addr: "단지에는 주소가 없고 대표 동에도 도로명주소가 없습니다", ttl: "단지는 화면용 묶음이라 기계용 원본이 없습니다" } })}
+      ${actions({ pt: g.pt, label: g.n, link, addr, ttl: null, why: { addr: "단지 자체에는 주소가 없고, 대표 동에도 도로명주소가 없습니다", ttl: "단지는 화면용 묶음이라 기계용 원본이 없습니다" } })}
       ${factsBlock(facts)}
       <section class="cd-sec"><h3 class="cd-h">동 목록 <span class="muted">${nf(members.length)}동</span></h3><ul class="cd-members">${memberRows}</ul></section>
       <section class="cd-sec g-sec"><h3 class="cd-h g-h">이어진 것</h3><ul class="g-links">
-        <li><span class="g-rel">단지 전체</span><span class="g-main muted">지도에서 보기</span><button type="button" class="g-spread" data-by="g" data-value="${g.g}" data-label="${esc(g.n)}">${nf(members.length)}동 번지기</button></li>
+        <li><span class="g-rel">단지 전체</span><span class="g-main muted">지도에서 보기</span><button type="button" class="g-spread" data-by="g" data-value="${g.g}" data-label="${esc(g.n)}">${nf(members.length)}동 표시</button></li>
         ${pnus.map(x => `<li><span class="g-rel">필지</span><span class="g-main"><button type="button" class="linkish g-open" data-path="${esc(x.p)}">${esc(x.j || x.p)}</button></span></li>`).join("")}
       </ul></section>
       ${othersBlock(sel)}
-      <section class="cd-sec cd-missing"><h3 class="cd-h">없는 정보</h3><p>단지는 건물 이름과 필지로 화면에서 묶은 것이라 고유 주소가 없습니다. 링크는 대표 동과 단지 표시(unit=group)로 잇습니다.</p></section>
+      <section class="cd-sec cd-missing"><h3 class="cd-h">없는 정보</h3><p>단지는 건물 이름과 필지로 화면에서 묶은 것이라 고유 주소가 없습니다. 링크는 대표 동과 단지 표시(unit=group)로 만듭니다.</p></section>
       <section class="cd-sec g-sec"><h3 class="cd-h g-h">출처</h3><dl class="g-src">
-        <div><dt>이 장소의 출처</dt><dd>동마다 다릅니다. 동을 눌러 동 카드에서 봅니다.${g.hh || g.site ? " 세대수와 대지면적은 서울시 건축물대장 총괄표제부입니다." : ""}</dd></div>
+        <div><dt>이 장소의 출처</dt><dd>동마다 다릅니다. 동을 눌러 각 동의 카드에서 확인하세요.${g.hh || g.site ? " 세대수와 대지면적은 서울시 건축물대장 총괄표제부입니다." : ""}</dd></div>
         <div><dt>이 모양의 출처</dt><dd>동마다 다릅니다.</dd></div></dl></section>
     </div></article>`;
     bindActions(el, { pt: g.pt, label: g.n, link, addr, ttl: null });

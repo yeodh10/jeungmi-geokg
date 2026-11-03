@@ -45,7 +45,7 @@ def run() -> None:
 
     # 잘못된 상태 이름은 422, 오류 본문은 detail 한 문장과 원래 목록
     bad = c.get("/api/proposals?status=bogus")
-    assert bad.status_code == 422 and bad.json()["detail"].startswith("요청 형식이 맞지 않다") and bad.json()["errors"], bad.text
+    assert bad.status_code == 422 and bad.json()["detail"].startswith("요청 형식이 맞지 않습니다") and bad.json()["errors"], bad.text
 
     # 승인 전: 대상이 그래프에 없다
     assert not c.get("/api/feature", params={"uri": p["target"]}).json()["in_graph"]
@@ -81,7 +81,7 @@ def run() -> None:
 
     # 같은 제안을 두 번 결정할 수 없다
     r = c.post(f"/api/proposals/{p['id']}/decision", json={"result": "rejected", "reviewer": "x", "comment": "다시"})
-    assert r.status_code == 409 and r.json()["detail"] == "이미 승인된 제안이다", r.text
+    assert r.status_code == 409 and r.json()["detail"] == "이미 승인된 제안입니다", r.text
     done = next(x for x in c.get("/api/proposals?status=approved").json() if x["id"] == p["id"])
     assert done["reviewer"] == "테스트 검토자" and done["decided_at"] == done["decision"]["at"], done
 

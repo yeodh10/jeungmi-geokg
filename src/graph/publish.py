@@ -51,30 +51,40 @@ HOLD_NOTE = ("민원행정기관 전자지도와 도로명주소 전자지도는
              "국가기본도와 수치지형도는 기본측량성과라서 공간정보관리법 제16조에 따라 해외 서버에 올리지 않습니다. "
              "이 네 자료에서 온 장소와 모양은 이 사이트에 넣지 않았습니다.")
 UNIT_KO = {"DEG_C": "℃", "PERCENT": "%", "DeciB": "dB", "LUX": "lux", "UNITLESS": ""}
+# 들어오는 관계의 이름 (정방향 이름은 어휘의 rdfs:label)
+INVERSE_LABEL = {
+    "locatedOn": "이 필지 위 건물", "onParcel": "이 필지의 상호", "hasEntrance": "이 출입구를 가진 건물", "housedIn": "이 건물 안 공공시설",
+    "inBuilding": "이 건물 안 상호", "within": "이 행정동 안 객체", "inLegalDong": "이 법정동 안 객체", "inBasicZone": "이 기초구역 안 객체",
+    "addressRoad": "이 도로를 주소로 쓰는 건물", "facesRoad": "이 도로 구간에 면한 출입구", "segmentOf": "이 도로의 구간",
+    "addressBuilding": "이 건물 주소로 설치된 센서", "sameBuildingAs": "같은 실물인 주소 미연결 건물", "affects": "이 객체를 바꾼 제안",
+    "completedBy": "이 고시로 준공된 객체", "planApprovedBy": "이 고시로 인가된 객체", "zoneDesignatedBy": "이 고시로 지정된 구역의 객체",
+    "zoneReleasedBy": "이 고시로 해제된 구역의 객체", "basemapFeature": "이 국가기본도 건물과 같은 우리 건물",
+    "digitalMapFeature": "이 수치지형도 건물과 같은 우리 건물", "bimBuilding": "이 BIM 모델과 이은 건물",
+}
 EXT_LABEL = {
     RDF_TYPE: "종류", RDFS_LABEL: "이름", DCT_SOURCE: "출처", RDFS_COMMENT: "설명",
     GEO + "hasGeometry": "모양", GEO + "hasDefaultGeometry": "기본 모양", GEO + "asWKT": "WKT",
-    "http://www.w3.org/2002/07/owl#sameAs": "같은 장소", "http://www.w3.org/ns/prov#wasInfluencedBy": "반영된 변경 제안",
+    "http://www.w3.org/2002/07/owl#sameAs": "같은 실물", "http://www.w3.org/ns/prov#wasInfluencedBy": "반영된 변경 제안",
     GEO + "Feature": "공간 객체(Feature)", GEO + "Geometry": "모양(Geometry)", "http://purl.org/dc/terms/issued": "고시일",
     "http://purl.org/dc/terms/description": "설명", "http://purl.org/dc/terms/created": "만든 시각",
 }
 # 종류(URI 경로 이름) -> 화면 이름, 공식 번호 설명 (명세 8절 말)
 KINDS = {
-    "station": ("역", "역사 건물의 건물관리번호(25자리)를 그대로 쓴다."),
-    "building": ("건물", "도로명주소 건물관리번호(25자리)를 그대로 쓴다."),
-    "building-gis": ("도로명주소 없는 건물", "도로명주소가 없는 건물이라 GIS건물통합식별번호(28자리)를 그대로 쓴다. 나중에 주소가 이어져도 이 고유 주소는 남는다."),
-    "entrance": ("건물 출입구", "주출입구는 '건물관리번호-main', 보조출입구는 '시군구코드-출입구일련번호'다."),
-    "parcel": ("필지", "PNU(필지고유번호, 19자리)를 그대로 쓴다."),
-    "road": ("도로", "도로명코드(시군구코드 5자리 + 도로명번호 7자리)를 그대로 쓴다."),
-    "admin-dong": ("행정동", "행정동코드(10자리)를 그대로 쓴다."),
-    "legal-dong": ("법정동", "법정동코드(10자리)를 그대로 쓴다."),
-    "basic-zone": ("우편구역 (기초구역)", "국가기초구역번호(5자리, 우편번호와 같다)를 그대로 쓴다."),
-    "notice": ("고시공고", "구청 고시 번호(시군구코드-연도-번호)를 그대로 쓴다."),
-    "sensor": ("센서", "서울시 도시데이터 센서(S-DoT)의 모델 시리얼을 그대로 쓴다."),
-    "business": ("상호", "소상공인시장진흥공단 상가업소번호(20자리)를 그대로 쓴다. 2026년 9월 기준 자료라 문을 닫거나 새로 연 가게와 다를 수 있다. "
-                 "영업시간, 전화번호, 리뷰는 이 자료에 없다."),
-    "observation": ("관측", "센서 시리얼, 측정 시각(연월일시분 12자리), 측정 항목을 이었다. 한 센서가 한 시각에 한 항목은 한 번만 잰다."),
-    "proposal": ("변경 제안", "변경 제안 번호다. 승인된 제안만 그래프에 들어온다."),
+    "station": ("역", "역사 건물의 건물관리번호(25자리)를 그대로 씁니다."),
+    "building": ("건물", "도로명주소 건물관리번호(25자리)를 그대로 씁니다."),
+    "building-gis": ("도로명주소 없는 건물", "도로명주소가 없는 건물이라 GIS건물통합식별번호(28자리)를 그대로 씁니다. 나중에 주소가 이어져도 이 고유 주소는 남습니다."),
+    "entrance": ("건물 출입구", "주출입구는 '건물관리번호-main', 보조출입구는 '시군구코드-출입구일련번호'입니다."),
+    "parcel": ("필지", "PNU(필지고유번호, 19자리)를 그대로 씁니다."),
+    "road": ("도로", "도로명코드(시군구코드 5자리 + 도로명번호 7자리)를 그대로 씁니다."),
+    "admin-dong": ("행정동", "행정동코드(10자리)를 그대로 씁니다."),
+    "legal-dong": ("법정동", "법정동코드(10자리)를 그대로 씁니다."),
+    "basic-zone": ("우편구역 (기초구역)", "국가기초구역번호(5자리, 우편번호와 같다)를 그대로 씁니다."),
+    "notice": ("고시공고", "구청 고시 번호(시군구코드-연도-번호)를 그대로 씁니다."),
+    "sensor": ("센서", "서울시 도시데이터 센서(S-DoT)의 모델 시리얼을 그대로 씁니다."),
+    "business": ("상호", "소상공인시장진흥공단 상가업소번호(20자리)를 그대로 씁니다. 2026년 9월 기준 자료라 문을 닫거나 새로 연 가게와 다를 수 있다. "
+                 "영업시간, 전화번호, 리뷰는 이 자료에 없습니다."),
+    "observation": ("관측", "센서 시리얼, 측정 시각(연월일시분 12자리), 측정 항목을 이었습니다. 한 센서는 한 시각에 한 항목을 한 번만 잽니다."),
+    "proposal": ("변경 제안", "변경 제안 번호입니다. 승인된 제안만 그래프에 들어옵니다."),
 }
 # 끝에 따로 보여 줄 공식 번호 속성 (정보 표에서는 뺀다)
 OFFICIAL = {"building": "buildingMgtNo", "building-gis": "gisBuildingId", "parcel": "pnu", "road": "roadCode", "admin-dong": "admDongCode",
@@ -97,8 +107,8 @@ PRINCIPLES = [
     ("객체 원자화", "건물, 출입구, 필지, 도로, 행정구역을 각각 하나의 장소로 쪼개고 모양(Geometry)은 따로 둡니다."),
     ("영구 식별자", "새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드 같은 공식 번호를 그대로 고유 주소(URI)에 씁니다. 장소가 없어져도 주소는 남습니다."),
     ("자동 갱신", "새 자료가 오면 그래프를 덮어쓰지 않고 장소마다 견줘 신규, 변경, 폐지 제안을 만듭니다."),
-    ("AI 제안 후 사람 승인", "고시공고는 LLM이 바뀌는 내용만 뽑고, 검토자가 승인한 변경만 그래프에 들어가며 누가 언제 승인했는지 남습니다. "
-                       "지금까지의 결정은 사람이 맡긴 검토자 Claude가 했고, 기록의 검토자 이름에 그대로 남아 있습니다."),
+    ("AI 제안 후 사람 승인", "고시공고에서는 LLM이 바뀌는 내용만 뽑고, 검토자가 승인한 변경만 그래프에 넣으며 누가 언제 승인했는지 기록합니다. "
+                       "지금까지의 결정은 사람이 맡긴 검토자 Claude가 내렸고, 기록의 검토자 이름에도 그렇게 남아 있습니다."),
 ]
 ICON = {
     "globe": '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
@@ -171,7 +181,7 @@ def page(title: str, body: str, *, nav: str | None = None, head: str = "", desc:
 <link rel="stylesheet" href="{SITE_PATH}/assets/style.css{v}"><link rel="stylesheet" href="{SITE_PATH}/assets/site.css{v}">{head}
 <script src="{SITE_PATH}/assets/common.js{v}"></script><script src="{SITE_PATH}/assets/site.js{v}" defer></script></head><body>
 <header class="topbar"><a class="brand" href="{SITE_PATH}/about/">증미역 공간 지식 그래프</a><nav aria-label="사이트 메뉴">{links}</nav>
-<span class="spacer"></span><label class="theme-pick"><span class="sr-only">화면 밝기</span><select id="theme-pick" class="field">
+<span class="spacer"></span><label class="theme-pick"><span class="sr-only">화면 모드</span><select id="theme-pick" class="field">
 <option value="system">밝기: 시스템</option><option value="light">밝게</option><option value="dark">어둡게</option></select></label>
 <a class="tb-link" href="{REPO}" target="_blank" rel="noopener">{ICON["code"]}<span>소스 코드</span></a></header>
 <main class="page">{body}</main>
@@ -215,7 +225,7 @@ def align_section() -> str:
     trs = "".join(f'<tr><td class="mono">{e(short(s))}</td><td>{kinds[p]}</td><td class="mono"><a href="{e(o)}" rel="noopener">{e(short(o))}</a></td></tr>' for s, p, o in rows)
     return (f'<section class="card sec"><h2>바깥 표준 어휘와 잇기 <span class="muted">{len(rows)}</span></h2>'
             '<p class="small muted">jgk를 모르는 시스템도 schema.org, INSPIRE 지형지물 개념, 위키데이터 이름으로 이 그래프를 읽을 수 있게 이었습니다. '
-            'schema.org는 하위 종류, 하위 속성으로 이어 RDFS 추론만으로 바깥 이름으로 물을 수 있고, 정의가 꼭 같지 않은 것은 가까운 개념으로만 이었습니다.</p>'
+            'schema.org와는 하위 종류, 하위 속성으로 이어 RDFS 추론만으로도 바깥 어휘 이름으로 질의할 수 있고, 정의가 꼭 같지 않은 것은 가까운 개념으로만 이었습니다.</p>'
             f'<div class="tablewrap"><table class="kv vocab">{trs}</table></div></section>')
 
 
@@ -278,6 +288,8 @@ def main() -> None:
                     "위키데이터 " + u.rsplit("/", 1)[-1] if u.startswith("http://www.wikidata.org/entity/") else u.rsplit("#", 1)[-1])
         return _names[u]
     pname = lambda p: labels.get(p) or EXT_LABEL.get(p) or p.rsplit("#", 1)[-1]
+    # 들어오는 관계는 반대 방향 이름으로 보인다 (필지 페이지에 '필지 위에 있다 → 건물'이 아니라 '이 필지 위 건물')
+    bname = lambda p: INVERSE_LABEL.get(p.rsplit("#", 1)[-1]) or f"이곳을 가리키는 관계: {pname(p)}"
     href_of = lambda u: u.replace(SITE, SITE_PATH) + "/"
 
     def link(u: str) -> str:
@@ -429,9 +441,9 @@ def main() -> None:
             else:
                 back[p].append(src)
         back_rows = "".join(
-            f'<tr><td class="k">{e(pname(p))}</td><td class="links">{" ".join(link(x) for x in sorted(srcs, key=nm)[:40])}'
+            f'<tr><td class="k">{e(bname(p))}</td><td class="links">{" ".join(link(x) for x in sorted(srcs, key=nm)[:40])}'
             + (f' <span class="muted">외 {len(srcs) - 40:,}곳</span>' if len(srcs) > 40 else "") + "</td></tr>"
-            for p, srcs in sorted(back.items(), key=lambda t: pname(t[0])))
+            for p, srcs in sorted(back.items(), key=lambda t: bname(t[0])))
         tenant_sec = ""
         if tenants:
             tenants.sort(key=lambda u: (floor_key(view.floor_of(u)), nm(u)))
@@ -487,7 +499,7 @@ def main() -> None:
         end_sec = f"""<section class="card sec graph end"><h2>고유 주소</h2>
   <div class="uri-row"><code class="uri">{e(s)}</code><button type="button" class="btn ghost mini copy" data-copy="{e(s)}" data-done="고유 주소를 복사했습니다">{ICON["copy"]}복사</button></div>
   {f'<p class="small"><span class="muted">{e(off_label)}</span> <span class="mono">{e(off_value)}</span></p>' if off_label else ""}
-  <p class="small muted">그래프의 사실 {len(keep):,}개에서 왔습니다.</p>
+  <p class="small muted">이 페이지는 그래프의 사실 {len(keep):,}개로 만들었습니다.</p>
   <details class="raw"><summary>기계용 원본 (Turtle), 모든 사실 {len(keep):,}개</summary>
     <p class="small"><a href="index.ttl" type="text/turtle">{ICON["file"]}index.ttl 내려받기</a> 같은 주소에 기계가 읽는 파일이 있습니다.</p>
     <div class="tablewrap"><table class="kv">{all_rows}</table></div></details>
@@ -565,7 +577,7 @@ def main() -> None:
     terms = sorted(s for s in triples if s.startswith(JGK))
     types_of = {s: {o.value for p, o in triples[s] if p.value == RDF_TYPE} for s in terms}
     OWL = "http://www.w3.org/2002/07/owl#"
-    groups = [("장소 종류", lambda t: OWL + "Class" in t), ("이어진 것 (관계)", lambda t: OWL + "ObjectProperty" in t),
+    groups = [("객체 종류", lambda t: OWL + "Class" in t), ("이어진 것 (관계)", lambda t: OWL + "ObjectProperty" in t),
               ("속성", lambda t: OWL + "DatatypeProperty" in t or OWL + "AnnotationProperty" in t),
               ("국가기본도 지형지물 분류", lambda t: "http://www.w3.org/2004/02/skos/core#Concept" in t),
               ("상태 값과 원천 데이터", lambda t: True)]
@@ -619,13 +631,13 @@ def main() -> None:
     <rect x="170" y="238" width="104" height="40" rx="10" fill="var(--soft)" stroke="var(--line-2)"/><text x="222" y="263" fill="var(--text-2)">필지 PNU</text>
     <rect x="16" y="186" width="112" height="40" rx="10" fill="var(--panel)" stroke="var(--basemap)" stroke-dasharray="4 3"/><text x="72" y="211" fill="var(--basemap)">국가기본도 건물</text>
   </g>
-</svg><figcaption class="small muted">장소는 공식 번호로 이름 붙고, 이어진 것으로 서로 이어진다. 도로 구간과 국가기본도 건물은 그래프에만 있고 공개 사이트에는 싣지 않는다.</figcaption></figure>
+</svg><figcaption class="small muted">장소마다 공식 번호로 이름을 붙이고 관계로 서로 이었습니다. 도로 구간과 국가기본도 건물은 그래프에만 있고 공개 사이트에는 싣지 않았습니다.</figcaption></figure>
 </section>
-<section><h2 class="sec-title">장소 종류</h2><div class="kgrid">{kind_cards}</div></section>
+<section><h2 class="sec-title">객체 종류</h2><div class="kgrid">{kind_cards}</div></section>
 <section><h2 class="sec-title">국가기본도 대전환 4원칙과 이 그래프</h2><div class="pgrid">{principles}</div></section>
-<section class="card sec two"><div><h2>그래프 쓰기</h2><p class="small">페이지마다 같은 주소에 기계용 원본(Turtle, <code>index.ttl</code>)이 있어 기계가 그대로 읽을 수 있습니다.
+<section class="card sec two"><div><h2>그래프 쓰기</h2><p class="small">페이지마다 같은 주소에 Turtle 원본(<code>index.ttl</code>)이 있어 프로그램이 그대로 읽을 수 있습니다.
 어휘는 <a href="{SITE_PATH}/def/">jgk</a>이고, 원본에서 그래프를 다시 만드는 코드는 <a href="{REPO}">GitHub 저장소</a>에 있습니다.</p></div>
-<div><h2>공개 범위</h2><p class="small">{e(HOLD_NOTE)} 출처를 알 수 없는 장소도 넣지 않고, 승인한 변경은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹습니다.
+<div><h2>공개 범위</h2><p class="small">{e(HOLD_NOTE)} 출처를 알 수 없는 장소도 넣지 않았고, 승인한 변경도 근거 자료가 적혀 있고 그 자료가 모두 공개 자료일 때만 반영합니다.
 개인 집 주소일 수 있는 주택 건물 안 상호 일부도 싣지 않았습니다.</p></div></section>"""
     (OUT / "about").mkdir()
     (OUT / "about" / "index.html").write_text(page("소개", body, nav="/about/", build=build,
@@ -633,7 +645,7 @@ def main() -> None:
 
     # 없는 주소 (GitHub Pages가 사이트 안의 없는 주소에 이 파일을 준다)
     body = f"""<section class="notfound card sec"><h1>이 주소를 찾지 못했습니다</h1>
-<p>없는 주소이거나 공개 범위가 바뀌어 더 보여 주지 않는 주소입니다.</p>
+<p>없는 주소이거나, 공개 범위가 바뀌어 더는 보여 주지 않는 주소입니다.</p>
 <p class="act-row"><a class="btn mini primary" href="{SITE_PATH}/">{ICON["map"]}증미역 지도</a> <a class="btn ghost mini" href="{SITE_PATH}/id/building/">건물 목록</a>
 <a class="btn ghost mini" href="{SITE_PATH}/about/">소개</a></p></section>"""
     (OUT / "404.html").write_text(page("없는 주소", body, build=build), encoding="utf-8")

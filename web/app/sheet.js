@@ -10,7 +10,7 @@ export function createSheet(ctx, panelEl) {
   const land = matchMedia("(max-height: 500px)");
   const root = document.documentElement;
   const top = panelEl.querySelector(".sheet-top");
-  top.innerHTML = `<button type="button" class="sheet-grip" aria-controls="panel" aria-expanded="false" aria-label="시트 높이 바꾸기, 지금 접힘. 위아래 방향키로 바꿉니다"><span class="grip-bar" aria-hidden="true"></span></button>`;
+  top.innerHTML = `<button type="button" class="sheet-grip" aria-controls="panel" aria-expanded="false" aria-label="시트 높이 바꾸기, 현재 접힘. 위아래 방향키로 바꿀 수 있습니다"><span class="grip-bar" aria-hidden="true"></span></button>`;
   const grip = top.querySelector(".sheet-grip");
   const fns = [];
   let name = "peek";
@@ -44,7 +44,7 @@ export function createSheet(ctx, panelEl) {
     document.body.classList.toggle("sheet-half", name === "half");
     document.body.classList.toggle("sheet-peek", name === "peek");
     grip.setAttribute("aria-expanded", String(name !== "peek"));
-    grip.setAttribute("aria-label", `시트 높이 바꾸기, 지금 ${LABEL[name]}. 위아래 방향키로 바꿉니다`);
+    grip.setAttribute("aria-label", `시트 높이 바꾸기, 현재 ${LABEL[name]}. 위아래 방향키로 바꿀 수 있습니다`);
     if (notify) fns.forEach(fn => { try { fn(name, px); } catch (e) { console.error(e); } });
   }
 

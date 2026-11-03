@@ -1,9 +1,10 @@
 // 주소창 상태 (명세 3.1절). 공개와 로컬이 같은 값을 쓴다.
-//   focus 고른 장소 경로, unit 단지 카드(group), q 찾기말, cat 분류, tab 탭(ask, data), theme 주제 보기, z 배율, c 경도,위도
+//   focus 고른 장소 경로, unit 단지 카드(group), q 찾기말, cat 분류, tab 탭(ask, data), theme 주제 보기, z 배율, c 경도,위도,
+//   d3 층수 입체 보기의 시점(기울기,방위각. 켰을 때만)
 // 쌓는 값(set의 push: true)은 pushState, 덮어쓰는 값은 replaceState로 적는다. 뒤로 가기는 popstate로 받아 알린다.
 // URLSearchParams.toString()은 '/'를 %2F로 바꾸므로 값을 직접 잇는다.
 
-const KEYS = ["focus", "unit", "q", "cat", "tab", "theme", "z", "c"];
+const KEYS = ["focus", "unit", "q", "cat", "tab", "theme", "z", "c", "d3"];
 const enc = v => encodeURIComponent(String(v)).replace(/%2F/gi, "/").replace(/%2C/gi, ",").replace(/%3A/gi, ":");
 
 function read() {
@@ -19,6 +20,7 @@ function read() {
   if (s.unit && s.unit !== "group") delete s.unit;
   if (s.cat && !/^[a-z0-9][a-z0-9_-]{0,39}$/.test(s.cat)) delete s.cat;
   if (s.tab && !/^[a-z][a-z0-9-]{0,23}$/.test(s.tab)) delete s.tab;
+  if (s.d3 && !/^\d{1,2},-?\d{1,3}$/.test(s.d3)) delete s.d3;
   return s;
 }
 

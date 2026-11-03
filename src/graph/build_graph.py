@@ -235,6 +235,19 @@ def add_business(g: Graph, proc: Path) -> None:
         add_geometry(g, s, shapely.Point(float(r.lon), float(r.lat)))
 
 
+def add_catalog(g: Graph) -> None:
+    """원천 자료 목록(DCAT): 어휘에 적은 자료마다 목록에 넣고, 공개 등급을 config/area.yaml의 공개 보류 목록에서 적는다.
+    공개 등급을 어휘에 손으로 적지 않는 것은 공개 사이트를 거르는 목록(src.graph.public.hold_sources)과 어긋나지 않게 하려는 것이다."""
+    import yaml
+    DCAT = Namespace("http://www.w3.org/ns/dcat#")
+    onto = Graph().parse(ROOT / "src" / "graph" / "ontology.ttl", format="turtle")
+    with open(ROOT / "config" / "area.yaml", encoding="utf-8") as f:
+        hold = {JGK[d] for d in yaml.safe_load(f)["publish"]["hold_sources"]}
+    for d in sorted(onto.subjects(RDF.type, JGK.Dataset)):
+        g.add((JGK.catalog, DCAT.dataset, d))
+        g.add((d, DCTERMS.accessRights, Literal("공개 보류" if d in hold else "공개", lang="ko")))
+
+
 def build(proc: Path = PROC) -> Graph:
     """proc 폴더의 객체 파일(src.model.build_objects 결과)로 그래프를 만든다."""
     gpkg = proc / "objects.gpkg"
@@ -273,10 +286,11 @@ def build(proc: Path = PROC) -> Graph:
         source_of = {"gis": DATASET_GIS, "navi": DATASET_NAVI, "register": DATASET_REGISTER}
         for k in filter(None, r.sources.split(";")):
             g.add((s, DCTERMS.source, source_of[k]))
-    # 필지 경계 (연속지적도). 모양 노드에만 출처를 단다
+    # 필지 경계와 지목 (연속지적도). 모양 노드와 필지 객체 모두에 출처를 단다 (지목, 기준일이 필지 객체에 있다)
     for r in read_optional(proc, "parcel_shape").itertuples():
         s = URIRef(r.uri)
         add_geometry(g, s, r.geometry, source=DATASET_CADASTRAL)
+        g.add((s, DCTERMS.source, DATASET_CADASTRAL))
         add(g, s, JGK.landCategory, r.land_category, lang="ko")
         add(g, s, JGK.cadastralDate, r.cadastral_date, XSD.date)
 
@@ -293,6 +307,8 @@ def build(proc: Path = PROC) -> Graph:
         add(g, s, JGK.approvalDate, r.approval_date, XSD.date)
         add(g, s, JGK.floorsAbove, None if pd.isna(r.floors_above) else int(r.floors_above), XSD.integer)
         add(g, s, JGK.floorsBelow, None if pd.isna(r.floors_below) else int(r.floors_below), XSD.integer)
+        if "height_m" in buildings.columns and not pd.isna(r.height_m):
+            add(g, s, JGK.heightM, f"{float(r.height_m):.2f}", XSD.decimal)
         if present(r.pnu):
             g.add((s, JGK.locatedOn, URIRef(uri.parcel(r.pnu))))
         if present(r.adm_dong_code):
@@ -345,6 +361,7 @@ def build(proc: Path = PROC) -> Graph:
     add_maps(g, proc)
     add_sensors(g, proc)
     add_business(g, proc)
+    add_catalog(g)
     return g
 
 
