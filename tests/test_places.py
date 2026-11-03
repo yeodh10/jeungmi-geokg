@@ -95,7 +95,7 @@ def check_real() -> None:
     assert not [r for r in rows if r.get("fa") == 0 or r.get("fb") == 0]
     assert not [r for r in rows if not r.get("j")], "지번 없는 건물"
     st = Counter(r.get("s", "사용") for r in rows)
-    assert st == Counter({"사용": 2162, "주소 미연결": 628}), st
+    assert st == Counter({"사용": 2162, "주소 미연결": 621, "주소 연결됨": 7}), st  # 공개 근거 승인(자리표시 잇기 7건)을 얹은 공개 뷰
     assert sum(1 for r in rows if r.get("sh") == 0) == 324
     by_name = {g["n"]: g for g in groups}
     g9 = by_name["가양9단지아파트"]

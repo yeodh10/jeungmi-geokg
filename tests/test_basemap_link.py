@@ -67,17 +67,19 @@ def check_near_same_address() -> None:
 
 
 def check_rules_on_data(df, proc) -> None:
-    """모양 규칙의 넓이와 층수 기준이 주소 잇기에도 걸린다. 모양 붙이기 겹침은 양쪽 모양 기준으로 잰다."""
+    """모양 규칙의 넓이와 층수 기준이 주소 잇기에도 걸린다. 모양 붙이기 겹침은 양쪽 모양 기준으로 잰다 (자리표시 모양은 빼고)."""
     import geopandas as gpd
 
-    from src.review.basemap_proposals import SHAPE_MAX_OVERLAP, SHAPE_MIN_AREA_M2, floor_gap, shape_candidates
+    from src.model.build_objects import GIS_TINY_M2
+    from src.review.basemap_proposals import SHAPE_MAX_OVERLAP, SHAPE_MIN_AREA_M2, floor_gap, real_outlines, shape_candidates
 
     b = gpd.read_file(proc / "objects.gpkg", layer="building").to_crs("EPSG:5186").set_index("uri")
     maps = gpd.read_file(proc / "objects.gpkg", layer="basemap_building").to_crs("EPSG:5186").set_index("uri")
     for r in df.itertuples():
         assert b.at[r.gis_uri, "geometry"].area >= SHAPE_MIN_AREA_M2 and maps.at[r.basemap_uri, "geometry"].area >= SHAPE_MIN_AREA_M2, r
         assert not floor_gap(b.at[r.building_uri, "floors_above"], maps.at[r.basemap_uri, "floors"]), r
-    polys = b[b.geom_type != "Point"].geometry.reset_index(drop=True)
+    polys = real_outlines(b).geometry.reset_index(drop=True)
+    assert polys.area.min() >= GIS_TINY_M2 and (b[b.geom_type != "Point"].area < GIS_TINY_M2).sum() > 0  # 실제 자료에 자리표시가 있다
     for r in shape_candidates(proc)[0].itertuples():
         m = maps.at[r.map_uri, "geometry"]
         for g in polys.iloc[polys.sindex.query(m, predicate="intersects")]:

@@ -49,7 +49,7 @@ EMAP_CRS = "EPSG:5179"
 # 국토정보플랫폼 수치지형도 Ver2.0의 .prj는 Korea_2000_Central_Belt_2010 (EPSG:5186과 같은 값)
 NGII_CRS = "EPSG:5186"
 EMAP_LAYERS = [("TL_SPRD_MANAGE", "emap_road_segment"), ("TL_SCCO_EMD", "emap_legal_dong"),
-               ("TL_KODIS_BAS", "emap_basic_zone")]
+               ("TL_KODIS_BAS", "emap_basic_zone"), ("TL_SPBD_BULD", "emap_building")]
 
 
 def load_area() -> dict:
@@ -80,8 +80,27 @@ def clip(gdf: gpd.GeoDataFrame, area, metric_crs: str, rule: str) -> gpd.GeoData
     return gdf[mask.values]
 
 
-def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
-    """raw 폴더의 원본에서 대상 범위를 잘라 out_dir에 저장한다."""
+def edge_centers(nb: pd.DataFrame, centers: gpd.GeoDataFrame, gis: gpd.GeoDataFrame, metric: str) -> gpd.GeoDataFrame:
+    """중심점은 범위 밖이지만 범위에 걸친 GIS 건물 모양 안에 든 내비게이션용DB 건물.
+
+    GIS 건물은 걸치기만 해도 넣고(intersects) 중심점은 안에 있어야 넣어서(within), 경계에 걸친 건물은 모양만 들어오고
+    건물관리번호를 잃어 주소 미연결로 보였다 (반경 1km에서 32동, docs/decisions.md 2026-11-03).
+    """
+    shapes = gis[["geometry"]].to_crs(metric)
+    x0, y0, x1, y1 = shapes.total_bounds
+    pts = points_from_xy(nb[~nb["bldg_mgt_no"].isin(centers["bldg_mgt_no"])], "center_x", "center_y", NAVI_CRS)
+    near = pts.to_crs(metric).cx[x0:x1, y0:y1]
+    hit = gpd.sjoin(near, shapes, predicate="within", how="inner")
+    return pts.loc[hit.index.unique()]
+
+
+def main(raw: Path = RAW, out_dir: Path = OUT_DIR, edge_buildings: bool = False) -> None:
+    """raw 폴더의 원본에서 대상 범위를 잘라 out_dir에 저장한다.
+
+    edge_buildings가 참이면 범위에 걸친 GIS 건물의 중심점도 넣는다 (edge_centers). 지금 그래프의 바탕(9월분)은
+    이 규칙 없이 만들어 두고, 자동 갱신의 새 자료(src.review.diff_proposals)에만 쓴다. 바탕을 바꾸면 이미 공개한
+    building-gis URI가 바탕에서 사라지므로, 경계 건물은 '새 건물 만들기 + 주소 미연결 건물 잇기' 제안으로 들어온다 (URI 규칙 4).
+    """
     out_gpkg = out_dir / "jeungmi_area.gpkg"
     cfg = load_area()
     metric = cfg["crs"]["metric"]
@@ -103,6 +122,8 @@ def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
     navi_dir = raw / "juso_navi_db"
     nb = read_navi_txt(navi_dir / "match_build_seoul.txt", NAVI_BUILD_COLS)
     centers = clip(points_from_xy(nb, "center_x", "center_y", NAVI_CRS), area, metric, rule_point)
+    if edge_buildings:
+        centers = pd.concat([centers, edge_centers(nb, centers, layers["gis_building"], metric)])
     layers["navi_building_center"] = centers
     # 중심점이 범위 안에 있는 건물의 주출입구만 남긴다 (출입구가 범위 밖에 살짝 걸쳐도 같은 건물로 묶기 위해)
     ent = points_from_xy(nb[nb["bldg_mgt_no"].isin(centers["bldg_mgt_no"])],
@@ -161,6 +182,14 @@ def main(raw: Path = RAW, out_dir: Path = OUT_DIR) -> None:
         layers["ngii_basemap_area"] = read("도엽인덱스5K")[["mapidcd_no", "geometry"]]
     else:
         print("[없음] data/raw/ngii_basemap -> 국가기본도 없이 진행")
+
+    # 10. 연속지적도형정보 (브이월드 AL_D002, EPSG:5186). .cpg는 UTF-8이라 적혀 있지만 글자는 CP949다
+    cad = sorted((raw / "vworld_cadastral").glob("AL_D002_*.shp")) if (raw / "vworld_cadastral").exists() else []
+    if cad:
+        g = gpd.read_file(cad[-1], encoding="cp949", bbox=bbox, engine="pyogrio")
+        layers["cadastral_parcel"] = clip(g.set_crs(metric, allow_override=True), area, metric, rule_poly)
+    else:
+        print("[없음] data/raw/vworld_cadastral -> 필지 경계 없이 진행")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     if out_gpkg.exists():

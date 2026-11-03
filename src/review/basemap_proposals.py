@@ -131,6 +131,17 @@ def near_same_address(outside: gpd.GeoDataFrame, map_cols: gpd.GeoDataFrame, key
     return near.sort_values(["distance_m", "map_uri"]).drop_duplicates("uri")
 
 
+def real_outlines(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """겹침을 잴 우리 건물 모양 (EPSG:5186). 넓이 GIS_TINY_M2 미만의 자리표시 마름모는 실제 외곽이 아니라 뺀다.
+
+    자리표시는 같은 실물의 점 건물 바로 옆에 찍혀 있어, 넣으면 그 점 건물에 붙일 국가기본도 모양이 '우리 다른 건물과 100% 겹침'으로
+    걸러진다 (2026-11-03 감사에서 5건). 자리표시는 src.review.placeholder_proposals가 같은 건물로 잇는다.
+    """
+    from src.model.build_objects import GIS_TINY_M2
+    polys = buildings[buildings.geom_type != "Point"].to_crs("EPSG:5186")
+    return polys[polys.area >= GIS_TINY_M2]
+
+
 def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     """모양 없이 점만 있는 건물에 국가기본도 건물 모양을 붙일 짝과, 제안하지 않은 까닭별 개수.
 
@@ -142,7 +153,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     5. 점이 어느 모양에도 들지 않으면(중심점이 외곽선 바로 밖에 찍힌 경우), SHAPE_NEAR_M 안의 모양 가운데
        도로명주소까지 같은 것에서 가장 가까운 모양으로 2, 3을 따져 제안한다. 이때는 주소가 없는 모양은 쓰지 않는다.
     6. 국가기본도 모양과 우리 다른 건물 모양이 어느 쪽 넓이로 재도 SHAPE_MAX_OVERLAP보다 많이 겹치지 않는다.
-       새 면 기준으로만 재면 작은 건물이 통째로 들어간 경우를 놓친다.
+       새 면 기준으로만 재면 작은 건물이 통째로 들어간 경우를 놓친다. 자리표시 모양은 재지 않는다 (real_outlines).
     7. 국가기본도 PNU가 점 건물과 다르면, 그 PNU가 점 건물의 관련 지번 가운데 하나여야 한다.
     8. 국가기본도 모양이 SHAPE_MIN_AREA_M2㎡ 이상이고, 층수가 부속 구조물로 보이지 않는다 (floor_gap).
        아파트 동 중심점이 경비실 같은 작은 부속 구조물 모양에 떨어진 경우를 거른다.
@@ -170,7 +181,7 @@ def shape_candidates(proc: Path = PROC) -> tuple[pd.DataFrame, dict]:
     per_map = j.groupby("map_uri").size()
     poly_of = basemap.set_index("uri").geometry.to_crs(stored_crs)
     metric_of = bm.set_index("map_uri").geometry
-    ours = buildings[buildings.geom_type != "Point"].to_crs("EPSG:5186").geometry.reset_index(drop=True)
+    ours = real_outlines(buildings).geometry.reset_index(drop=True)
 
     def overlap(map_uri: str) -> float:
         """우리 다른 건물과 겹치는 비율. 새 면 기준과 그 건물 기준 가운데 큰 값이다."""
@@ -252,7 +263,7 @@ def audit(proc: Path = PROC) -> pd.DataFrame:
     ours = gpd.read_file(gpkg, layer="building").to_crs("EPSG:5186")
     by_uri = ours.set_index("uri")
     maps = gpd.read_file(gpkg, layer="basemap_building").to_crs("EPSG:5186").set_index("uri")
-    polys = ours[ours.geom_type != "Point"].reset_index(drop=True)
+    polys = real_outlines(ours).reset_index(drop=True)
     map_of = dict(zip(*(pd.read_csv(proc / "building_basemap.csv", dtype=str)[c] for c in ("building_uri", "map_uri"))))
     rows = []
     for p in ProposalStore().load():

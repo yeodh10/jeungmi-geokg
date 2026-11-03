@@ -17,7 +17,7 @@ PROC = ROOT / "data" / "processed"
 FILES = ["objects.gpkg", "facility_building.csv", "parcel.csv", "admin_dong.csv", "building_entrance.csv",
          "road.csv", "entrance_road.csv", "building_zone.csv", "parcel_legal_dong.csv", "building_basemap.csv",
          "building_digital_map.csv"]
-EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone", "basemap_building", "digital_map_building"]
+EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone", "basemap_building", "digital_map_building", "parcel_shape"]
 FAKE_MGT = "1150010200199990000000001"  # 시험용 건물관리번호 (실제 번호 아님)
 
 

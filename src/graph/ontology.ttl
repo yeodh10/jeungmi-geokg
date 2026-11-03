@@ -115,7 +115,7 @@ jgk:inBasicZone a owl:ObjectProperty ; rdfs:label "기초구역에 속한다"@ko
     rdfs:comment "건물 주소의 우편번호로 정한 소속이다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:BasicZone .
 jgk:sameBuildingAs a owl:ObjectProperty ; rdfs:label "같은 실물 건물"@ko ;
-    rdfs:comment "주소 미연결 건물이 건물관리번호 건물과 같은 실물 건물이라는 연결. 두 객체는 자료가 달라 모양, 용도, 이름, 층수가 서로 다를 수 있다. owl:sameAs로 잇고 추론하면 두 객체의 값과 번호가 한 객체에 섞이므로 쓰지 않는다. 2026-11-02 앞에 승인한 제안은 owl:sameAs로 남아 있다."@ko ;
+    rdfs:comment "주소 미연결 건물이 건물관리번호 건물과 같은 실물 건물이라는 연결. 두 객체는 자료가 달라 모양, 용도, 이름, 층수가 서로 다를 수 있다. owl:sameAs로 잇고 추론하면 두 객체의 값과 번호가 한 객체에 섞이므로 쓰지 않는다. 2026-11-02 앞에 승인한 제안의 owl:sameAs는 2026-11-03에 이 관계로 옮겼다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:Building .
 jgk:within a owl:ObjectProperty ; rdfs:label "행정동에 속한다"@ko ;
     rdfs:comment "원천 데이터의 행정동코드로 정한 소속이다. 모양끼리의 포함 관계는 geof:sfWithin으로 따로 계산한다."@ko ;
@@ -179,6 +179,9 @@ jgk:linkedBy a owl:DatatypeProperty ; rdfs:label "이은 방법"@ko ; rdfs:domai
 # 필지에 붙이는 단지 정보 (건축물대장 총괄표제부)
 
 jgk:siteArea a owl:DatatypeProperty ; rdfs:label "대지면적(㎡)"@ko ; rdfs:range xsd:decimal .
+jgk:landCategory a owl:DatatypeProperty ; rdfs:label "지목"@ko ; rdfs:domain jgk:Parcel ; rdfs:range rdf:langString ;
+    rdfs:comment "연속지적도 지번 표기 끝의 지목 한 글자(대, 도, 전, 임 등). 측량에 쓰지 못하는 참조용 도면의 값이다."@ko .
+jgk:cadastralDate a owl:DatatypeProperty ; rdfs:label "필지 경계 기준일"@ko ; rdfs:domain jgk:Parcel ; rdfs:range xsd:date .
 jgk:totalFloorArea a owl:DatatypeProperty ; rdfs:label "연면적(㎡)"@ko ; rdfs:range xsd:decimal .
 jgk:households a owl:DatatypeProperty ; rdfs:label "세대수"@ko ; rdfs:range xsd:integer .
 jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물수"@ko ; rdfs:range xsd:integer .
@@ -300,6 +303,12 @@ jgk:dataset-sbiz-store a jgk:Dataset ;
     rdfs:comment "분기마다 바뀐다. 기준일 뒤에 문을 닫거나 새로 연 가게와 다를 수 있다. 주택 건물 안 업체는 1층이나 지하의 손님이 찾아오는 업종만 공개 사이트에 낸다(config/area.yaml)."@ko ;
     dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15083033/fileData.do> .
+jgk:dataset-cadastral a jgk:Dataset ;
+    dcterms:title "국토교통부 연속지적도형정보 (브이월드 AL_D002, 서울, 2026-10-08 기준)"@ko ;
+    rdfs:label "국토교통부 연속지적도형정보 (브이월드 AL_D002, 서울, 2026-10-08 기준)"@ko ;
+    rdfs:comment "지적도와 임야도의 경계점을 이어 만든 참조용 도면이다. 측량 자료로 쓰지 못하고 법적 효력이 없다. 필지 모양에만 쓴다."@ko ;
+    dcterms:license "CC BY (브이월드 자료 페이지)"@ko ;
+    dcterms:source <https://www.vworld.kr/dtmk/dtmk_ntads_s002.do?dsId=23> .
 jgk:dataset-gangseo-notice a jgk:Dataset ;
     dcterms:title "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;
     rdfs:label "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;

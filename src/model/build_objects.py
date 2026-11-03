@@ -302,6 +302,27 @@ def make_basemap_objects(area_gpkg: Path, buildings, centers, metric: str, stora
     return {"layer": layer, "links": links, "review": review, "unmatched": unmatched, "report": report}
 
 
+def make_parcel_shapes(area_gpkg: Path, parcels: pd.DataFrame, storage: str) -> gpd.GeoDataFrame:
+    """필지마다 연속지적도에서 PNU(A1)가 같은 경계, 지목, 기준일. 필지 집합은 늘리지 않는다 (건물과 대장에 나온 PNU만).
+
+    A5는 '지번+지목' 꼴('52-104도', '산12임')이라 끝의 글자를 지목으로 쓴다. 한 PNU에 폴리곤이 여럿이면 합친다.
+    """
+    cols = ["uri", "pnu", "land_category", "cadastral_date"]
+    if "cadastral_parcel" not in set(pyogrio.list_layers(area_gpkg)[:, 0]):
+        return gpd.GeoDataFrame({c: [] for c in cols}, geometry=[], crs=storage)
+    cad = gpd.read_file(area_gpkg, layer="cadastral_parcel").to_crs(storage)
+    cad = cad[cad["A1"].isin(parcels["pnu"])]
+    shapes = cad.dissolve(by="A1", aggfunc="first").reset_index()
+    # 그래프는 좌표를 소수 7자리로 적는다(build_graph.add_geometry). 반올림만 하면 좁은 필지 1개가 스스로 교차해서,
+    # 미리 그 격자에 맞추되 모양이 올바르게 남도록 GEOS 정밀도 축소를 쓴다
+    shapes["geometry"] = shapely.set_precision(shapes.geometry.values, 1e-7)
+    return gpd.GeoDataFrame({
+        "uri": shapes["A1"].map(uri.parcel), "pnu": shapes["A1"],
+        "land_category": shapes["A5"].str.extract(r"([^\d\-\s]+)$")[0].replace({"산": None}),
+        "cadastral_date": shapes["A6"].astype(str).str[:10],
+    }, geometry=shapes.geometry, crs=storage)
+
+
 def split_register(reg: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """총괄표제부를 필지마다 한 행으로 고른다. 돌려주는 것: (쓰는 행, 사람이 볼 행).
 
@@ -527,6 +548,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     parcels = pd.DataFrame(parcels)
     # 빈 값이 섞인 정수 열이 2.0처럼 실수로 저장되지 않게 한다
     parcels = parcels.astype({"households": "Int64", "main_building_count": "Int64"})
+    parcel_shapes = make_parcel_shapes(area_gpkg, parcels, storage)
 
     # 6. 행정동 (내비게이션용DB 행정동코드)
     dongs = (centers[["adm_dong_code", "adm_dong_name"]].drop_duplicates().sort_values("adm_dong_code"))
@@ -584,6 +606,8 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     pd.DataFrame(facility_review).to_csv(proc / "review_public_facility.csv", index=False, encoding="utf-8")
     entrances.to_file(out_gpkg, layer="entrance", driver="GPKG", engine="pyogrio")
     parcels.to_csv(proc / "parcel.csv", index=False, encoding="utf-8")
+    if len(parcel_shapes):
+        parcel_shapes.to_file(out_gpkg, layer="parcel_shape", driver="GPKG", engine="pyogrio")
     dongs.to_csv(proc / "admin_dong.csv", index=False, encoding="utf-8")
     links.to_csv(proc / "building_entrance.csv", index=False, encoding="utf-8")
     conflicts.to_csv(proc / "review_gis_id_conflict.csv", index=False, encoding="utf-8")
@@ -630,6 +654,7 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
         "parcel": {"total": len(parcels),
                    "with_complex_info": int(parcels["sources"].str.contains("register").sum()),
                    "with_site_area": int(parcels["site_area"].notna().sum()),
+                   "with_boundary": len(parcel_shapes),
                    "register_duplicate_pnu_rows": len(reg_review)},
         "admin_dong": len(dongs),
         "road": {"total": len(emap["road"]), "segments": len(emap["road_segment"]),

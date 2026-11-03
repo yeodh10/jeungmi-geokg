@@ -137,16 +137,24 @@ def diff(g_old: Graph, g_new: Graph, tag: str, source: str, current: ox.Store | 
                 for gid in g_new.objects(geom, JGK.sourceGisBuildingId):
                     new_by_gis[str(gid)] = s
 
+    # 새 건물의 새 출입구는 그 건물 제안에 함께 넣는다. 건물은 출입구를 가리키고(jgk:hasEntrance) 출입구는 건물에 이어져야 해서
+    # 따로 내면 어느 쪽도 먼저 SHACL을 통과하지 못한다
+    bundled = {e: s for s, kind in new.items() if s not in old and kind == "Building"
+               for e in g_new.objects(s, JGK.hasEntrance) if e in new and e not in old}
+
     for s, kind in new.items():
-        if s in old:
+        if s in old or s in bundled:
             continue
-        triples = feature_triples(g_new, s)
+        entrances = [e for e, b in bundled.items() if b == s]
+        triples = feature_triples(g_new, s).union(*(feature_triples(g_new, e) for e in entrances))
         if current is not None:  # 이미 승인으로 들어온 값은 다시 넣지 않는다
             triples = {(a, b, c) for a, b, c in triples if to_term(c).to_ox() not in now_values(current, a, b)}
             if not triples:
                 continue
         props.append(make("create", s, kind, f"{KIND_KO.get(kind, kind)} '{label(g_new, s)}' 신규 등록",
-                          [f"새 자료에만 있다 ({source})", f"트리플 {len(triples)}개"],
+                          [f"새 자료에만 있다 ({source})", f"트리플 {len(triples)}개"]
+                          + ([f"새 출입구 {len(entrances)}개를 함께 등록한다: " + ", ".join(str(e).rsplit("/", 1)[-1] for e in sorted(entrances))]
+                             if entrances else []),
                           [Change(op="add", s=str(a), p=str(b), o=to_term(c)) for a, b, c in sorted(triples)], g_new))
 
     new_sources = set(g_new.objects(None, DCTERMS.source))
@@ -218,7 +226,7 @@ def main() -> None:
         from src.ingest import clip_area
         from src.model import build_objects
         new_dir.mkdir(parents=True, exist_ok=True)
-        clip_area.main(args.raw, new_dir)
+        clip_area.main(args.raw, new_dir, edge_buildings=True)  # 새 자료는 경계 건물 규칙으로 자른다 (clip_area.main)
         build_objects.main(new_dir)
 
     current = load_store() if args.old == PROC else None  # 지금 그래프의 바탕이 아닌 자료와 견줄 때는 자료끼리만 본다

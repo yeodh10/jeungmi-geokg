@@ -49,7 +49,7 @@ DOTS = re.compile("[\u00b7\u2027\u30fb\u318d\uff65]")
 LONG_NO = re.compile(r"[0-9]{20,}")
 APP_BANNED = ("/api/", "localhost", "web/local")
 # 공개 근거 제안이 승인되면 바뀌는 숫자 (명세 6절 '상태 수', 0절). 사람이 공개 근거 제안을 승인하면 함께 고친다
-STATUS_COUNTS = {"주소 연결됨": 0, "사용": 2162, "주소 미연결": 628}
+STATUS_COUNTS = {"주소 연결됨": 7, "사용": 2162, "주소 미연결": 621}  # 2026-11-03 자리표시 잇기 7건 (GIS, 내비게이션용DB 근거)
 POINT_BUILDINGS = 324
 NAME_KEYS = {"n", "name"}                 # 앱 자료에서 화면 이름이 든 칸
 PATH_KEYS = {"p", "path", "b", "lot"}     # 앱 자료에서 장소 경로가 든 칸

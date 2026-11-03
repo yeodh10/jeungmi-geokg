@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # 범위가 서울이라 전국 파일 중 서울 것과 공통 파일만 푼다.
 PLAN = [
     ("AL_D010_11_*.zip", "vworld_gis_building", None),
+    # 브이월드 연속지적도형정보 (dsId 23, 서울). 필지 경계 (docs/data-sources.md)
+    ("AL_D002_11_*.zip", "vworld_cadastral", None),
     ("민원행정기관전자지도_*.zip", "juso_public_office", None),
     ("*내비게이션용DB_전체분.7z", "juso_navi_db",
      ["match_build_seoul.txt", "match_jibun_seoul.txt", "match_rs_entrc.txt", "*.pdf"]),

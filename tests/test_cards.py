@@ -101,7 +101,7 @@ def check_real() -> None:
     assert len(items) >= 12 and all(x["rows"] and x["sparql"] and x["map"] for x in items.values())
     featured = {x["id"]: x["n"] for x in items.values() if x["featured"]}
     assert featured == {"edu-500": 22, "floors-20": 21, "apt-15": 162, "entrance-2": 140, "before-1980": 314,
-                        "named-no-address": 147, "parcel-3": 151, "sensor-600": 3}, featured
+                        "named-no-address": 141, "parcel-3": 151, "sensor-600": 3}, featured  # 공개 근거 승인 7건 반영 (2026-11-03)
     assert "{{NEAR:" in items["edu-500"]["sparql"] and "미리 실행한 답" in q["note"]
     names = [c["n"] for x in items.values() for r in x["rows"] for c in r if isinstance(c, dict)]
     assert "가동" not in names and not [x for x in names if re.search(r"[0-9]{20,}", x)]

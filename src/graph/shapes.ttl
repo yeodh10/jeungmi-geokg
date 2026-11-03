@@ -131,7 +131,9 @@ jgks:Parcel a sh:NodeShape ;
     sh:property [ sh:path jgk:households ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ;
                   sh:message "세대수는 0 이상의 정수 하나"@ko ] ;
     sh:property [ sh:path jgk:siteArea ; sh:maxCount 1 ; sh:datatype xsd:decimal ; sh:minExclusive 0 ;
-                  sh:message "대지면적은 0보다 커야 한다 (원천 건축물대장 값 확인 필요)"@ko ] .
+                  sh:message "대지면적은 0보다 커야 한다 (원천 건축물대장 값 확인 필요)"@ko ] ;
+    sh:property [ sh:path jgk:landCategory ; sh:maxCount 1 ; sh:message "지목은 하나"@ko ] ;
+    sh:property [ sh:path jgk:cadastralDate ; sh:maxCount 1 ; sh:datatype xsd:date ; sh:message "필지 경계 기준일은 날짜 하나"@ko ] .
 
 jgks:Entrance a sh:NodeShape ;
     sh:targetClass jgk:BuildingEntrance ;

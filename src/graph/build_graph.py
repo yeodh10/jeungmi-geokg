@@ -36,6 +36,7 @@ DATASET_NGII = JGK["dataset-ngii-digital-map"]
 DATASET_KBM = JGK["dataset-ngii-basemap"]
 DATASET_SDOT = JGK["dataset-sdot"]
 DATASET_SBIZ = JGK["dataset-sbiz-store"]
+DATASET_CADASTRAL = JGK["dataset-cadastral"]
 SOURCE_OF = {"navi": DATASET_NAVI, "emap": DATASET_EMAP, "gis": DATASET_GIS, "register": DATASET_REGISTER}
 
 
@@ -272,6 +273,12 @@ def build(proc: Path = PROC) -> Graph:
         source_of = {"gis": DATASET_GIS, "navi": DATASET_NAVI, "register": DATASET_REGISTER}
         for k in filter(None, r.sources.split(";")):
             g.add((s, DCTERMS.source, source_of[k]))
+    # 필지 경계 (연속지적도). 모양 노드에만 출처를 단다
+    for r in read_optional(proc, "parcel_shape").itertuples():
+        s = URIRef(r.uri)
+        add_geometry(g, s, r.geometry, source=DATASET_CADASTRAL)
+        add(g, s, JGK.landCategory, r.land_category, lang="ko")
+        add(g, s, JGK.cadastralDate, r.cadastral_date, XSD.date)
 
     for r in buildings.itertuples():
         s = URIRef(r.uri)

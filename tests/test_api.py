@@ -42,8 +42,9 @@ def strict(r):
 
 
 def fresh(review_app, n: int) -> list[str]:
-    """다른 시험이 쓰지 않은, 지금 사용 중인 건물 n개 (n은 10 이하)."""
-    q = (f"SELECT ?b WHERE {{ ?b a <{JGK}Building> ; <{JGK}status> <{JGK}Active> }} "
+    """다른 시험이 쓰지 않은, 지금 사용 중인 건물 n개 (n은 10 이하). 승인으로 같은 건물 잇기에 든 건물은 고르지 않는다."""
+    q = (f"SELECT ?b WHERE {{ ?b a <{JGK}Building> ; <{JGK}status> <{JGK}Active> "
+         f"FILTER NOT EXISTS {{ ?x <{JGK}sameBuildingAs> ?b }} FILTER NOT EXISTS {{ ?b <{JGK}sameBuildingAs> ?y }} }} "
          f"ORDER BY ?b LIMIT {n} OFFSET {next(spare) * 10}")
     return [s["b"].value for s in review_app.store().query(q)]
 
