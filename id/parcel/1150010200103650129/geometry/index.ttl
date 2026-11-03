@@ -1,0 +1,3 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200103650129/geometry> <http://www.opengis.net/ont/geosparql#asWKT> "POLYGON ((126.8614865 37.5514077, 126.8615319 37.5514147, 126.8615416 37.551347, 126.8613578 37.5513236, 126.8613545 37.5513382, 126.86137 37.5513411, 126.8613421 37.5514847, 126.8614728 37.5515033, 126.8614865 37.5514077))"^^<http://www.opengis.net/ont/geosparql#wktLiteral> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200103650129/geometry> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-cadastral> .
+<https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010200103650129/geometry> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Geometry> .

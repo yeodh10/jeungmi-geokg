@@ -34,12 +34,12 @@ export async function init(ctx) {
     const yOpt = (sel, first) => `<option value="0">${first}</option>${decades.map(d => `<option value="${d}"${sel === d ? " selected" : ""}>${d}년</option>`).join("")}`;
     el.innerHTML = `<div class="cond">
       <h2 class="res-title" tabindex="-1">조건 찾기</h2>
-      <p class="small muted">건물 자료로 고릅니다. 묶음(단지)은 한 줄로 셉니다.</p>
+      <p class="small muted">건물 자료에서 고릅니다. 단지는 한 줄로 셉니다.</p>
       <fieldset class="pick-set"><legend>용도 (고르지 않으면 전체)</legend>${ugBoxes}</fieldset>
       <div class="cond-row"><label for="cond-floor">지상 층수</label><select id="cond-floor">${FLOORS.map(([v, t]) => `<option value="${v}"${cond.minFloors === v ? " selected" : ""}>${t}</option>`).join("")}</select></div>
-      <div class="cond-row"><label for="cond-yf">사용승인 연도</label><span class="cond-years"><select id="cond-yf" aria-label="몇 년부터">${yOpt(cond.yearFrom, "처음부터")}</select>
-        <span aria-hidden="true">~</span><select id="cond-yt" aria-label="몇 년까지">${yOpt(cond.yearTo ? Math.floor(cond.yearTo / 10) * 10 : 0, "지금까지")}</select></span></div>
-      <p class="small muted">사용승인일은 2018년까지의 자료이고, 연도를 고르면 사용승인일이 없는 건물은 빠집니다.</p>
+      <div class="cond-row"><label for="cond-yf">사용승인 연도</label><span class="cond-years"><select id="cond-yf" aria-label="시작 연도">${yOpt(cond.yearFrom, "처음부터")}</select>
+        <span aria-hidden="true">~</span><select id="cond-yt" aria-label="끝 연도">${yOpt(cond.yearTo ? Math.floor(cond.yearTo / 10) * 10 : 0, "지금까지")}</select></span></div>
+      <p class="small muted">사용승인일은 2018년까지의 자료입니다. 연도를 고르면 사용승인일이 없는 건물은 빠집니다.</p>
       <div class="cond-row"><label for="cond-d">역에서 직선 거리</label><select id="cond-d">${DIST.map(([v, t]) => `<option value="${v}"${cond.maxD === v ? " selected" : ""}>${t}</option>`).join("")}</select></div>
       <p class="cond-count" aria-live="polite"></p>
       <div class="res-acts"><button type="button" class="btn cond-apply">적용</button><button type="button" class="btn ghost cond-reset">조건 지우기</button></div>
@@ -66,7 +66,7 @@ export async function init(ctx) {
       const r = count(cond);
       const c = { ...cond, ug: cond.ug.slice() };
       ctx.results.show({ kind: "cond", key: "cond", title: "조건 찾기 결과", items: r.items, sort: "station", focus: true,
-        extraNote: `${label(c)}. 건물 ${nf(r.buildings)}동이 맞습니다.`,
+        extraNote: `${label(c)}. 조건에 맞는 건물은 ${nf(r.buildings)}동입니다.`,
         empty: `<p>맞는 건물이 없습니다.</p><div class="res-acts"><button type="button" class="btn" data-cond-back>조건 바꾸기</button></div>` });
       ui.live(`조건에 맞는 곳 ${nf(r.items.length)}곳을 목록과 지도에 표시했습니다`);
     };

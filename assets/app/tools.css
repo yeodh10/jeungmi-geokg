@@ -87,3 +87,7 @@ body.measuring .maplibregl-canvas-container, body.measuring .maplibregl-canvas-c
 @media (max-width: 900px) and (max-height: 500px) {
   .theme-pop, .measure-pick { top: calc(68px + env(safe-area-inset-top)); }
 }
+.bright-set { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
+.bright-set .seg { display: flex; gap: 2px; }
+.bright-set .seg .pick { flex: 1; min-height: 36px; }
+.bright-set input[type="range"] { width: 100%; accent-color: var(--accent); }

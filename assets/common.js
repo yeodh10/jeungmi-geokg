@@ -27,7 +27,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const EXT = {
   "22-rdf-syntax-ns#type": "종류", "rdf-schema#label": "이름", "terms/source": "출처", "terms/description": "설명",
   "terms/created": "만든 시각", "geosparql#hasGeometry": "모양", "geosparql#hasDefaultGeometry": "기본 모양",
-  "geosparql#asWKT": "WKT", "owl#sameAs": "같은 객체", "prov#wasInfluencedBy": "반영된 변경 제안",
+  "geosparql#asWKT": "WKT", "owl#sameAs": "같은 실물", "prov#wasInfluencedBy": "반영된 변경 제안",
   "geosparql#Feature": "공간 객체", "geosparql#Geometry": "모양", "prov#Entity": "기록",
 };
 const ext = u => { for (const k in EXT) if (String(u).endsWith(k)) return EXT[k]; return null; };
@@ -67,17 +67,17 @@ const MAP_CENTER = [126.86125, 37.55772];
 const MAP_FONT = "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
 // MapLibre 기본 영어 문구를 한국어로 (키는 maplibre-gl 4.7.1의 defaultLocale에서 확인)
 const MAP_LOCALE = {
-  "AttributionControl.ToggleAttribution": "지도 자료 표기 펴고 접기", "AttributionControl.MapFeedback": "지도 의견 보내기",
-  "FullscreenControl.Enter": "전체 화면", "FullscreenControl.Exit": "전체 화면 끝내기",
+  "AttributionControl.ToggleAttribution": "지도 출처 표시 펼치기/접기", "AttributionControl.MapFeedback": "지도 의견 보내기",
+  "FullscreenControl.Enter": "전체 화면", "FullscreenControl.Exit": "전체 화면 종료",
   "GeolocateControl.FindMyLocation": "내 위치 찾기", "GeolocateControl.LocationNotAvailable": "위치를 알 수 없습니다",
   "LogoControl.Title": "MapLibre 로고", "Map.Title": "지도", "Marker.Title": "지도 표식",
-  "NavigationControl.ResetBearing": "북쪽이 위로 오게", "NavigationControl.ZoomIn": "확대", "NavigationControl.ZoomOut": "축소",
+  "NavigationControl.ResetBearing": "북쪽을 위로", "NavigationControl.ZoomIn": "확대", "NavigationControl.ZoomOut": "축소",
   "Popup.Close": "말풍선 닫기", "ScaleControl.Feet": "ft", "ScaleControl.Meters": "m", "ScaleControl.Kilometers": "km",
   "ScaleControl.Miles": "mi", "ScaleControl.NauticalMiles": "nm",
   "TerrainControl.Enable": "지형 켜기", "TerrainControl.Disable": "지형 끄기",
-  "CooperativeGesturesHandler.WindowsHelpText": "Ctrl 키를 누른 채 휠을 굴리면 지도가 커지고 작아집니다",
-  "CooperativeGesturesHandler.MacHelpText": "⌘ 키를 누른 채 휠을 굴리면 지도가 커지고 작아집니다",
-  "CooperativeGesturesHandler.MobileHelpText": "두 손가락으로 지도를 움직입니다",
+  "CooperativeGesturesHandler.WindowsHelpText": "Ctrl 키를 누른 채 마우스 휠을 돌리면 지도를 확대하거나 축소할 수 있습니다",
+  "CooperativeGesturesHandler.MacHelpText": "⌘ 키를 누른 채 스크롤하면 지도를 확대하거나 축소할 수 있습니다",
+  "CooperativeGesturesHandler.MobileHelpText": "두 손가락으로 지도를 움직이세요",
 };
 const MAP_ATTRIBUTION = '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> '
   + '<a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> '

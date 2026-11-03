@@ -104,8 +104,8 @@ export function init(ctx) {
     box.className = "pp-box";
     const coord = `${pt[1].toFixed(6)}, ${pt[0].toFixed(6)}`;
     if (dC > 1000) {
-      box.innerHTML = `<p class="pp-name">여기는 범위 밖입니다</p>
-        <p class="pp-sub">이 지도는 증미역 반경 1km만 다룹니다. 여기는 역에서 직선 ${nf(Math.round(dSt))}m입니다.</p>
+      box.innerHTML = `<p class="pp-name">지도 범위 밖입니다</p>
+        <p class="pp-sub">이 지도는 증미역 반경 1km만 다룹니다. 이곳은 역에서 직선 ${nf(Math.round(dSt))}m 떨어져 있습니다.</p>
         <div class="pp-acts"><button type="button" class="btn ghost mini" data-a="station">증미역으로 가기</button></div>`;
     } else {
       const near = nearBuildings(pt);

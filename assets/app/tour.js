@@ -33,7 +33,7 @@ export function init(ctx) {
   };
 
   const STEPS = [
-    { title: "지도 전체", text: () => `증미역 반경 1km 안 건물 ${nf(data.count.buildings)}동이 용도별 색으로 깔려 있습니다. 확대할수록 이름 글자가 늘고, 원 밖은 어둡게 덮었습니다.`,
+    { title: "지도 전체", text: () => `증미역 반경 1km 안 건물 ${nf(data.count.buildings)}동이 용도별 색으로 깔려 있습니다. 확대할수록 더 많은 이름이 나타나고, 범위 원 밖은 어둡게 덮었습니다.`,
       async go() {
         bus.emit("deselect");
         panel.selectTab("search");
@@ -50,7 +50,7 @@ export function init(ctx) {
         if (!alive(t)) return;
         mark(foot);
       } },
-    { title: "이어진 것", text: () => "이어진 것에서 행정동 등촌제1동을 눌렀습니다. 같은 행정동에 속한 건물이 보라색으로 번집니다. 경계선은 공개 자료가 없어 그리지 않습니다.",
+    { title: "이어진 것", text: () => "'이어진 것'에서 행정동 등촌제1동을 지도에 표시했습니다. 같은 행정동에 속한 건물이 보라색으로 칠해집니다. 행정동 경계선은 공개 자료가 없어 그리지 않습니다.",
       async go(t) {
         panel.selectTab("search");
         await openStation();
@@ -62,7 +62,7 @@ export function init(ctx) {
     { title: "출처와 자료 탭", text: () => {
         const src = run && run.src;
         const s = src ? ` 증미역 카드에는 이 장소의 출처(${src.object.join(", ") || "없음"})와 이 모양의 출처(${src.shape.join(", ") || "없음"})를 나눠 적었습니다.` : "";
-        return `자료 탭에는 쓴 출처와 공개하지 않은 자료, 그 까닭이 있습니다.${s}`;
+        return `자료 탭에서는 사용한 출처와 공개하지 않은 자료, 그 사유를 볼 수 있습니다.${s}`;
       },
       async go(t) {
         bus.emit("spread:clear");
@@ -80,7 +80,7 @@ export function init(ctx) {
         d.open = true;
         mark(panel.el.querySelector("#pane-ask .ask-answer"));
       } },
-    { title: "기계용 원본", text: () => "장소 페이지 주소 끝에 index.ttl을 붙이면 같은 장소를 기계가 읽는 Turtle 원본으로 받습니다. 아래는 증미역 원본의 앞부분입니다.",
+    { title: "기계용 원본", text: () => "장소 페이지 주소 끝에 index.ttl을 붙이면 같은 장소를 기계가 읽는 Turtle 원본으로 받을 수 있습니다. 아래는 증미역 원본의 앞부분입니다.",
       async go(t) {
         bus.emit("spread:clear");
         panel.selectTab("search");
@@ -95,8 +95,8 @@ export function init(ctx) {
           const r = await fetch(url);
           const txt = r.ok ? await r.text() : "";
           if (!alive(t)) return;
-          box.querySelector("pre").textContent = txt ? txt.split("\n").filter(l => l.trim() && !/^@prefix/.test(l)).slice(0, 10).join("\n") : "원본을 받지 못했습니다. 위 링크로 열어 보세요.";
-        } catch (e) { if (alive(t)) box.querySelector("pre").textContent = "원본을 받지 못했습니다. 위 링크로 열어 보세요."; }
+          box.querySelector("pre").textContent = txt ? txt.split("\n").filter(l => l.trim() && !/^@prefix/.test(l)).slice(0, 10).join("\n") : "원본을 받지 못했습니다. 위 링크로 열어 주세요.";
+        } catch (e) { if (alive(t)) box.querySelector("pre").textContent = "원본을 받지 못했습니다. 위 링크로 열어 주세요."; }
       } },
   ];
   const alive = t => run && run.token === t;

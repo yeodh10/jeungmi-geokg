@@ -6,6 +6,7 @@
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#locatedOn> <https://yeodh10.github.io/jeungmi-geokg/id/parcel/1150010100102740008> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#inLegalDong> <https://yeodh10.github.io/jeungmi-geokg/id/legal-dong/1150010100> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#inBasicZone> <https://yeodh10.github.io/jeungmi-geokg/id/basic-zone/07562> .
+<https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#heightM> "45.3"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#hasEntrance> <https://yeodh10.github.io/jeungmi-geokg/id/entrance/1150010100102740008028103-main> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#floorsBelow> "1"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102740008028103> <https://yeodh10.github.io/jeungmi-geokg/def#floorsAbove> "10"^^<http://www.w3.org/2001/XMLSchema#integer> .

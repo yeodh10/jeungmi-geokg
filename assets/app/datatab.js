@@ -22,9 +22,9 @@ export function init(ctx) {
     load().then(s => {
       const srcRow = x => `<li><p class="nm">${esc(x.name)} <span class="chip ${x.public ? "pub" : "held"}">${x.public ? "공개" : "공개하지 않음"}</span></p>
         <p>${esc(x.by || "")}${x.as_of ? (/기준|받은 날|내려받기|제작/.test(x.as_of) ? `, ${esc(x.as_of)}` : `, ${esc(x.as_of)} 기준`) : ""}</p>
-        ${x.public ? `<p>쓴 곳: ${esc(x.used_for || "")}</p>${x.license ? `<p>이용 조건: ${esc(x.license)}</p>` : ""}${x.note ? `<p>${esc(x.note)}</p>` : ""}
+        ${x.public ? `<p>활용: ${esc(x.used_for || "")}</p>${x.license ? `<p>이용 조건: ${esc(x.license)}</p>` : ""}${x.note ? `<p>${esc(x.note)}</p>` : ""}
           ${safeUrl(x.url) ? `<p><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">자료 안내 ${ui.icon("external", 12)}</a></p>` : ""}`
-          : `<p>까닭: ${esc(x.reason || "")}</p>`}</li>`;
+          : `<p>사유: ${esc(x.reason || "")}</p>`}</li>`;
       const pub = s.sources.filter(x => x.public), held = s.sources.filter(x => !x.public);
       el.innerHTML = `
         <section class="dt-sec"><h2 class="dt-h" tabindex="-1">이 지도의 자료</h2>
@@ -33,14 +33,14 @@ export function init(ctx) {
           ${s.hiddenBusinessesNote ? `<p class="dt-p" style="margin-top:8px">${esc(s.hiddenBusinessesNote)}</p>` : ""}</section>
         <section class="dt-sec" data-tour="held"><h3 class="dt-h">공개하지 않은 자료 <span class="muted">${nf(held.length)}종</span></h3><ul class="dt-src">${held.map(srcRow).join("")}</ul></section>
         <section class="dt-sec"><h3 class="dt-h">이 지도에 없는 것</h3><ul class="dt-absent">${(s.absent || []).map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-          <p class="dt-p" style="margin-top:8px">값이 없는 칸은 빈칸으로 두지 않고 카드의 '없는 정보'에 적습니다.</p></section>
+          <p class="dt-p" style="margin-top:8px">값이 없는 항목은 빈칸으로 두지 않고 카드의 '없는 정보'에 모아 적습니다.</p></section>
         <section class="dt-sec"><h3 class="dt-h">공개 범위</h3><p class="dt-p">${esc(s.scope || "")}</p><p class="dt-p">${esc(s.history || "")}</p>
-          <p class="dt-p">장소마다 고유 주소 (URI)가 있습니다. 카드 맨 아래의 고유 주소를 열면 같은 장소의 페이지와 기계용 원본 (Turtle)이 나옵니다.</p></section>
+          <p class="dt-p">장소마다 고유 주소(URI)가 있습니다. 카드 맨 아래의 고유 주소를 열면 그 장소의 페이지와 기계용 원본(Turtle)을 볼 수 있습니다.</p></section>
         <section class="dt-sec"><h3 class="dt-h">건물 색 (용도)</h3>${legend()}</section>
         <section class="dt-sec dt-credits"><h3 class="dt-h">지도 자료 표기</h3>
           <p class="dt-p">${(s.credits || []).map(c => safeUrl(c.url) ? `<a href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener">${esc(c.name)}</a>` : `<span>${esc(c.name)}</span>`).join("")}</p>
           <p class="dt-p">${esc(s.creditsNote || "")}</p>
-          <p class="dt-p"><a href="${esc(cfg.mode === "public" ? cfg.root : "https://yeodh10.github.io/jeungmi-geokg")}/about/">소개 페이지</a>에 그래프 쓰는 법이 있습니다.</p></section>`;
+          <p class="dt-p"><a href="${esc(cfg.mode === "public" ? cfg.root : "https://yeodh10.github.io/jeungmi-geokg")}/about/">소개 페이지</a>에서 그래프 사용법을 볼 수 있습니다.</p></section>`;
     }).catch(() => {
       el.innerHTML = `<div class="cd-fail" role="alert"><p>자료 탭 내용을 받지 못했습니다.</p><button type="button" class="btn mini">${ui.icon("refresh", 14)}다시 시도</button></div>`;
       el.querySelector("button").addEventListener("click", () => render(el));
@@ -74,7 +74,7 @@ export function init(ctx) {
       ${ctx.features.has("ask") ? `<section class="dt-sec home-qs"><h3 class="dt-h">대표 질문</h3><ul class="ask-list">${ui.skeleton(3)}</ul></section>` : ""}
       <section class="dt-sec"><h3 class="dt-h">건물 종류</h3><ul class="home-bars">${bars}</ul></section>
       <section class="dt-sec"><h3 class="dt-h">지은 때 <span class="muted">(사용승인일)</span></h3><ul class="home-bars">${years}</ul>
-        <p class="small muted">사용승인일은 2018년까지의 자료입니다. 값이 없는 건물 ${nf(noDate)}동은 세지 않았습니다.</p></section>
+        <p class="small muted">사용승인일은 2018년까지의 자료입니다. 값이 없는 건물 ${nf(noDate)}동은 제외했습니다.</p></section>
       <section class="dt-sec"><h3 class="dt-h">이 지도에 없는 것</h3>
         <p class="home-missing">영업시간, 리뷰, 전화번호, 버스와 지하철 시간표, 실시간 교통은 없습니다. 상호는 공공데이터에 등록된 곳만 있습니다.
         ${ctx.features.has("datatab") ? `<button type="button" class="linkish home-data">자료 탭에서 자세히 보기</button>` : ""}</p></section>
@@ -95,7 +95,7 @@ export function init(ctx) {
     };
     if (qs && Array.isArray(data.featured)) draw(data.featured);
     else if (qs && ctx.questions) ctx.questions().then(q => draw(q.items.filter(x => x.featured)))
-      .catch(() => { qs.innerHTML = `<li class="muted small">질문을 받지 못했습니다. 묻기 탭에서 다시 해 보세요.</li>`; });
+      .catch(() => { qs.innerHTML = `<li class="muted small">질문을 받지 못했습니다. 묻기 탭에서 다시 시도해 주세요.</li>`; });
   }
   panel.setHome(home);
 }

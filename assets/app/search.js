@@ -302,7 +302,7 @@ export async function init(ctx) {
     </div>`;
     el.querySelectorAll(".res-tab").forEach(b => b.onclick = () => { R.tab = b.dataset.tab; R.page = 1; rerender(); emitMarkers(); });
     const sel = el.querySelector("#res-sort");
-    if (sel) sel.onchange = () => { R.sort = sel.value; R.page = 1; rerender(); emitMarkers(); ui.live(`${SORTS[R.sort]}으로 바꿨습니다`); };
+    if (sel) sel.onchange = () => { R.sort = sel.value; R.page = 1; rerender(); emitMarkers(); ui.live(`${SORTS[R.sort]}으로 정렬했습니다`); };
     const more = el.querySelector(".res-more");
     if (more) more.onclick = () => { R.page += 1; const k = (R.page - 1) * PAGE; rerender(); emitMarkers(); const b = el.querySelectorAll(".res-row")[k]; if (b) b.focus(); };
     const all = el.querySelector(".res-all");
@@ -334,7 +334,7 @@ export async function init(ctx) {
 
   // 빈 결과 (3.5절 표, 3.11절 다시 찾기 0건). 막다른 길로 두지 않고 다음 행동을 붙인다
   function emptyHtml() {
-    if (R.bounds) return `<div class="res-empty"><p>맞는 곳이 없습니다. 지금 지도 안에는 이 결과가 없습니다.</p>
+    if (R.bounds) return `<div class="res-empty"><p>지금 보이는 지도 안에는 결과가 없습니다.</p>
       <div class="res-acts"><button type="button" class="btn res-all2">전체 범위로 다시 찾기</button></div></div>`;
     if (R.empty) return `<div class="res-empty">${R.empty}</div>`;
     const n = R.note || { kind: "none", text: "맞는 장소를 찾지 못했습니다." };
@@ -343,7 +343,7 @@ export async function init(ctx) {
     let acts = "";
     if (n.kind === "absent") acts = `<p class="small muted">대신 이렇게 찾을 수 있습니다.</p><div class="res-chips">${chips.map(c => `<button type="button" class="chip-btn" data-chip="${esc(c.key)}">${esc(c.label)}</button>`).join("")}</div>`;
     else if (n.kind === "outside") acts = `<div class="res-acts"><button type="button" class="btn res-area">증미역 반경 1km 전체 보기</button></div>`;
-    acts += `<p class="small muted">이렇게 찾아 보세요.</p><div class="res-chips">${ex.map(q => `<button type="button" class="chip-btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`;
+    acts += `<p class="small muted">이렇게 찾아보세요.</p><div class="res-chips">${ex.map(q => `<button type="button" class="chip-btn" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`;
     acts += `<div class="res-qs" hidden><p class="small muted">미리 실행한 질문</p><ul></ul></div>`;
     return `<div class="res-empty"><p class="res-empty-msg">${esc(n.text)}</p>${acts}</div>`;
   }

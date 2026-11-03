@@ -67,7 +67,7 @@ searchbar.innerHTML = `<div class="sb" role="search">
     <li><a href="https://github.com/yeodh10/jeungmi-geokg" target="_blank" rel="noopener">소스 코드 ${ui.icon("external", 14)}</a></li>
     ${cfg.mode === "local" ? '<li><a href="/">변경 제안 검토</a></li>' : ""}
   </ul></nav>
-  <fieldset class="theme-pick"><legend>화면 밝기</legend>
+  <fieldset class="theme-pick"><legend>화면 모드</legend>
     <label><input type="radio" name="theme-pick" value="system">${ui.icon("system", 18)}시스템</label>
     <label><input type="radio" name="theme-pick" value="light">${ui.icon("sun", 18)}밝게</label>
     <label><input type="radio" name="theme-pick" value="dark">${ui.icon("moon", 18)}어둡게</label>
@@ -137,13 +137,13 @@ try {
   ctx.map.on("webglcontextlost", () => {
     const box = document.createElement("div");
     box.className = "map-fallback";
-    box.innerHTML = `<p>지도 그림이 멈췄습니다.</p><button type="button" class="btn">${ui.icon("refresh", 16)}다시 불러오기</button>`;
+    box.innerHTML = `<p>지도 표시가 멈췄습니다.</p><button type="button" class="btn">${ui.icon("refresh", 16)}다시 불러오기</button>`;
     box.querySelector("button").onclick = () => location.reload();
     mapEl.appendChild(box);
   });
 } catch (e) {
   console.warn("지도를 그리지 못했습니다:", e && e.message);
-  mapEl.innerHTML = `<div class="map-fallback"><p>이 브라우저에서는 지도를 그릴 수 없습니다 (WebGL을 쓸 수 없음).</p>
+  mapEl.innerHTML = `<div class="map-fallback"><p>이 브라우저에서는 지도를 표시할 수 없습니다(WebGL 미지원).</p>
     <p class="small">찾기, 결과 목록, 장소 정보, 묻기, 자료 탭은 그대로 쓸 수 있습니다.</p></div>`;
   document.body.classList.add("no-map");
 }
@@ -160,17 +160,17 @@ if (ctx.map) {
 
 // 내 위치: 눌렀을 때만 권한을 묻는다. 거부, 실패, 범위 밖은 한 줄 알림만 내고 지도는 움직이지 않는다
 function locate() {
-  if (!navigator.geolocation) { ui.toast("이 브라우저는 위치를 알려 주지 않습니다."); return; }
+  if (!navigator.geolocation) { ui.toast("이 브라우저에서는 위치 정보를 쓸 수 없습니다."); return; }
   ui.toast("내 위치를 찾는 중입니다");
   navigator.geolocation.getCurrentPosition(pos => {
     const pt = [pos.coords.longitude, pos.coords.latitude];
     const [w, s, e, n] = MAP_BOUNDS;
-    if (!(pt[0] >= w && pt[0] <= e && pt[1] >= s && pt[1] <= n)) { ui.toast("지금 위치가 이 지도의 범위(증미역 둘레 2.5km) 밖입니다."); return; }
+    if (!(pt[0] >= w && pt[0] <= e && pt[1] >= s && pt[1] <= n)) { ui.toast("현재 위치가 지도 범위(증미역 중심 가로세로 약 2.5km) 밖에 있습니다."); return; }
     ctx.mapApi.setMe(pt);
     ctx.map.easeTo({ center: pt, zoom: Math.max(ctx.map.getZoom(), 16), duration: M.dur(400) });
     ui.live("지도를 내 위치로 옮겼습니다");
   }, err => {
-    ui.toast(err && err.code === 1 ? "위치 권한이 없어 내 위치를 볼 수 없습니다." : "내 위치를 알 수 없습니다. 잠시 뒤에 다시 해 보세요.");
+    ui.toast(err && err.code === 1 ? "위치 권한이 없어 내 위치를 볼 수 없습니다." : "내 위치를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
   }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 }
 
@@ -275,7 +275,7 @@ function closePlace() {
 
 function notFound() {
   ui.toast("이 장소를 찾지 못했습니다");
-  ui.live("이 장소를 찾지 못했습니다. 처음 화면으로 갑니다");
+  ui.live("이 장소를 찾지 못해 처음 화면으로 돌아갑니다");
   state.set({ focus: null, unit: null }, { silent: true });
   if (selected) bus.emit("deselect");
   else panel.remove("place");
@@ -394,7 +394,7 @@ async function loadFeatures() {
 function searchFallback() {
   if (ctx.features.has("search")) return;
   document.getElementById("q").addEventListener("keydown", e => {
-    if (e.key === "Enter") ui.toast("찾기 기능을 불러오지 못했습니다. 메뉴의 건물 목록에서 찾을 수 있습니다.");
+    if (e.key === "Enter") ui.toast("찾기 기능을 불러오지 못했습니다. 메뉴의 건물 목록을 이용해 주세요.");
   });
 }
 
@@ -449,4 +449,4 @@ async function start() {
   bus.emit("app:ready", {});
 }
 
-start().catch(e => { console.error(e); ui.toast("화면을 여는 중에 문제가 생겼습니다. 새로 고쳐 주세요."); });
+start().catch(e => { console.error(e); ui.toast("화면을 여는 중에 문제가 생겼습니다. 새로고침해 주세요."); });

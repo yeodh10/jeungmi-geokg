@@ -94,8 +94,8 @@ export async function init(ctx) {
 
   function render() {
     const guide = mode === "distance"
-      ? (done ? "다 쟀습니다." : pts.length ? "다음 점을 누르세요. 백스페이스는 한 점 취소, Esc나 오른쪽 단추는 끝내기입니다." : "지도에서 출발점을 누르세요.")
-      : (done ? "다 쟀습니다." : pts.length ? "반경 끝점을 누르세요. 아래 단추로 반경을 바로 고를 수도 있습니다." : "지도에서 가운데 점을 누르세요.");
+      ? (done ? "재기를 마쳤습니다." : pts.length ? "다음 점을 누르세요. 백스페이스로 한 점을 취소하고, Esc 키나 마우스 오른쪽 버튼으로 끝냅니다." : "지도에서 출발점을 누르세요.")
+      : (done ? "재기를 마쳤습니다." : pts.length ? "반경 끝점을 누르세요. 아래 버튼으로 반경을 바로 고를 수도 있습니다." : "지도에서 가운데 점을 누르세요.");
     let body = "";
     if (mode === "distance") body = `<p class="measure-val">직선 거리 합계 <b>${fmt(total())}</b>${pts.length > 2 ? ` <span class="muted">(점 ${pts.length}개)</span>` : ""}</p>`;
     else {
@@ -111,7 +111,7 @@ export async function init(ctx) {
     box.innerHTML = `<div class="pop-head"><h2 class="pop-title" tabindex="-1">${mode === "distance" ? "거리 재기" : "반경 재기"}</h2>
       <button type="button" class="sb-btn measure-close" aria-label="재기 닫기">${ui.icon("close", 18)}</button></div>
       <p class="small muted measure-guide" aria-live="polite">${guide}</p>${body}
-      <p class="small muted">직선 거리입니다. 걷는 길이나 걸리는 시간이 아닙니다.</p>
+      <p class="small muted">직선 거리입니다. 실제 걷는 거리나 걸리는 시간과는 다릅니다.</p>
       <div class="measure-acts">
         ${!done && pts.length ? `<button type="button" class="btn ghost mini" data-a="undo">한 점 취소</button><button type="button" class="btn ghost mini" data-a="end">끝내기</button>` : ""}
         <button type="button" class="btn ghost mini" data-a="clear"${pts.length ? "" : " disabled"}>지우기</button>
@@ -215,7 +215,7 @@ export async function init(ctx) {
     draw();
     render();
     box.querySelector(".pop-title").focus();
-    ui.live(`${mode === "distance" ? "거리" : "반경"} 재기를 시작했습니다. 지도를 눌러 점을 찍습니다`);
+    ui.live(`${mode === "distance" ? "거리" : "반경"} 재기를 시작했습니다. 지도를 눌러 점을 찍으세요`);
   }
   function stop() {
     arm(false);

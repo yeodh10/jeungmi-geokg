@@ -36,13 +36,13 @@ export function init(ctx) {
     el.innerHTML = `<div class="ask-slot" data-slot="ask"></div><p class="ask-note">불러오는 중입니다.</p><div class="ask-body">${ui.skeleton(6)}</div>`;
     bus.emit("ask:ready", { slot: el.querySelector(".ask-slot") });
     load().then(qs => {
-      el.querySelector(".ask-note").textContent = qs.note || "미리 실행한 답입니다. 자유 질문은 이 저장소의 로컬 서버에서 됩니다.";
+      el.querySelector(".ask-note").textContent = qs.note || "미리 실행해 둔 답입니다. 질문을 직접 입력하려면 이 저장소의 로컬 서버를 실행해 주세요.";
       const body = el.querySelector(".ask-body");
       body.innerHTML = `<div class="ask-ans"></div><div class="ask-qs">${listHtml(qs.items)}</div>`;
       body.querySelectorAll(".ask-q").forEach(b => b.addEventListener("click", () => answer(b.dataset.id, { focus: true })));
       if (openId) answer(openId, { focus: false });
     }).catch(() => {
-      el.querySelector(".ask-note").textContent = "미리 실행한 답입니다. 자유 질문은 이 저장소의 로컬 서버에서 됩니다.";
+      el.querySelector(".ask-note").textContent = "미리 실행해 둔 답입니다. 질문을 직접 입력하려면 이 저장소의 로컬 서버를 실행해 주세요.";
       const body = el.querySelector(".ask-body");
       body.innerHTML = `<div class="cd-fail" role="alert"><p>질문 자료를 받지 못했습니다.</p><button type="button" class="btn mini">${ui.icon("refresh", 14)}다시 시도</button></div>`;
       body.querySelector("button").addEventListener("click", () => render(el));
@@ -63,15 +63,15 @@ export function init(ctx) {
     const body = () => q.rows.slice(0, shown).map(r => `<tr>${r.map(v => `<td>${cell(v)}</td>`).join("")}</tr>`).join("");
     const mapN = (q.map || []).length;
     box.innerHTML = `<section class="ask-answer" aria-live="polite"><h2 tabindex="-1">${esc(q.q)}</h2><p>${esc(q.answer)}</p>
-        <div class="ask-acts">${mapN ? `<button type="button" class="btn ghost mini ask-show">지도에 ${nf(mapN)}곳 보라색으로</button>` : ""}
+        <div class="ask-acts">${mapN ? `<button type="button" class="btn ghost mini ask-show">지도에 ${nf(mapN)}곳 표시</button>` : ""}
         <button type="button" class="btn ghost mini ask-close">답 닫기</button></div></section>
       ${q.rows.length ? `<div class="ask-table-wrap"><table class="ask-table"><caption class="sr-only">${esc(q.q)} 표, ${nf(q.rows.length)}행</caption>
         <thead>${head}</thead><tbody>${body()}</tbody></table></div>
         ${q.rows.length > shown ? `<p class="small muted ask-more-wrap">${nf(q.rows.length)}행 가운데 ${nf(shown)}행을 보여 줍니다. 지도에는 모두 표시합니다.
           <button type="button" class="btn ghost mini ask-more">더 보기</button></p>` : ""}` : `<p class="muted">표로 보일 행이 없습니다.</p>`}
-      <details class="ask-sparql"><summary>어떻게 찾았나요 (실행한 쿼리 SPARQL)</summary>
+      <details class="ask-sparql"><summary>어떻게 찾았나요 (실행한 SPARQL 쿼리)</summary>
         <pre>${esc(q.sparql || "")}</pre>
-        <p>공개 범위 그래프에서 빌드 때 실행했습니다.${/\{\{NEAR:/.test(q.sparql || "") ? " {{NEAR:장소:거리}}는 그 장소에서 그 거리만큼의 원으로 바꿔 실행한 자리입니다." : ""}${q.from ? ` 평가 질문 ${esc(q.from)}의 정답 쿼리를 바탕으로 했습니다.` : ""}</p></details>`;
+        <p>공개 범위 그래프에서 빌드 때 실행했습니다.${/\{\{NEAR:/.test(q.sparql || "") ? " {{NEAR:장소:거리}} 자리는 그 장소를 중심으로 주어진 거리만큼의 원으로 바꿔 실행했습니다." : ""}${q.from ? ` 평가 질문 ${esc(q.from)}의 정답 쿼리를 바탕으로 했습니다.` : ""}</p></details>`;
     const bind = () => box.querySelectorAll(".ask-table [data-path]").forEach(b => b.addEventListener("click", () => openPath(b.dataset.path)));
     bind();
     const more = box.querySelector(".ask-more");

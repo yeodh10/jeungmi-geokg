@@ -10,6 +10,7 @@
 @prefix sosa: <http://www.w3.org/ns/sosa/> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
 
 # 증미역 공간 지식 그래프 어휘
 # 모든 객체는 geo:Feature, 모양은 geo:Geometry로 따로 둔다.
@@ -24,7 +25,7 @@ jgk:Building a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "건물"@ko 
 jgk:BuildingEntrance a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "건물 출입구"@ko .
 jgk:RoadSegment a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "도로 구간"@ko .
 jgk:Parcel a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "필지"@ko ;
-    rdfs:comment "지금은 모양 없이 PNU만 가진다. 연속지적도를 붙이면 모양을 더한다."@ko .
+    rdfs:comment "PNU로 식별한다. 모양은 연속지적도(참조용 도면)에서 PNU가 같은 폴리곤을 붙이고, 모양 노드의 출처를 연속지적도로 적는다."@ko .
 jgk:PublicFacility a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "공공시설"@ko .
 jgk:Station a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "역"@ko .
 jgk:AdminDong a owl:Class ; rdfs:subClassOf geo:Feature ; rdfs:label "행정동"@ko .
@@ -53,7 +54,7 @@ jgk:basemap-G a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation
 jgk:basemap-H a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:notation "H" ; skos:prefLabel "주기"@ko .
 
 jgk:basemapClass a owl:AnnotationProperty ; rdfs:label "국가기본도 지형지물 대분류"@ko ;
-    rdfs:comment "객체 종류(owl:Class)가 수치지도 지형지물 분류체계의 어느 대분류에 드는지."@ko .
+    rdfs:comment "객체 종류(owl:Class)가 수치지도 지형지물 분류체계의 어느 대분류에 드는지 적는다."@ko .
 jgk:basemap-B0010000 a skos:Concept ; skos:inScheme jgk:basemap-classes ; skos:broader jgk:basemap-B ;
     skos:notation "B0010000" ; skos:prefLabel "건물"@ko ;
     skos:scopeNote "수치지형도 Ver2.0 레이어 N3A_B0010000. 속성 '종류' 값(아파트, 일반주택, 주택외건물, 무벽건물 등)으로 건물 레이어임을 확인했다."@ko .
@@ -115,7 +116,7 @@ jgk:inBasicZone a owl:ObjectProperty ; rdfs:label "기초구역에 속한다"@ko
     rdfs:comment "건물 주소의 우편번호로 정한 소속이다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:BasicZone .
 jgk:sameBuildingAs a owl:ObjectProperty ; rdfs:label "같은 실물 건물"@ko ;
-    rdfs:comment "주소 미연결 건물이 건물관리번호 건물과 같은 실물 건물이라는 연결. 두 객체는 자료가 달라 모양, 용도, 이름, 층수가 서로 다를 수 있다. owl:sameAs로 잇고 추론하면 두 객체의 값과 번호가 한 객체에 섞이므로 쓰지 않는다. 2026-11-02 앞에 승인한 제안은 owl:sameAs로 남아 있다."@ko ;
+    rdfs:comment "주소 미연결 건물이 건물관리번호 건물과 같은 실물 건물이라는 연결. 두 객체는 자료가 달라 모양, 용도, 이름, 층수가 서로 다를 수 있다. owl:sameAs로 잇고 추론하면 두 객체의 값과 번호가 한 객체에 섞이므로 쓰지 않는다. 2026-11-02 전에 승인한 제안의 owl:sameAs는 2026-11-03에 이 관계로 옮겼다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:Building .
 jgk:within a owl:ObjectProperty ; rdfs:label "행정동에 속한다"@ko ;
     rdfs:comment "원천 데이터의 행정동코드로 정한 소속이다. 모양끼리의 포함 관계는 geof:sfWithin으로 따로 계산한다."@ko ;
@@ -156,8 +157,10 @@ jgk:roadAddress a owl:DatatypeProperty ; rdfs:label "도로명주소"@ko ; rdfs:
 jgk:useName a owl:DatatypeProperty ; rdfs:label "용도"@ko ; rdfs:range xsd:string .
 jgk:structureName a owl:DatatypeProperty ; rdfs:label "구조"@ko ; rdfs:range xsd:string .
 jgk:approvalDate a owl:DatatypeProperty ; rdfs:label "사용승인일"@ko ; rdfs:range xsd:date .
-jgk:floorsAbove a owl:DatatypeProperty ; rdfs:label "지상층수"@ko ; rdfs:range xsd:integer .
-jgk:floorsBelow a owl:DatatypeProperty ; rdfs:label "지하층수"@ko ; rdfs:range xsd:integer .
+jgk:floorsAbove a owl:DatatypeProperty ; rdfs:label "지상 층수"@ko ; rdfs:range xsd:integer .
+jgk:heightM a owl:DatatypeProperty ; rdfs:label "건물 높이(m)"@ko ; rdfs:domain jgk:Building ; rdfs:range xsd:decimal ;
+    rdfs:comment "건축물대장의 높이(GIS건물통합정보 A16, 미터). 측량한 높이가 아니라 대장에 적힌 값이다. 입체 지도의 LoD1 높이로 쓴다."@ko .
+jgk:floorsBelow a owl:DatatypeProperty ; rdfs:label "지하 층수"@ko ; rdfs:range xsd:integer .
 jgk:entranceType a owl:DatatypeProperty ; rdfs:label "출입구 유형"@ko ; rdfs:range xsd:string .
 
 # 상호 (소상공인 상가정보). 이름은 rdfs:label, 주소는 jgk:roadAddress를 함께 쓴다. 값의 가운뎃점은 쉼표로 바꿔 넣었다
@@ -170,7 +173,7 @@ jgk:categorySmall a owl:DatatypeProperty ; rdfs:label "상권업종 소분류"@k
 jgk:floorInfo a owl:DatatypeProperty ; rdfs:label "층 정보"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string ;
     rdfs:comment "원천 값 그대로('1', '지', 'B1' 등). 값이 없는 행이 많고, 없으면 넣지 않는다."@ko .
 jgk:inBuilding a owl:ObjectProperty ; rdfs:label "들어 있는 건물"@ko ; rdfs:domain jgk:Business ; rdfs:range jgk:Building ;
-    rdfs:comment "상가정보의 건물관리번호가 같은 건물, 그것이 없으면 PNU가 같은 건물이 하나뿐일 때 그 건물. 어떻게 이었는지는 jgk:linkedBy에 적는다."@ko .
+    rdfs:comment "상가정보의 건물관리번호와 번호가 같은 건물. 그런 건물이 없으면 PNU가 같은 건물이 하나뿐일 때 그 건물이다. 어떻게 이었는지는 jgk:linkedBy에 적는다."@ko .
 jgk:onParcel a owl:ObjectProperty ; rdfs:label "있는 필지"@ko ; rdfs:domain jgk:Business ; rdfs:range jgk:Parcel ;
     rdfs:comment "건물을 하나로 정할 수 없을 때(PNU가 같은 건물이 여럿) 상가정보의 PNU로 필지에만 잇는다."@ko .
 jgk:linkedBy a owl:DatatypeProperty ; rdfs:label "이은 방법"@ko ; rdfs:domain jgk:Business ; rdfs:range xsd:string ;
@@ -179,9 +182,13 @@ jgk:linkedBy a owl:DatatypeProperty ; rdfs:label "이은 방법"@ko ; rdfs:domai
 # 필지에 붙이는 단지 정보 (건축물대장 총괄표제부)
 
 jgk:siteArea a owl:DatatypeProperty ; rdfs:label "대지면적(㎡)"@ko ; rdfs:range xsd:decimal .
+jgk:landCategory a owl:DatatypeProperty ; rdfs:label "지목"@ko ; rdfs:domain jgk:Parcel ; rdfs:range rdf:langString ;
+    rdfs:comment "지목의 정식 이름(대, 도로, 공장용지 등 28가지). 연속지적도 지번 표기 끝의 부호를 바꾼 값이다. 측량에 쓰지 못하는 참조용 도면의 값이다."@ko .
+jgk:cadastralDate a owl:DatatypeProperty ; rdfs:label "필지 경계 자료 기준일"@ko ; rdfs:domain jgk:Parcel ; rdfs:range xsd:date ;
+    rdfs:comment "연속지적도 파일 전체의 데이터 기준일(A6)이다. 필지마다 따로 정한 날짜가 아니다."@ko .
 jgk:totalFloorArea a owl:DatatypeProperty ; rdfs:label "연면적(㎡)"@ko ; rdfs:range xsd:decimal .
 jgk:households a owl:DatatypeProperty ; rdfs:label "세대수"@ko ; rdfs:range xsd:integer .
-jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물수"@ko ; rdfs:range xsd:integer .
+jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물 수"@ko ; rdfs:range xsd:integer .
 jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; rdfs:range xsd:string .
 
 # 변경 제안 (승인된 것만 그래프에 들어온다)
@@ -198,7 +205,7 @@ jgk:completedBy a owl:ObjectProperty ; rdfs:label "준공, 공사완료 고시"@
 jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
 jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
 jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko ;
-    rdfs:comment "변경 기록(rdf:Statement)에는 승인을 거둘 때 생긴 사건을 뜻하는 withdraw도 쓴다."@ko .
+    rdfs:comment "변경 기록(rdf:Statement)에는 승인 철회 사건을 뜻하는 withdraw도 쓴다."@ko .
 jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice, notice-table)"@ko .
 jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "결정한 검토자"@ko ;
     rdfs:comment "승인이나 정정을 한 검토자 이름. 사람이거나, 사람이 맡긴 자동 검토자다(기록에 'Claude (사용자 위임)'처럼 그대로 남는다). 변경 기록에는 정정 사건의 검토자도 적는다."@ko .
@@ -208,7 +215,7 @@ jgk:hasChange a owl:ObjectProperty ; rdfs:label "바꾼 트리플"@ko ; rdfs:dom
     rdfs:comment "승인된 제안이 넣거나 뺀 트리플 하나. rdf:subject, rdf:predicate, rdf:object와 jgk:changeOp로 적는다. 이 기록으로 승인 전 시점의 그래프를 되살린다."@ko .
 jgk:changeOp a owl:DatatypeProperty ; rdfs:label "넣기(add) 또는 빼기(remove)"@ko ; rdfs:range xsd:string .
 jgk:changeOf a owl:ObjectProperty ; rdfs:label "이 변경을 낸 제안"@ko ; rdfs:domain rdf:Statement ; rdfs:range jgk:ChangeProposal ;
-    rdfs:comment "제안 노드가 승인을 거둘 때 빠져도 변경 기록은 이 관계로 제안을 가리킨다."@ko .
+    rdfs:comment "승인을 철회해 제안 노드가 빠져도 변경 기록은 이 관계로 제안을 가리킨다."@ko .
 jgk:changeOrder a owl:DatatypeProperty ; rdfs:label "변경 재생 순서"@ko ; rdfs:domain rdf:Statement ; rdfs:range xsd:integer ;
     rdfs:comment "결정의 일련번호 * 1,000,000 + 제안 안의 차례. 시각 T의 값은 트리플마다 이 번호가 가장 큰 사건으로 정한다."@ko .
 
@@ -227,7 +234,7 @@ jgk:installArea a owl:DatatypeProperty ; rdfs:label "설치 지역 종류"@ko ; 
     rdfs:comment "원본 값 그대로(residential_area, main_street, roads_and_parks 등)."@ko .
 jgk:installAddress a owl:DatatypeProperty ; rdfs:label "설치 주소"@ko ; rdfs:domain jgk:Sensor ; rdfs:range xsd:string .
 jgk:addressBuilding a owl:ObjectProperty ; rdfs:label "설치 주소의 건물"@ko ; rdfs:domain jgk:Sensor ; rdfs:range jgk:Building ;
-    rdfs:comment "설치 주소와 도로명주소가 같은 건물. 센서는 대개 가로등, 전봇대에 달려 건물에서 몇십 m 떨어져 있어, 건물에 달렸다(sosa:isHostedBy)고 쓰지 않는다. 한 주소에 건물이 여러 동이면 센서에서 가장 가까운 동이다."@ko .
+    rdfs:comment "설치 주소와 도로명주소가 같은 건물. 센서는 가로등이나 전봇대에 달린 것으로 보여 건물에서 8.8~24.1m 떨어져 있어, 건물에 달렸다(sosa:isHostedBy)고 쓰지 않는다. 한 주소에 건물이 여러 동이면 센서에서 가장 가까운 동이다."@ko .
 jgk:addressBuildingDistance a owl:DatatypeProperty ; rdfs:label "설치 주소 건물까지 거리(m)"@ko ; rdfs:domain jgk:Sensor ; rdfs:range xsd:decimal .
 jgk:unit a owl:ObjectProperty ; rdfs:label "단위"@ko ; rdfs:domain sosa:ObservableProperty ;
     rdfs:comment "QUDT 단위 어휘의 단위."@ko .
@@ -238,7 +245,7 @@ jgk:humidity a sosa:ObservableProperty ; rdfs:label "상대 습도"@ko ; jgk:uni
 jgk:noise a sosa:ObservableProperty ; rdfs:label "소음"@ko ; jgk:unit unit:DeciB ; jgk:sourceColumn "소음 평균(dB)" .
 jgk:illuminance a sosa:ObservableProperty ; rdfs:label "조도"@ko ; jgk:unit unit:LUX ; jgk:sourceColumn "조도 평균(lux)" .
 jgk:uv a sosa:ObservableProperty ; rdfs:label "자외선"@ko ; jgk:unit unit:UNITLESS ; jgk:sourceColumn "자외선 평균(UV)" ;
-    rdfs:comment "원본 단위 표기가 'UV'뿐이라 QUDT에 맞는 단위가 없어 단위 없음으로 둔다."@ko .
+    rdfs:comment "원본 단위 표기가 'UV'뿐이고 QUDT에 맞는 단위가 없어 단위 없음으로 둔다."@ko .
 
 # 다른 표준 어휘의 이름을 화면에 한국어로 보이려고 붙인 이름
 sosa:Sensor rdfs:label "센서(SOSA)"@ko .
@@ -253,41 +260,54 @@ sosa:hasFeatureOfInterest rdfs:label "관측 대상"@ko .
 
 # 출처
 
-jgk:Dataset a owl:Class ; rdfs:label "원천 데이터"@ko .
+jgk:Dataset a owl:Class ; rdfs:label "원천 데이터"@ko ; rdfs:subClassOf dcat:Dataset ;
+    rdfs:comment "그래프에 들어온 원천 자료. 자료마다 이용 조건(dcterms:license)과 공개 등급(dcterms:accessRights)을 꼭 적는다(SHACL). 공개 등급은 config/area.yaml의 공개 보류 목록에서 만든다."@ko .
+jgk:catalog a dcat:Catalog ;
+    dcterms:title "증미역 공간 지식 그래프 원천 자료 목록"@ko ;
+    rdfs:label "증미역 공간 지식 그래프 원천 자료 목록"@ko ;
+    rdfs:comment "자료마다 출처, 기준일, 이용 조건, 공개 등급을 적은 목록이다. 객체와 모양 노드의 dcterms:source가 이 목록의 자료를 가리켜, 어느 값이 어느 자료에서 왔는지 따라갈 수 있다."@ko .
 jgk:sourceGisBuildingId a owl:DatatypeProperty ; rdfs:label "모양을 가져온 GIS 건물 번호"@ko ;
     rdfs:domain geo:Geometry ; rdfs:range xsd:string .
 
 jgk:dataset-gis-building a jgk:Dataset ;
     dcterms:title "국토교통부 GIS건물통합정보 (AL_D010, 서울)"@ko ;
     rdfs:label "국토교통부 GIS건물통합정보 (AL_D010, 서울)"@ko ;
+    dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15052097/fileData.do> .
 jgk:dataset-navi-db a jgk:Dataset ;
     dcterms:title "행정안전부 도로명주소 내비게이션용DB (2026년 9월분)"@ko ;
     rdfs:label "행정안전부 도로명주소 내비게이션용DB (2026년 9월분)"@ko ;
+    dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15050419/fileData.do> .
 jgk:dataset-public-office a jgk:Dataset ;
     dcterms:title "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
     rdfs:label "행정안전부 민원행정기관 전자지도 (2024년 1월분)"@ko ;
+    dcterms:license "공공누리 제1유형 (출처표시). 이용목적 심사를 거쳐 받는다"@ko ;
     dcterms:source <https://business.juso.go.kr> .
 jgk:dataset-juso-emap a jgk:Dataset ;
     dcterms:title "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
     rdfs:label "행정안전부 도로명주소 전자지도 (서울, 2026년 9월분)"@ko ;
+    dcterms:license "공공누리 제1유형 (출처표시). 이용목적 심사를 거쳐 받는다"@ko ;
     dcterms:source <https://business.juso.go.kr> .
 jgk:dataset-ngii-basemap a jgk:Dataset ;
     dcterms:title "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-30, 증미역 반경 1.25km 영역)"@ko ;
     rdfs:label "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-30, 증미역 반경 1.25km 영역)"@ko ;
+    dcterms:license "공공누리 제1유형. 기본측량성과라 공간정보관리법 제16조의 국외 반출 제한을 받는다"@ko ;
     dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-ngii-digital-map a jgk:Dataset ;
     dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (증미역 둘레 도엽 2장, 2025년 제작)"@ko ;
     rdfs:label "국토지리정보원 수치지형도 Ver2.0 1:5,000 (증미역 둘레 도엽 2장, 2025년 제작)"@ko ;
+    dcterms:license "공공누리 제1유형. 기본측량성과라 공간정보관리법 제16조의 국외 반출 제한을 받는다"@ko ;
     dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;
     rdfs:label "행정안전부 행정표준코드 기관코드"@ko ;
+    dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15077870/openapi.do> .
 jgk:dataset-building-register a jgk:Dataset ;
     dcterms:title "서울시 건축물대장 총괄표제부"@ko ;
     rdfs:label "서울시 건축물대장 총괄표제부"@ko ;
+    dcterms:license "공공누리 제1유형 (출처표시)"@ko ;
     dcterms:source <https://data.seoul.go.kr/dataList/OA-23051/S/1/datasetView.do> .
 jgk:dataset-sdot a jgk:Dataset ;
     dcterms:title "서울시 스마트서울 도시데이터 센서(S-DoT) 환경정보 (설치 위치 2026-03-11, 관측 2026-10-12~18)"@ko ;
@@ -297,9 +317,15 @@ jgk:dataset-sdot a jgk:Dataset ;
 jgk:dataset-sbiz-store a jgk:Dataset ;
     dcterms:title "소상공인시장진흥공단 상가(상권)정보 (서울, 2026년 9월 기준)"@ko ;
     rdfs:label "소상공인시장진흥공단 상가(상권)정보 (서울, 2026년 9월 기준)"@ko ;
-    rdfs:comment "분기마다 바뀐다. 기준일 뒤에 문을 닫거나 새로 연 가게와 다를 수 있다. 주택 건물 안 업체는 1층이나 지하의 손님이 찾아오는 업종만 공개 사이트에 낸다(config/area.yaml)."@ko ;
+    rdfs:comment "분기마다 바뀐다. 기준일 뒤에 문을 닫거나 새로 연 가게와 다를 수 있다. 주택 건물 안 업체는 1층이나 지하에 있으면서 손님이 찾아오는 업종만 공개 사이트에 싣는다(config/area.yaml)."@ko ;
     dcterms:license "이용허락범위 제한 없음 (공공데이터포털)"@ko ;
     dcterms:source <https://www.data.go.kr/data/15083033/fileData.do> .
+jgk:dataset-cadastral a jgk:Dataset ;
+    dcterms:title "국토교통부 연속지적도형정보 (브이월드 AL_D002, 서울, 데이터 기준일 2026-10-05, 파일 2026-10-08)"@ko ;
+    rdfs:label "국토교통부 연속지적도형정보 (브이월드 AL_D002, 서울, 데이터 기준일 2026-10-05, 파일 2026-10-08)"@ko ;
+    rdfs:comment "지적도와 임야도의 경계점을 이어 만든 참조용 도면이다. 측량 자료로 쓰지 못하고 법적 효력이 없다. 필지 모양에만 쓴다."@ko ;
+    dcterms:license "CC BY (출처표시, 브이월드 자료 페이지 표기)"@ko ;
+    dcterms:source <https://www.vworld.kr/dtmk/dtmk_ntads_s002.do?dsId=23> .
 jgk:dataset-gangseo-notice a jgk:Dataset ;
     dcterms:title "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;
     rdfs:label "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;

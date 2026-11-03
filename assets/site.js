@@ -14,7 +14,7 @@
       let box = b.parentElement.querySelector("input.copy-fallback");
       if (!box) {
         box = Object.assign(document.createElement("input"), { className: "field copy-fallback", readOnly: true, value });
-        box.setAttribute("aria-label", "복사하지 못해 값을 보여 줍니다. 직접 복사해 주세요");
+        box.setAttribute("aria-label", "자동으로 복사하지 못했습니다. 이 칸의 값을 직접 복사해 주세요");
         b.insertAdjacentElement("afterend", box);
       }
       box.focus(); box.select();
@@ -51,7 +51,7 @@
       map = new maplibregl.Map(mapOptions({ container: el, style: baseStyle(), attributionControl: { compact: true },
         cooperativeGestures: true, center: MAP_CENTER, zoom: 16 }));
     } catch (e) {  // WebGL을 못 쓰면 지도 자리에 안내만 둔다
-      el.innerHTML = '<p class="small muted map-off">이 브라우저에서는 지도를 그릴 수 없습니다. 위치는 기계용 원본의 좌표로 볼 수 있습니다.</p>';
+      el.innerHTML = '<p class="small muted map-off">이 브라우저에서는 지도를 표시할 수 없습니다. 위치는 기계용 원본의 좌표에서 확인할 수 있습니다.</p>';
       return;
     }
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
