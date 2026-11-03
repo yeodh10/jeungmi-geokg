@@ -34,7 +34,7 @@ def main() -> None:
     ap.add_argument("--unpack", action="store_true", help="_archives의 압축 파일부터 다시 푼다")
     args = ap.parse_args()
 
-    from src.graph import build_graph, check_queries, interop, publish, validate
+    from src.graph import appdata, build_graph, check_queries, interop, publish, validate
     from src.ingest import clip_area, unpack
     from src.model import build_business, build_objects, build_sensors
 
@@ -54,8 +54,9 @@ def main() -> None:
     step("SHACL 데이터 규칙 검사", validate.main, report)
     step("상호운용성 검사 (바깥 주소 확인은 python -m src.graph.interop)", lambda: _interop_offline(interop), report)
     step("URI 공개 페이지 만들기", publish.main, report)
-    if has_sbiz:  # publish가 site 폴더를 새로 만들므로 그 뒤에 쓴다
-        step("공개 지도의 상호 찾기 자료", lambda: print(build_business.write_site()), report)
+    # publish가 site 폴더를 새로 만들므로 그 뒤에 쓴다. 상호 찾기 자료도 여기서 assets/data/businesses.json으로 쓴다
+    step("지도 앱 자료 (places, shapes, 입구, 상호, 질문, 자료 탭, 카드)", appdata.main, report)
+    step("공개 전 검사 (public_check)", _public_check, report)
     report["seconds"] = round(time.perf_counter() - t0, 1)
 
     objects = json.loads((PROC / "objects_report.json").read_text(encoding="utf-8"))
@@ -79,7 +80,16 @@ def main() -> None:
         report["summary"] |= {"상호": len(b), "공개 상호": int((b["public"] == "True").sum())}
     (PROC / "pipeline_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"끝 ({report['seconds']}초): " + ", ".join(f"{k} {v:,}" for k, v in report["summary"].items()))
-    print("결과: data/processed/ (그래프 jeungmi_geokg.ttl, 검사 validation_report.md, 쿼리 query_check.md, 페이지 site/)")
+    print("결과: data/processed/ (그래프 jeungmi_geokg.ttl, 검사 validation_report.md, 쿼리 query_check.md, 페이지와 앱 자료 site/)")
+
+
+def _public_check() -> None:
+    """공개 출력 전수 검사. 하나라도 나오면 파이프라인을 멈춘다 (단계 출력은 보고서에만 남으므로 문제를 예외 글에 담는다)."""
+    from src.graph.public_check import check
+    problems, info = check()
+    if problems:
+        raise RuntimeError(f"공개 전 검사 실패 {len(problems)}건: " + "; ".join(problems[:20]))
+    print(json.dumps(info, ensure_ascii=False))
 
 
 def _interop_offline(interop_module) -> None:

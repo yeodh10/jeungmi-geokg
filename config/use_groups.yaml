@@ -1,0 +1,76 @@
+# 건물 용도 묶음과 분류 칩 (명세 9절, 0-1절). src/graph/places.py가 읽어 places.json의 useGroups, chips로 브라우저에 보낸다.
+# 화면 코드(web/app)에는 용도 값이나 낱말을 적지 않고 이 파일 값만 쓴다.
+
+# 주제 보기 8개. uses는 건물 용도(useName) 원천 값이다. 27개 원래 값이 모두 한 곳에 들어 있어야 한다 (tests/test_places.py).
+# color는 기본 지도의 옅은 건물 색 토큰(web/style.css의 --b-*)이다. 자동차는 공장 색, 자료 없음은 그 외 색을 함께 쓴다.
+themes:
+  - key: home
+    label: 주거
+    color: --b-home
+    uses: [공동주택, 단독주택, 주택]
+  - key: shop
+    label: 상가 건물
+    color: --b-shop
+    uses: [제1종근린생활시설, 제2종근린생활시설, 근린생활시설, 판매시설, 숙박시설]
+  - key: office
+    label: 업무
+    color: --b-office
+    uses: [업무시설]
+  - key: edu
+    label: 교육, 문화, 의료
+    color: --b-edu
+    uses: [교육연구시설, 교육및복지시설, 노유자시설, 문화/관광/레저시설, 종교시설, 의료시설, 운동시설]
+  - key: factory
+    label: 공장, 창고
+    color: --b-factory
+    uses: [공장, 창고시설, 공장/창고시설, 위험물저장및처리시설]
+  - key: car
+    label: 자동차
+    color: --b-factory
+    uses: [자동차관련시설]
+  - key: other
+    label: 그 외
+    color: --b-other
+    uses: [여객(화물)운송시설, 보안/위험시설, 유통시설, 운수시설, 환경정화시설, 발전시설]
+  - key: none
+    label: 자료 없음
+    color: --b-other
+    uses: []          # 용도 값이 없는 건물 (빈 값)
+
+# 이름에 이 낱말이 든 건물을 기관 건물로 본다. 글자 1단계와 '공공기관' 칩이 함께 쓴다.
+# 공공시설 자료는 공개하지 않으므로 이름 낱말로만 고른다. 빠진 곳이 있을 수 있다.
+agency_words: [주민센터, 행정복지센터, 구청, 소방서, 안전센터, 경찰서, 지구대, 파출소, 우체국, 도서관, 보건소, 세무서]
+
+# 학교 낱말. 글자 1단계와 '학교' 칩이 함께 쓴다.
+school_words: [초등학교, 중학교, 고등학교]
+
+# 분류 칩. 장소(묶음은 한 곳으로 센다) 5곳 미만인 칩은 places.json에 넣지 않는다.
+# kind
+#   name  화면 이름(묶음은 묶음 이름)에 words 가운데 하나가 든 장소
+#   use   용도가 uses 가운데 하나인 건물이 있는 장소. exclude_words가 이름에 들면 뺀다
+#   biz   상호 (businesses.json). small, middle, large는 상권업종 소, 중, 대분류 원천 값이고(가운뎃점은 쉼표로 바꾼 값) 하나라도 맞으면 든다.
+#         exclude_middle에 든 중분류는 뺀다. 상호 칩의 n은 합친 뒤 줄 수다
+# first가 참인 칩이 첫 줄에 나오고 나머지는 더보기에 들어간다 (첫 줄: 학교, 아파트 단지, 상가 건물, 업무 건물, 더보기).
+chips:
+  - {key: school, label: 학교, first: true, kind: name, words: [초등학교, 중학교, 고등학교]}
+  - {key: apt, label: 아파트 단지, first: true, kind: name, words: [아파트]}
+  - {key: shop, label: 상가 건물, first: true, kind: use, uses: [제1종근린생활시설, 제2종근린생활시설, 근린생활시설]}
+  - {key: office, label: 업무 건물, first: true, kind: use, uses: [업무시설]}
+  - {key: cafe, label: 카페, kind: biz, small: [카페]}
+  - {key: food, label: 음식점, kind: biz, large: [음식], exclude_middle: [비알코올]}
+  - {key: conv, label: 편의점, kind: biz, small: [편의점]}
+  - {key: pharmacy, label: 약국, kind: biz, small: [약국]}
+  - {key: clinic, label: 병원, kind: biz, middle: [의원, 병원]}
+  - {key: academy, label: 학원, kind: biz, middle: [일반 교육],
+     small: [요가/필라테스 학원, 음악학원, 태권도/무술학원, 미술학원, 외국어학원, 기타 기술/직업 훈련학원]}
+  - {key: villa, label: 공동주택 (아파트 제외), kind: use, uses: [공동주택], exclude_words: [아파트]}
+  - {key: officetel, label: 오피스텔, kind: name, words: [오피스텔]}
+  - {key: car, label: 자동차 시설, kind: use, uses: [자동차관련시설]}
+  - {key: factory, label: 공장과 창고, kind: use, uses: [공장, 창고시설, 공장/창고시설]}
+  - {key: care, label: "어르신, 어린이 시설", kind: use, uses: [노유자시설]}
+  - {key: religion, label: 종교, kind: use, uses: [종교시설]}
+  - {key: lodging, label: 숙박, kind: use, uses: [숙박시설]}
+  - {key: sale, label: 판매, kind: use, uses: [판매시설]}
+  - {key: sport, label: 운동, kind: use, uses: [운동시설]}
+  - {key: agency, label: 공공기관, kind: name, words: [주민센터, 행정복지센터, 구청, 소방서, 안전센터, 경찰서, 지구대, 파출소, 우체국, 도서관, 보건소, 세무서],
+     note: 이름에 기관 낱말이 든 건물만 찾았습니다. 빠진 곳이 있을 수 있습니다.}

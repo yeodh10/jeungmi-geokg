@@ -1,0 +1,251 @@
+# 묻기 탭의 미리 실행한 질문 (명세 3.7절, 9절). src/graph/questions.py가 공개 범위 그래프(public_query_store)에서 실행해
+# assets/data/questions.json에 쓴다. 답의 숫자는 손으로 적지 않고 실행 결과로 채운다.
+#
+# 칸
+#   id         고유 이름
+#   question   화면에 보이는 질문
+#   featured   참이면 대표 질문 (첫 패널과 묻기 탭 위). 8개
+#   answer     한 문장 답. {n}은 count_var(없으면 map_var)의 서로 다른 값 수, {변수}는 첫 행의 그 값(장소는 화면 이름)
+#   columns    표에 보일 열 {변수: 쉬운 열 이름}. 순서대로 보인다
+#   map_var    지도에 보라색으로 그릴 장소 변수 (건물)
+#   count_var  세는 변수가 map_var와 다를 때 (필지를 세고 건물을 그릴 때)
+#   source     이 질문을 가져온 곳 (eval/nl_questions.yaml의 문제 번호, 없으면 자체 질문)
+#   map_sparql 지도 장소를 따로 고를 때 (표 행이 500을 넘지 않게). 이 쿼리의 map_var 값을 지도에 그린다
+#   sparql     실행할 쿼리. 접두어(jgk, geo, geof, rdfs)는 붙여서 실행한다. 거리 조건은 {{NEAR:URI:미터}} 자리표시로 쓰고
+#              실행할 때 src.query.nl.fill_near가 원으로 바꾼다. 화면에는 자리표시가 든 이 글을 보여 준다
+# 오류, 0행, 500행 초과는 빌드 실패다. 이름 칸은 원천 이름 대신 화면 이름(display_name)을 쓰므로 rdfs:label을 고르지 않는다.
+
+- id: edu-500
+  question: 증미역 500m 안 교육연구시설
+  featured: true
+  source: q25
+  answer: 증미역 500m 안에 용도가 교육연구시설인 건물이 {n}동 있습니다.
+  columns: {b: 건물, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT ?b ?use WHERE {
+      ?b a jgk:Building ; jgk:useName ?use ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(?use = "교육연구시설")
+      FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:500}}))
+    } ORDER BY ?b
+
+- id: floors-20
+  question: 지상 20층 이상인 건물
+  featured: true
+  source: q07
+  answer: 지상 20층 이상인 건물은 {n}동입니다.
+  columns: {b: 건물, f: 지상 층수, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT ?b ?f ?use WHERE {
+      ?b a jgk:Building ; jgk:floorsAbove ?f .
+      OPTIONAL { ?b jgk:useName ?use }
+      FILTER(?f >= 20)
+    } ORDER BY DESC(?f) ?b
+
+- id: apt-15
+  question: 공동주택이면서 지상 15층 이상인 건물
+  featured: true
+  source: q20
+  answer: 공동주택이면서 지상 15층 이상인 건물은 {n}동입니다.
+  columns: {b: 건물, f: 지상 층수}
+  map_var: b
+  sparql: |
+    SELECT ?b ?f WHERE {
+      ?b a jgk:Building ; jgk:useName "공동주택" ; jgk:floorsAbove ?f .
+      FILTER(?f >= 15)
+    } ORDER BY DESC(?f) ?b
+
+- id: entrance-2
+  question: 출입구가 2개 이상인 건물
+  featured: true
+  source: q15
+  answer: 출입구가 2개 이상인 건물은 {n}동입니다.
+  columns: {b: 건물, k: 출입구 수}
+  map_var: b
+  sparql: |
+    SELECT ?b (COUNT(DISTINCT ?e) AS ?k) WHERE {
+      ?b a jgk:Building ; jgk:hasEntrance ?e .
+    } GROUP BY ?b HAVING (COUNT(DISTINCT ?e) >= 2) ORDER BY DESC(?k) ?b
+
+- id: before-1980
+  question: 1980년 이전에 사용승인을 받은 건물
+  featured: true
+  answer: 사용승인일이 1980년 1월 1일보다 이른 건물은 {n}동입니다. 사용승인일 자료는 2018년까지입니다.
+  columns: {b: 건물, d: 사용승인일, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT ?b ?d ?use WHERE {
+      ?b a jgk:Building ; jgk:approvalDate ?d .
+      OPTIONAL { ?b jgk:useName ?use }
+      FILTER(?d < "1980-01-01"^^<http://www.w3.org/2001/XMLSchema#date>)
+    } ORDER BY ?d ?b
+
+- id: named-no-address
+  question: 도로명주소는 없는데 이름이 있는 건물
+  featured: true
+  answer: 도로명주소가 없지만 이름이 있는 건물은 {n}동입니다.
+  columns: {b: 건물, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?use WHERE {
+      ?b a jgk:Building ; jgk:status jgk:AddressUnlinked ; rdfs:label ?l .
+      OPTIONAL { ?b jgk:useName ?use }
+    } ORDER BY ?b
+
+- id: parcel-3
+  question: 건물이 3동 이상 들어선 필지
+  featured: true
+  answer: 건물이 3동 이상 들어선 필지는 {n}곳입니다.
+  columns: {p: 필지, k: 건물 수}
+  map_var: b
+  count_var: p
+  # 표는 필지마다 한 행이고(151행), 지도에는 그 필지 위 건물을 모두 그린다 (한 쿼리로 건물마다 행을 만들면 500행을 넘는다)
+  sparql: |
+    SELECT ?p (COUNT(DISTINCT ?x) AS ?k) WHERE {
+      ?x a jgk:Building ; jgk:locatedOn ?p .
+    } GROUP BY ?p HAVING (COUNT(DISTINCT ?x) >= 3) ORDER BY DESC(?k) ?p
+  map_sparql: |
+    SELECT DISTINCT ?b WHERE {
+      { SELECT ?p WHERE { ?x a jgk:Building ; jgk:locatedOn ?p } GROUP BY ?p HAVING (COUNT(DISTINCT ?x) >= 3) }
+      ?b a jgk:Building ; jgk:locatedOn ?p .
+    } ORDER BY ?b
+
+- id: sensor-600
+  question: 증미역 600m 안 센서
+  featured: true
+  answer: 증미역 600m 안에 센서가 {n}대 있습니다. 300m 안에는 없습니다.
+  columns: {s: 센서}
+  map_var: s
+  sparql: |
+    SELECT ?s WHERE {
+      ?s a jgk:Sensor ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:600}}))
+    } ORDER BY ?s
+
+- id: station-address
+  question: 증미역 역사 건물의 도로명주소
+  source: q01
+  answer: 증미역 역사 건물의 도로명주소는 {a}입니다.
+  columns: {b: 건물, a: 도로명주소}
+  map_var: b
+  sparql: |
+    SELECT ?b ?a WHERE {
+      <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> jgk:housedIn ?b .
+      ?b jgk:roadAddress ?a .
+    }
+
+- id: station-zone
+  question: 증미역 역사 건물이 속한 우편구역
+  source: q12
+  answer: 증미역 역사 건물은 우편구역(기초구역) {z}에 속합니다.
+  columns: {b: 건물, z: 우편구역 번호}
+  map_var: b
+  sparql: |
+    SELECT ?b ?z WHERE {
+      <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> jgk:housedIn ?b .
+      ?b jgk:inBasicZone ?bz . ?bz jgk:basicZoneNo ?z .
+    }
+
+- id: deungchon-no-address
+  question: 법정동 등촌동의 도로명주소 없는 건물
+  source: q03
+  answer: 법정동이 등촌동인 건물 가운데 도로명주소가 없는 건물은 {n}동입니다.
+  columns: {b: 건물, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?use WHERE {
+      ?b a jgk:Building ; jgk:status jgk:AddressUnlinked ; jgk:inLegalDong ?d .
+      ?d rdfs:label "등촌동"@ko .
+      OPTIONAL { ?b jgk:useName ?use }
+    } ORDER BY ?b
+
+- id: yeomchang-no-address
+  question: 법정동 염창동의 도로명주소 없는 건물
+  source: q16
+  answer: 법정동이 염창동인 건물 가운데 도로명주소가 없는 건물은 {n}동입니다.
+  columns: {b: 건물, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?use WHERE {
+      ?b a jgk:Building ; jgk:status jgk:AddressUnlinked ; jgk:inLegalDong ?d .
+      ?d rdfs:label "염창동"@ko .
+      OPTIONAL { ?b jgk:useName ?use }
+    } ORDER BY ?b
+
+- id: gayang-apartment
+  question: 법정동 가양동의 공동주택 건물
+  source: q04
+  answer: 법정동 가양동에 용도가 공동주택인 건물이 {n}동 있습니다.
+  columns: {b: 건물, f: 지상 층수}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?f WHERE {
+      ?b a jgk:Building ; jgk:useName "공동주택" ; jgk:inLegalDong ?d .
+      ?d rdfs:label "가양동"@ko .
+      OPTIONAL { ?b jgk:floorsAbove ?f }
+    } ORDER BY ?b
+
+- id: sub-entrance
+  question: 주출입구가 아닌 출입구가 있는 건물
+  source: q14
+  answer: 주출입구가 아닌 출입구(공용, 보행자용, 차량용)는 {n}개입니다.
+  columns: {e: 출입구, t: 유형, b: 건물}
+  map_var: b
+  count_var: e
+  sparql: |
+    SELECT ?e ?t ?b WHERE {
+      ?e a jgk:BuildingEntrance ; jgk:entranceType ?t .
+      ?b jgk:hasEntrance ?e .
+      FILTER(?t != "주출입구")
+    } ORDER BY ?t ?e ?b
+
+- id: name-apartment
+  question: 이름에 '아파트'가 들어간 건물
+  source: q19
+  answer: 이름에 '아파트'가 들어간 건물은 {n}동입니다.
+  columns: {b: 건물, f: 지상 층수}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?f WHERE {
+      ?b a jgk:Building ; rdfs:label ?l .
+      OPTIONAL { ?b jgk:floorsAbove ?f }
+      FILTER(CONTAINS(STR(?l), "아파트"))
+    } ORDER BY ?b
+
+- id: yangcheon-ro
+  question: 양천로를 주소로 쓰는 건물
+  answer: 도로명주소의 길 이름이 정확히 양천로인 건물은 {n}동입니다. 양천로61길 같은 곁길은 따로 셉니다.
+  columns: {b: 건물, use: 용도}
+  map_var: b
+  sparql: |
+    SELECT DISTINCT ?b ?use WHERE {
+      ?b a jgk:Building ; jgk:addressRoad ?r .
+      ?r rdfs:label "양천로"@ko .
+      OPTIONAL { ?b jgk:useName ?use }
+    } ORDER BY ?b
+
+- id: cafe-300
+  question: 증미역 300m 안 카페가 있는 건물
+  answer: 증미역 300m 안에 공공데이터에 등록된 카페가 {n}곳 있습니다 (상가정보 2026년 9월 기준).
+  columns: {s: 상호, b: 들어 있는 건물}
+  map_var: b
+  count_var: s
+  sparql: |
+    SELECT ?s ?b WHERE {
+      ?s a jgk:Business ; jgk:categorySmall "카페" ; jgk:inBuilding ?b ; geo:hasDefaultGeometry/geo:asWKT ?w .
+      FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:300}}))
+    } ORDER BY ?b ?s
+
+- id: households-1000
+  question: 세대수가 1,000세대 이상인 필지의 건물
+  answer: 건축물대장 총괄표제부의 세대수가 1,000세대 이상인 필지는 {n}곳입니다.
+  columns: {p: 필지, h: 세대수, b: 건물}
+  map_var: b
+  count_var: p
+  sparql: |
+    SELECT ?p ?h ?b WHERE {
+      ?p a jgk:Parcel ; jgk:households ?h .
+      ?b a jgk:Building ; jgk:locatedOn ?p .
+      FILTER(?h >= 1000)
+    } ORDER BY DESC(?h) ?p ?b
