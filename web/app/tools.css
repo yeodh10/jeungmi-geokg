@@ -1,0 +1,89 @@
+/* 지도 도구: 분류 칩, 더보기 창, 지도 보기(주제, 범례, 입체), 재기, 조건 찾기 (명세 3.2, 3.3, 4.2, 7.2, 7.3절)
+   색은 style.css 토큰만 쓴다. 주제 보기 색은 지도 안에만 쓰고 화면 틀의 강조색은 파랑과 보라뿐이다 */
+
+/* 칩 줄 (#map-top 안, 휴대폰은 가로 스크롤) */
+.chips { display: flex; gap: 8px; padding: 6px 0; }
+.chip-btn { position: relative; flex: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 14px; border: 1px solid var(--line);
+            border-radius: 999px; background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap;
+            box-shadow: var(--shadow-1); }
+.chip-btn::after { content: ""; position: absolute; inset: -6px -2px; }   /* 누름 영역 44px */
+.chip-btn:hover { background: var(--hover); }
+.chip-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip-btn:disabled { opacity: .5; }
+.chip-more.on { border-color: var(--accent); color: var(--accent); }
+.chip-more .ic { margin-right: -4px; }
+.res-chips .chip-btn, .measure-presets .chip-btn { box-shadow: none; }
+
+/* 떠 있는 작은 창 (더보기, 지도 보기, 재기 고르기) */
+.tool-pop { position: fixed; z-index: 45; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius);
+            box-shadow: var(--shadow-3); overflow-y: auto; overscroll-behavior: contain; }
+.tool-pop[hidden] { display: none; }
+.chip-pop { max-height: min(60dvh, 520px); }
+.chip-pop-list { display: grid; }
+.chip-pop-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px;
+                 background: none; color: var(--text); text-align: left; }
+.chip-pop-item:hover { background: var(--hover); }
+.chip-pop-item[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.chip-cond { width: 100%; min-height: 44px; margin-top: 8px; }
+.pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -4px 4px 0; }
+.pop-title, .legend-title { font-size: 14px; margin: 0; }
+.pop-title:focus { outline: none; }
+.theme-pop { top: 12px; right: 64px; width: 300px; max-height: calc(100dvh - 24px); }
+.measure-pick { top: 64px; right: 64px; width: 260px; display: grid; gap: 6px; }
+.measure-pick .btn { justify-content: flex-start; min-height: 44px; }
+.pick-set { border: 0; margin: 0; padding: 0; }
+.pick-set legend { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 2px; }
+.pick { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 6px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.pick:hover { background: var(--hover); }
+.pick input { margin: 0; accent-color: var(--accent); width: 18px; height: 18px; }
+.dong-pick, .year-pick { margin: 4px 0 8px; display: grid; gap: 4px; font-size: 13px; }
+.dong-pick[hidden] { display: none; }
+.dong-pick select, .cond select { min-height: 40px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); color: var(--text); }
+.year-pick input { width: 100%; accent-color: var(--accent); min-height: 32px; }
+.pop-legend { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+.pick-3d { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 4px; border-radius: 0; }
+.sw.faint { background-image: repeating-linear-gradient(135deg, transparent 0 2px, rgba(255, 255, 255, .7) 2px 4px); }
+.tool.on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+
+/* 범례 (주제를 켜면 지도 왼쪽 아래에 함께 뜬다) */
+.theme-legend { position: fixed; z-index: 14; left: 416px; bottom: 40px; width: 240px; padding: 10px 12px; background: var(--raised);
+                border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-2); font-size: 13px; }
+.theme-legend[hidden] { display: none; }
+.theme-legend .legend { margin: 0; padding: 0; list-style: none; }
+.theme-legend .btn.mini { min-height: 32px; }
+body.panel-collapsed .theme-legend { left: 12px; }
+
+/* 재기 상자 */
+.measure-box { position: fixed; z-index: 44; bottom: 40px; left: calc(404px + (100vw - 404px) / 2); transform: translateX(-50%); width: 340px;
+               padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.measure-box[hidden] { display: none; }
+body.panel-collapsed .measure-box { left: 50%; }
+.measure-box p { margin: 0 0 6px; }
+.measure-val { font-size: 14px; font-variant-numeric: tabular-nums; }
+.measure-by { margin: 0 0 6px; padding-left: 18px; font-size: 13px; columns: 2; }
+.measure-presets { display: flex; gap: 6px; margin: 4px 0 8px; }
+.measure-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.measure-acts .btn.mini { min-height: 36px; position: relative; }
+.measure-acts .btn.mini::after { content: ""; position: absolute; inset: -4px 0; }
+body.measuring .maplibregl-canvas-container, body.measuring .maplibregl-canvas-container canvas { cursor: crosshair !important; }
+
+/* 조건 찾기 */
+.cond .pick-set { margin: 8px 0; }
+.cond-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0; font-size: 14px; }
+.cond-years { display: inline-flex; align-items: center; gap: 4px; }
+.cond-count { margin: 12px 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.cond .btn { min-height: 44px; }
+
+@media (max-width: 900px) {
+  .chips { padding: 2px 0; }
+  .chip-btn { height: 36px; }
+  .chip-btn::after { inset: -4px -2px; }
+  .theme-pop, .measure-pick { top: calc(116px + env(safe-area-inset-top)); right: 60px; left: 8px; width: auto;
+                              max-height: calc(100dvh - var(--sheet-h) - 130px - env(safe-area-inset-top)); }
+  .theme-legend { left: 8px; bottom: calc(var(--sheet-h) + 34px); width: min(240px, calc(100vw - 72px)); max-height: 40dvh; overflow-y: auto; }
+  .measure-box { left: 8px; right: 8px; width: auto; transform: none; bottom: calc(var(--sheet-h) + 8px); max-height: 50dvh; overflow-y: auto; }
+  body.sheet-full .theme-legend, body.sheet-full .measure-box { visibility: hidden; }
+}
+@media (max-width: 900px) and (max-height: 500px) {
+  .theme-pop, .measure-pick { top: calc(68px + env(safe-area-inset-top)); }
+}
