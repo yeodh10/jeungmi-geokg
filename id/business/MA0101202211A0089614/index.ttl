@@ -1,0 +1,14 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 허준로 217" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400114870000009475> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "기타 산업용 기계/장비 대여업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "산업용품 대여" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "시설관리, 임대" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202211A0089614" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://www.w3.org/2000/01/rdf-schema#label> "플러스비젼"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202211A0089614> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

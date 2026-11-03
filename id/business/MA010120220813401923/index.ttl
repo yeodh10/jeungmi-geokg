@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 공항대로46길 25" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010300111130000014815> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "3" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "컴퓨터/노트북/프린터 수리업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "컴퓨터 수리" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "수리, 개인" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220813401923" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://www.w3.org/2000/01/rdf-schema#label> "프리존월드"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220813401923> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

@@ -1,0 +1,13 @@
+증미역 지도 배경 타일
+
+표기: OpenFreeMap (https://openfreemap.org), © OpenMapTiles (https://www.openmaptiles.org/), © OpenStreetMap 기여자 (https://www.openstreetmap.org/copyright)
+제공처: https://tiles.openfreemap.org/planet (키 없음)
+받은 판: 20261025_080012_pt
+받은 날: 2026-11-03
+범위: 증미역 중심에서 동서남북 2.5km 사각형 [서, 남, 동, 북] = [126.832902, 37.535157, 126.889575, 37.580275], 배율 13~14, 18장
+남긴 층: transportation, transportation_name, water, water_name, waterway, park, landuse, landcover, place, boundary
+뺀 층: aerodrome_label, aeroway, building, housenumber, mountain_peak, poi
+
+지도 자료는 OpenStreetMap 기여자의 자료이고 Open Database License(ODbL 1.0, https://opendatacommons.org/licenses/odbl/)를 따릅니다.
+타일 형식과 층 구성은 OpenMapTiles 스키마(https://openmaptiles.org/schema/)입니다.
+이 폴더의 타일은 위 제공처에서 받은 것에서 층만 뺐고, 값은 고치지 않았습니다.

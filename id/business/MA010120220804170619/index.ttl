@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로 551-17" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400104490004000001> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "9" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "시각 디자인업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "전문 디자인" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "과학, 기술" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220804170619" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://www.w3.org/2000/01/rdf-schema#label> "티움크리에이션"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220804170619> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 공항대로 509" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106490014027199> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "2" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "자동차 대여업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "운송장비 대여" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "시설관리, 임대" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220800545248" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://www.w3.org/2000/01/rdf-schema#label> "해동렌트카주"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220800545248> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

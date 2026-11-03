@@ -1,0 +1,14 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로 551-17" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010400104490004000001> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "경영 컨설팅업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "본사, 경영 컨설팅" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "과학, 기술" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202508A0013262" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://www.w3.org/2000/01/rdf-schema#label> "중한투자무역플랫폼"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202508A0013262> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

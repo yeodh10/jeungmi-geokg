@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로 655" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "PNU" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1980188459344500844200000000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "2" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "이비인후과 의원" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "의원" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "보건의료" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202410A0029268" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://www.w3.org/2000/01/rdf-schema#label> "드림이비인후과의원"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0029268> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

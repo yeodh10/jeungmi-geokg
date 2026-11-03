@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로 657" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "PNU" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building-gis/1980188479614500503300000000> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "1" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "핸드폰 소매업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "가전, 통신 소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220803312302" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://www.w3.org/2000/01/rdf-schema#label> "나인모바일"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220803312302> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

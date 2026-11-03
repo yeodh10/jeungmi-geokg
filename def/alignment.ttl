@@ -29,6 +29,10 @@ jgk:LegalDong rdfs:subClassOf schema:Place .
 jgk:BasicZone rdfs:subClassOf schema:Place .
 jgk:PublicFacility rdfs:subClassOf schema:Place .
 jgk:Station rdfs:subClassOf schema:SubwayStation .
+jgk:Business rdfs:subClassOf schema:LocalBusiness .
+jgk:businessNo rdfs:subPropertyOf schema:identifier .
+jgk:inBuilding rdfs:subPropertyOf schema:containedInPlace .
+jgk:onParcel rdfs:subPropertyOf schema:containedInPlace .
 jgk:roadAddress rdfs:subPropertyOf schema:address .
 jgk:installAddress rdfs:subPropertyOf schema:address .
 jgk:buildingMgtNo rdfs:subPropertyOf schema:identifier .
@@ -43,8 +47,9 @@ jgk:inLegalDong rdfs:subPropertyOf schema:containedInPlace .
 jgk:housedIn rdfs:subPropertyOf schema:containedInPlace .
 
 # BIM: W3C Linked Building Data 그룹의 BOT. 우리 건물도 BIM 모델 건물과 같은 bot:Building이라 BOT 도구가 함께 읽는다
+# jgk:bimBuilding은 건물을 가리키는 관계라 rdfs:seeAlso(더 볼 자료) 아래에 둔다. skos:related는 개념끼리의 관계여서, 그 아래에 두면 추론이 건물을 skos:Concept으로 만든다
 jgk:Building rdfs:subClassOf bot:Building .
-jgk:bimBuilding rdfs:subPropertyOf skos:related .
+jgk:bimBuilding rdfs:subPropertyOf rdfs:seeAlso .
 
 # INSPIRE 지형지물 개념 (정의 범위가 달라 가까운 개념으로만)
 jgk:Building skos:closeMatch inspire:Building .
@@ -67,6 +72,7 @@ jgk:Sensor skos:closeMatch wd:Q167676 .
 # 화면에 보일 이름
 schema:Place rdfs:label "장소(schema.org)"@ko .
 schema:SubwayStation rdfs:label "지하철역(schema.org)"@ko .
+schema:LocalBusiness rdfs:label "지역 업소(schema.org)"@ko .
 schema:address rdfs:label "주소(schema.org)"@ko .
 schema:identifier rdfs:label "식별자(schema.org)"@ko .
 schema:containedInPlace rdfs:label "속한 장소(schema.org)"@ko .

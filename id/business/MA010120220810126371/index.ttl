@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 화곡로58길 33" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010300111150018014939> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "1" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "요리 주점" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "주점" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "음식" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220810126371" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://www.w3.org/2000/01/rdf-schema#label> "테마"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220810126371> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

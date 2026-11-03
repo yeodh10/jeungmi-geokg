@@ -11,7 +11,17 @@
   --active: #4f7bd9; --unlinked: #f08c00; --linked: #12a467; --retired: #d92d20;
   --facility: #7a4fe0; --road: #0e9384; --legaldong: #1d2939; --basemap: #c11574; --digitalmap: #6941c6;
   --station: #d29b00; --select: #1d4ed8; --answer: #7a5af8; --sensor: #0284c7;
-  --radius: 10px; --radius-sm: 6px;
+  /* 그래프 영역 (고유 주소, 이어진 것, 출처, 묻기, 번짐). 선택은 --select(파랑), 그래프는 --graph(보라) */
+  --graph: #6941c6; --graph-soft: #f1ecfe; --graph-line: #d9cdfb;
+  /* 지도 배경 (시안 A 따뜻한 동네). 지도 스크립트가 css()로 읽는다 */
+  --map-land: #f6f1e7; --map-residential: #f3ecdd; --map-water: #a3d6f0; --map-park: #c4e6b0; --map-wood: #b4dca0;
+  --map-road: #ffffff; --map-road-line: #e2d6c2; --map-road-2: #fff3c4; --map-road-1: #ffdc7a; --map-road-1-line: #eeb94a;
+  --map-motorway: #f8ad66; --map-motorway-line: #dd8a3c; --map-rail: #8e99a6;
+  --map-bldg-line: #c9b896; --map-text: #2b2a27; --map-text-2: #5b5e66; --map-water-text: #2f7fb0; --map-halo: #ffffff;
+  --map-mask: rgba(60,45,20,.16); --station-mark: #e0ab1f; --on-station: #0b2545;
+  /* 건물 용도 (옅은 색) */
+  --b-home: #f1dfc2; --b-shop: #f9d0b0; --b-office: #cfdcf5; --b-edu: #c9ead0; --b-factory: #e2d8ec; --b-other: #ebe3d4;
+  --radius-lg: 14px; --radius: 10px; --radius-sm: 6px;
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   --shadow-2: 0 4px 12px rgba(16, 24, 40, .10), 0 2px 4px rgba(16, 24, 40, .06);
   --shadow-3: 0 12px 32px rgba(16, 24, 40, .16);
@@ -28,6 +38,13 @@
     --brand: #dbe6ff;
     --ok: #4ccb8a; --ok-soft: #12291f; --no: #ff7b6e; --no-soft: #331a18; --warn: #f6a54b; --warn-soft: #33240f;
     --active: #6f95ea; --legaldong: #c3c8d0; --select: #93b4ff;
+    --graph: #b3a1f7; --graph-soft: #241d3f; --graph-line: #3a2f63;
+    --map-land: #16191e; --map-residential: #191c21; --map-water: #12324a; --map-park: #1c3324; --map-wood: #1a2f21;
+    --map-road: #2a2f38; --map-road-line: #3a404b; --map-road-2: #3a3a2e; --map-road-1: #6b5a2a; --map-road-1-line: #8a7333;
+    --map-motorway: #7a5230; --map-motorway-line: #94633a; --map-rail: #5a6472;
+    --map-bldg-line: #4a4438; --map-text: #e3e1dc; --map-text-2: #a4acb8; --map-water-text: #7fc1e8; --map-halo: #16191e;
+    --map-mask: rgba(0,0,0,.45);
+    --b-home: #3a3226; --b-shop: #4a3226; --b-office: #27324a; --b-edu: #213a2a; --b-factory: #332b40; --b-other: #2c2a26;
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 4px 14px rgba(0, 0, 0, .45); --shadow-3: 0 12px 32px rgba(0, 0, 0, .55);
   }
 }
@@ -39,6 +56,13 @@
   --brand: #dbe6ff;
   --ok: #4ccb8a; --ok-soft: #12291f; --no: #ff7b6e; --no-soft: #331a18; --warn: #f6a54b; --warn-soft: #33240f;
   --active: #6f95ea; --legaldong: #c3c8d0; --select: #93b4ff;
+  --graph: #b3a1f7; --graph-soft: #241d3f; --graph-line: #3a2f63;
+  --map-land: #16191e; --map-residential: #191c21; --map-water: #12324a; --map-park: #1c3324; --map-wood: #1a2f21;
+  --map-road: #2a2f38; --map-road-line: #3a404b; --map-road-2: #3a3a2e; --map-road-1: #6b5a2a; --map-road-1-line: #8a7333;
+  --map-motorway: #7a5230; --map-motorway-line: #94633a; --map-rail: #5a6472;
+  --map-bldg-line: #4a4438; --map-text: #e3e1dc; --map-text-2: #a4acb8; --map-water-text: #7fc1e8; --map-halo: #16191e;
+  --map-mask: rgba(0,0,0,.45);
+  --b-home: #3a3226; --b-shop: #4a3226; --b-office: #27324a; --b-edu: #213a2a; --b-factory: #332b40; --b-other: #2c2a26;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .4); --shadow-2: 0 4px 14px rgba(0, 0, 0, .45); --shadow-3: 0 12px 32px rgba(0, 0, 0, .55);
 }
 
@@ -153,6 +177,11 @@ select.field { appearance: none; padding-right: 30px; cursor: pointer;
 /* 지도 */
 .maplibregl-popup-content { font: 13px/1.45 var(--font); border-radius: 8px; box-shadow: var(--shadow-2); }
 .maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: var(--shadow-2) !important; }
+:root[data-theme="dark"] .maplibregl-ctrl-group { background: var(--raised); }
+:root[data-theme="dark"] .maplibregl-ctrl-group button + button { border-top-color: var(--line); }
+:root[data-theme="dark"] .maplibregl-ctrl button .maplibregl-ctrl-icon { filter: invert(1); }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib { background: rgba(22, 26, 33, .8); color: var(--muted); }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib a { color: var(--muted); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .maplibregl-ctrl-group { background: var(--raised); }
   :root:not([data-theme="light"]) .maplibregl-ctrl-group button + button { border-top-color: var(--line); }

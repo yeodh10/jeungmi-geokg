@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 공항대로45가길 11" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106560052029580> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "3" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "애완동물/애완용품 소매업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "애완동물, 용품 소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202507A0031981" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://www.w3.org/2000/01/rdf-schema#label> "루프"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202507A0031981> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

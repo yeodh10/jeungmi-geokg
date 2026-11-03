@@ -1,0 +1,14 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 공항대로 519" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106480004029547> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "교육컨설팅업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "교육 지원" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "교육" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202410A0730044" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://www.w3.org/2000/01/rdf-schema#label> "바움심리상담센터"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202410A0730044> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

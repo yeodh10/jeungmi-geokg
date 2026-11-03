@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 공항대로46길 25" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010300111130000014815> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "3" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "경영 컨설팅업" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "본사, 경영 컨설팅" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "과학, 기술" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA010120220801279015" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://www.w3.org/2000/01/rdf-schema#label> "뉴코컨설팅"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA010120220801279015> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

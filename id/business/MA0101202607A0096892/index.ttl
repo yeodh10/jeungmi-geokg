@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 양천구 목동중앙북로7가길 61" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1147010200106130001000001> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "1" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "약국" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "의약, 화장품 소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "소매" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202607A0096892" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://www.w3.org/2000/01/rdf-schema#label> "등촌약국"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202607A0096892> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .

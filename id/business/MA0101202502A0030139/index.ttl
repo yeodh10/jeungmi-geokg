@@ -1,0 +1,15 @@
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#status> <https://yeodh10.github.io/jeungmi-geokg/def#Active> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#roadAddress> "서울특별시 강서구 양천로67길 15" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#linkedBy> "건물관리번호" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#inBuilding> <https://yeodh10.github.io/jeungmi-geokg/id/building/1150010100102420012027439> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#floorInfo> "5" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#categorySmall> "외과 의원" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#categoryMiddle> "의원" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#categoryLarge> "보건의료" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <https://yeodh10.github.io/jeungmi-geokg/def#businessNo> "MA0101202502A0030139" .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://www.opengis.net/ont/geosparql#hasGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://www.opengis.net/ont/geosparql#hasDefaultGeometry> <https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139/geometry> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://purl.org/dc/terms/source> <https://yeodh10.github.io/jeungmi-geokg/def#dataset-sbiz-store> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://www.w3.org/2000/01/rdf-schema#label> "365웰재활의학과의원강서점"@ko .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://yeodh10.github.io/jeungmi-geokg/def#Business> .
+<https://yeodh10.github.io/jeungmi-geokg/id/business/MA0101202502A0030139> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.opengis.net/ont/geosparql#Feature> .
