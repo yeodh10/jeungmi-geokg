@@ -569,7 +569,9 @@ def check_real_approvals(tmp: Path) -> None:
     now = load_store(ps)
     report = last_report()
     assert not report.conflicts and not report.skipped and len(report.applied) == len(real), report.conflicts[:3]
-    assert len(changes_between(now)) == sum(len(p.changes) for p in real)
+    # 거둔 승인은 넣은 사건과 거둔 사건을 둘 다 남긴다
+    withdrawn = sum(len(p.changes) * p.approvals_before() for p in ps.load())
+    assert len(changes_between(now)) == sum(len(p.changes) for p in real) + 2 * withdrawn
     base = load_store(ProposalStore(tmp / "none.json"))
     before = "2026-10-30T15:53:44+09:00"  # 첫 승인 1초 전
     bad = []

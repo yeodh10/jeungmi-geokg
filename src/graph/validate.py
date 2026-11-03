@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections import Counter, defaultdict
 from functools import lru_cache
@@ -115,6 +116,24 @@ def invalid_reason(geom) -> str:
     return INVALID_KO.get(reason, reason)
 
 
+# OGC WKT 문법의 겉모양: 모양 이름(로마자), 괄호, 쉼표, 숫자, ASCII 공백만 쓴다. NUL 같은 제어 글자, 전각 숫자, 특수 공백,
+# 뒤에 붙은 다른 글은 GEOS가 읽기 전에 막는다. GEOS는 NUL에서 읽기를 멈춰 그 뒤의 글을 보지 못한다
+WKT_CHARS = re.compile(r"[ \t\r\n]*[A-Za-z][A-Za-z \t\r\n]*(?:\([A-Za-z0-9+\-., \t\r\n()]*\))?[ \t\r\n]*")
+# 좌표 숫자의 꼴(OGC: 부호, 정수부, 소수부, 지수). 16진수(0x7E)나 '1.2.3'은 밖이다. NaN, 무한대는 꼴만 받고 finite()가 막는다
+WKT_NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|[+-]?(?:nan|inf|infinity)", re.I)
+WKT_WORD = re.compile(r"[A-Za-z]+")
+
+
+def wkt_grammar_problem(value: str) -> str | None:
+    """OGC WKT 문법 밖의 글자나 숫자 꼴이 있으면 그 까닭. 모양이 올바른지는 GEOS가 본다."""
+    if not WKT_CHARS.fullmatch(value):
+        return "WKT에 OGC 문법 밖의 글자가 있다(제어 글자, 전각 숫자, 뒤에 붙은 글 등)"
+    for token in re.split(r"[ \t\r\n(),]+", value):
+        if token and not WKT_WORD.fullmatch(token) and not WKT_NUMBER.fullmatch(token):
+            return f"WKT 좌표가 OGC 숫자 꼴이 아니다({token[:20]!r})"
+    return None
+
+
 def wkt_problem(value: str) -> str | None:
     """WKT 값이 지도에 그릴 수 없는 값이면 그 까닭. 깨진 WKT 하나가 건물 레이어 전체를 내린다.
 
@@ -122,8 +141,12 @@ def wkt_problem(value: str) -> str | None:
     높이(Z)와 M 값은 받지 않는다. 저장 그래프의 모양 13,805개(2026-11-03)는 모두 2차원이고, 지도(GeoJSON)와 공간 질의도
     경도, 위도만 쓴다. 쓰지 않는 차원을 받으면 NaN, 무한대가 숨을 자리만 생긴다. 건물 높이는 층수 속성으로 적는다.
     숫자가 아닌 값은 모든 차원에서 먼저 본다. NaN이 든 선을 GEOS에 넘기면 '스스로 교차한다'처럼 틀린 까닭이 나온다.
+    GEOS보다 먼저 OGC 문법(글자와 숫자 꼴)을 본다. GEOS는 NUL 뒤의 글을 보지 않고 16진 숫자도 읽어서, 받은 값이 그래프에 그대로 남는다.
     """
     shown = repr(value[:60])
+    grammar = wkt_grammar_problem(value)
+    if grammar:
+        return f"{grammar}: {shown}"
     try:
         geom = shapely.from_wkt(value)
     except NotImplementedError:  # 곡선 모양(CIRCULARSTRING, COMPOUNDCURVE 등)

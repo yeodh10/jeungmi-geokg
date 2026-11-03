@@ -10,7 +10,8 @@
 - 쿼리가 실패하면 오류 내용을 붙여 한 번 더 고쳐 쓰게 한다.
 - 쿼리는 일꾼 프로세스에서 돈다 (src/query/worker.py). QUERY_SECONDS나 메모리 상한을 넘기면 프로세스째 끝내고 새로 띄운다.
   일꾼을 준비하는 동안 오는 질의는 QueryBusy로 받지 않는다. 결과도 칸과 전체 크기에 상한이 있다.
-- 그래프에서 뽑아 프롬프트에 넣는 값은 승인으로 바뀔 수 있다. 줄바꿈, 긴 글, 허용하지 않은 글자가 든 값은 넣지 않고,
+- 그래프에서 뽑아 프롬프트에 넣는 값은 승인으로 바뀔 수 있다. 그래서 원천 자료(objects.gpkg, admin_dong.csv)에 있는 값만 넣는다
+  (허용 목록). 승인으로 바뀌거나 새로 생긴 값은 넣지 않는다. 그 위에 줄바꿈, 긴 글, 허용하지 않은 글자가 든 값과
   입력 가드가 차단이나 검토로 보는 값(한글만 쓴 지시문 등)도 넣지 않는다.
 """
 from __future__ import annotations
@@ -18,9 +19,11 @@ from __future__ import annotations
 import logging
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import geopandas as gpd
+import pandas as pd
 import pyoxigraph as ox
 import shapely
 from pydantic import BaseModel, Field
@@ -34,6 +37,7 @@ from src.model.uri import BASE
 from src.query.worker import MAX_ROWS, START_SECONDS, QueryBusy, QueryTimeout, QueryTooBig, pool  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[2]
+PROC = ROOT / "data" / "processed"
 QUERIES = ROOT / "src" / "graph" / "queries"
 ONTOLOGY = ROOT / "src" / "graph" / "ontology.ttl"
 QUERY_SECONDS = 20
@@ -100,29 +104,59 @@ def safe_value(v: str) -> bool:
     return bool(SAFE_VALUE.fullmatch(v)) and guard_check(v, document=True).decision == "허용"
 
 
-def graph_context(store) -> str:
+def source_values(proc: Path = PROC) -> dict[str, set]:
+    """프롬프트에 넣어도 되는 값의 원천 어휘: 역(URI, 이름), 행정동(URI, 이름), 건물 용도, 시설 유형.
+
+    그래프를 만드는 원천 파일(src/graph/build_graph.py가 읽는 objects.gpkg, admin_dong.csv)에서 바로 읽으므로 승인으로 늘릴 수 없다.
+    파일이 다시 만들어지면 새로 읽는다. 파일을 읽지 못하면 빈 어휘라 아무 값도 넣지 않는다.
+    """
+    files = (proc / "objects.gpkg", proc / "admin_dong.csv")
+    try:
+        stamp = tuple(f.stat().st_mtime_ns for f in files)
+    except OSError:
+        log.warning("원천 어휘 파일을 읽지 못해 프롬프트에 그래프 값을 넣지 않는다: %s", proc)
+        return {"stations": set(), "dongs": set(), "uses": set(), "types": set()}
+    return _source_values(str(proc), stamp)
+
+
+@lru_cache(maxsize=2)
+def _source_values(proc: str, stamp: tuple) -> dict[str, set]:
+    gpkg = Path(proc) / "objects.gpkg"
+    read = lambda layer, cols: gpd.read_file(gpkg, layer=layer, ignore_geometry=True, columns=cols).fillna("")
+    stations = read("station", ["uri", "name"])
+    dongs = pd.read_csv(Path(proc) / "admin_dong.csv", dtype=str, keep_default_na=False)
+    return {"stations": set(zip(stations["uri"], stations["name"])), "dongs": set(zip(dongs["uri"], dongs["adm_dong_name"])),
+            "uses": set(read("building", ["use_name"])["use_name"]) - {""},
+            "types": set(read("public_facility", ["facility_type"])["facility_type"]) - {""}}
+
+
+def graph_context(store, source: dict[str, set] | None = None) -> str:
     """질문에 자주 나오는 이름과 URI를 그래프에서 뽑아 프롬프트에 넣는다 (그래프가 바뀌면 같이 바뀐다).
 
-    승인된 값이 그대로 시스템 프롬프트에 들어가므로 safe_value, SAFE_URI에 맞는 값만 넣는다. 빠진 값은 로그에 남는다.
+    승인된 값이 시스템 프롬프트에 들어가지 않게 원천 어휘(source_values)에 있는 값만 넣고, 그 값도 safe_value, SAFE_URI를 거친다.
+    역과 행정동은 URI와 이름이 함께 원천과 맞아야 한다. 빠진 값은 로그에 남는다. source는 시험에서 어휘를 바꿀 때 준다.
     """
+    source = source_values() if source is None else source
+
     def rows(q):
         return [[t.value if t is not None else "" for t in r] for r in store.query(PREFIXES + q)]
 
-    def values(found):
-        kept = [v for v in found if safe_value(v)]
+    def values(found, allowed):
+        kept = [v for v in found if v in allowed and safe_value(v)]
         if len(kept) < len(found):
             log.warning("프롬프트에 넣지 않은 그래프 값 %d개", len(found) - len(kept))
         return kept
 
-    def named(found):
-        kept = [(s, l) for s, l in found if SAFE_URI.fullmatch(s) and safe_value(l)]
+    def named(found, allowed):
+        kept = [(s, l) for s, l in found if (s, l) in allowed and SAFE_URI.fullmatch(s) and safe_value(l)]
         if len(kept) < len(found):
             log.warning("프롬프트에 넣지 않은 그래프 이름 %d개", len(found) - len(kept))
         return kept
-    stations = named(rows("SELECT ?s ?l WHERE { ?s a jgk:Station ; rdfs:label ?l }"))
-    dongs = named(rows("SELECT ?s ?l WHERE { ?s a jgk:AdminDong ; rdfs:label ?l } ORDER BY ?l"))
-    uses = values([u for u, _ in rows("SELECT ?u (COUNT(*) AS ?n) WHERE { ?b jgk:useName ?u } GROUP BY ?u ORDER BY DESC(?n) LIMIT 30")])
-    types = values([t for (t,) in rows("SELECT DISTINCT ?t WHERE { ?f jgk:facilityType ?t } ORDER BY ?t")])
+    stations = named(rows("SELECT ?s ?l WHERE { ?s a jgk:Station ; rdfs:label ?l }"), source["stations"])
+    dongs = named(rows("SELECT ?s ?l WHERE { ?s a jgk:AdminDong ; rdfs:label ?l } ORDER BY ?l"), source["dongs"])
+    uses = values([u for u, _ in rows("SELECT ?u (COUNT(*) AS ?n) WHERE { ?b jgk:useName ?u } GROUP BY ?u ORDER BY DESC(?n) LIMIT 30")],
+                  source["uses"])
+    types = values([t for (t,) in rows("SELECT DISTINCT ?t WHERE { ?f jgk:facilityType ?t } ORDER BY ?t")], source["types"])
     return "\n".join([
         "역: " + ", ".join(f"{l} <{s}>" for s, l in stations),
         "행정동: " + ", ".join(f"{l} <{s}>" for s, l in dongs),

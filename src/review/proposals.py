@@ -506,10 +506,20 @@ def content(p: Proposal) -> tuple:
     return p.action, p.target, [c.model_dump() for c in p.changes]
 
 
+class ProposalFileError(Exception):
+    """제안 파일 전체를 읽지 못했다. 기록 하나가 아니라 파일이 깨졌다.
+
+    JSON이 아니거나, 맨 바깥이 목록이 아니거나({}, null, 숫자), 목록인데 기록이 하나도 읽히지 않는다([1, 2, null], [{"id": "x"}]).
+    검토 서버는 503으로 답하고, 깨진 파일을 덮어쓰지 않는다.
+    """
+
+
 class ProposalStore:
     """제안 목록을 JSON 파일 하나에 둔다. 스레드끼리, 프로세스끼리 잠그고, 잠금 안에서 다시 읽어 고친다.
 
     읽지 못하는 기록은 그 기록만 건너뛴다. 건너뛴 기록은 broken으로 꺼내 볼 수 있고, 저장해도 파일에서 사라지지 않는다.
+    기록이 하나도 읽히지 않거나 파일 전체를 읽지 못하면 ProposalFileError를 낸다. 그대로 두면 승인을 하나도 얹지 않은 그래프가
+    아무 경고 없이 뜬다. 읽기 단계에서 멈추므로 저장까지 가지 않아 깨진 파일을 덮어쓰지 않는다.
     """
 
     def __init__(self, path: Path | None = None):
@@ -527,6 +537,10 @@ class ProposalStore:
                 if i == 49:
                     raise
                 time.sleep(0.02)
+            except ValueError as e:  # JSONDecodeError와 UnicodeDecodeError도 ValueError다
+                raise ProposalFileError(f"JSON으로 읽지 못했다: {e}") from e
+        if not isinstance(data, list):
+            raise ProposalFileError("맨 바깥이 목록이 아니다")
         good, broken = [], []
         for i, raw in enumerate(data):
             try:
@@ -534,6 +548,8 @@ class ProposalStore:
             except ValueError as e:
                 row = raw if isinstance(raw, dict) else {}
                 broken.append({"index": i, "id": row.get("id"), "status": row.get("status"), "error": str(e), "raw": raw})
+        if data and not good:  # 일부만 깨지면 그 기록만 건너뛰지만, 모두 깨진 목록은 파일이 깨진 것이다
+            raise ProposalFileError(f"기록 {len(data)}개를 하나도 읽지 못했다")
         number_decisions(good)
         return good, broken
 

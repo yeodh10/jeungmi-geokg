@@ -49,7 +49,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.graph.store import ReplayReport, build_store, last_report, load_store, remember
 from src.model.uri import BASE
-from src.review.proposals import Change, ProposalStore, Term, group_of, iri, text
+from src.review.proposals import Change, ProposalFileError, ProposalStore, Term, group_of, iri, text
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "web" / "review.html"
@@ -119,7 +119,9 @@ def same_origin(origin: str, scope: dict, host: str) -> bool:
 
 def refusal(scope: dict, headers: Headers) -> tuple[int, str] | None:
     """입구에서 돌려보낼 요청이면 상태 코드와 문장. Host가 맞아도 다른 사이트의 페이지가 브라우저를 시켜 보낸 요청은 막는다."""
-    if scope["path"].startswith("/api/") and headers.get("sec-fetch-site") in ("cross-site", "same-site"):
+    # 브라우저는 소문자로 보내지만 값은 대소문자를 가리지 않고 본다. 같은 출처(same-origin)와 사용자가 직접 연 요청(none)만 받는다
+    site = headers.get("sec-fetch-site")
+    if scope["path"].startswith("/api/") and site is not None and site.strip().lower() not in ("same-origin", "none"):
         return 403, "다른 사이트에서 온 요청은 받지 않는다"
     if scope["method"] not in ("GET", "HEAD", "OPTIONS"):
         origin = headers.get("origin")
@@ -179,29 +181,7 @@ async def response_headers(request: Request, call_next):
     return response
 
 
-class ProposalFileError(Exception):
-    """제안 파일 전체를 읽지 못했다. 기록 하나가 아니라 파일이 깨졌다(JSON이 아니거나 맨 바깥이 목록이 아니다)."""
-
-
-class ServerProposals(ProposalStore):
-    """서버가 쓰는 제안 저장소. 파일 전체를 읽지 못하면 ProposalFileError를 내고, 서버는 503으로 답한다.
-
-    읽기 단계에서 멈추므로 결정과 정정도 저장까지 가지 않아 깨진 파일을 덮어쓰지 않는다.
-    맨 바깥이 목록이 아닌 JSON({} 등)도 막는다. 그대로 두면 승인을 하나도 얹지 않은 그래프가 아무 경고 없이 뜬다.
-    """
-
-    def _read(self):
-        try:
-            good, broken = super()._read()
-            if not good and self.path.exists() and not isinstance(json.loads(self.path.read_text(encoding="utf-8")), list):
-                raise TypeError("맨 바깥이 목록이 아니다")
-        except (ValueError, TypeError) as e:  # JSONDecodeError와 UnicodeDecodeError도 ValueError다. null, 숫자는 TypeError
-            log.error("제안 파일을 읽지 못했다: %s: %s", self.path, e)
-            raise ProposalFileError(str(e)) from e
-        return good, broken
-
-
-proposals = ServerProposals()
+proposals = ProposalStore()  # 파일 전체를 읽지 못하면 ProposalFileError를 내고, 서버는 503으로 답한다
 # boot: 서버를 켤 때마다 달라지는 값. 다시 켜면 판 번호가 0으로 돌아가도 ETag가 겹치지 않게 한다
 state = {"store": None, "version": 0, "boot": format(time.time_ns(), "x")}
 lock = threading.RLock()  # 그래프를 불러오고 승인을 반영하는 동안 다른 요청이 끼어들지 않게 한다
@@ -382,6 +362,7 @@ async def bad_request(request: Request, exc: RequestValidationError):
 
 @app.exception_handler(ProposalFileError)
 async def proposal_file_error(request: Request, exc: ProposalFileError):
+    log.error("제안 파일을 읽지 못했다: %s: %s", proposals.path, exc)
     return JSONResponse(status_code=503, content={"detail": FILE_BROKEN})
 
 

@@ -10,8 +10,9 @@
 그 앞에서 입력 가드(src/guard)가 원문을 본다. 차단이면 LLM에 보내지 않고, 검토면 제안 flags에 경고를 남긴다.
 
 입력 가드가 뚫려도 버티도록 코드가 모델이 쓴 글을 다시 본다:
-- 근거 문장, 대상 주소와 이름, 새 값, 효력 날짜가 원문에 있어야 제안이 된다. 공간 문서가 아니라고 뽑았으면 변경을 버린다.
-- 주소는 글 전체를 본다. 다른 시도나 시군구 이름, 범위 밖 우편번호가 어디에든 있으면 찾지 않는다.
+- 근거 문장, 대상 주소와 이름, 새 값이 원문에 있어야 제안이 된다. 효력 날짜는 그 근거 문장 안에 있어야 한다.
+  공간 문서가 아니라고 뽑았으면 변경을 버린다.
+- 주소는 허용 목록으로 본다. 도로명, 지번 앞뒤에 남은 낱말이 모두 범위 안 이름이나 아는 낱말이어야 찾는다.
 - 고시 묶음(notice_key)과 고시 객체는 파일 머리의 시군구와 번호로 정한다. 모델 글에서 뽑지 않는다.
 - 건물 용도는 어휘와 맞춘다. 새 값은 프롬프트로 이어질 수 있어서 줄바꿈과 길이를 막는다.
 - 모델이 쓴 요약은 길이 상한, 입력 가드, 출력 가드를 거쳐야 검토 화면과 그래프에 들어간다.
@@ -82,6 +83,20 @@ BLOCK_DONG = re.compile(r"제?\d+동|[가나다라마바사아자차카타파하
 ZIP = re.compile(r"(?<![\d-])\d{5}(?![\d-])")  # 다섯 자리 우편번호. 지번 본번과 건물 번호는 네 자리까지다
 OLD_ZIP = re.compile(r"(?:\(우\)|우편번호|〒)\s*:?\s*\d{3}\s*-\s*\d{3}")  # 여섯 자리 옛 우편번호. 대조할 자료가 없다
 WORD_SPLIT = re.compile(r"[\s,()\[\]{}<>·・/~|:;'\"]+")
+# 주소를 풀 때 남는 낱말은 모두 아는 낱말이어야 한다(허용 목록). 모르는 낱말이 하나라도 있으면 풀지 않는다.
+# 주소에 쓰는 글자: 한글 음절, 로마자, 숫자, 보통 띄어쓰기와 몇몇 문장 부호. 건물 이름에 쓰는 글자(Ⅱ, & 등)는 Resolver가 더한다.
+# 자모만 쓴 글자, 한자, 전각 괄호, 보이지 않는 글자, 특수 공백은 쓰지 않는다
+ADDRESS_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ,.()[]-~·/")
+# 주소의 뼈대: 도로명과 건물 번호, 동과 지번(쉼표나 ~로 이은 지번까지). 뼈대를 떼고 남은 낱말을 허용 목록과 견준다.
+# 도로명과 동 이름은 남겨 범위를 본다. 뼈대 밖의 숫자('480 94', '608-012')는 모르는 낱말이다
+ROAD_CORE = re.compile(r"(\S+(?:로|길))\s*(?:지하\s*)?\d+(?:-\d+)?")
+LOT = r"(?:산\s*)?\d+(?:\s*[-의]\s*\d+)?(?:번지)?"
+DONG_CORE = re.compile(rf"([가-힣][가-힣\d]*동)\s*{LOT}(?:\s*[,~]\s*{LOT})*")
+# 뼈대 밖에 남아도 되는 낱말. 실제 고시 95건의 주소 60개에 나온 꼴(일대, 일원, 외, 등, 외8필지, 10필지)과
+# 건물 안의 위치(지하1층, 3층, B1, 101호, 101동, 가동)다
+ADDRESS_WORDS = re.compile(r"일대|일원|외|등|(?:외\s*)?\d+\s*필지|(?:지하)?\d+층|B\d+층?|제?\d+(?:-\d+)?호|제?\d+동|[가나다라마바사아자차카타파하]동"
+                           r"|우|우편번호|\d{5}")  # 우편번호는 scope가 ZIP으로 먼저 범위를 본다
+ROAD_NAME = re.compile(r"[가-힣][가-힣\d]*(?:로|길)")  # 뼈대에서 남긴 도로명. 그래프에 없는 도로면 찾기에서 맞지 않는다
 
 ChangeType = Literal[
     "building_demolished",   # 건물 멸실, 철거
@@ -212,13 +227,25 @@ def one_line(value: str) -> bool:
 
 
 def date_in_source(day: str, doc: str) -> bool:
-    """YYYY-MM-DD 날짜가 원문에 어떤 꼴로든 있는가. doc은 띄어쓰기를 뺀 원문이다.
+    """YYYY-MM-DD 날짜가 글에 어떤 꼴로든 있는가. doc은 띄어쓰기를 뺀 글(효력 날짜는 근거 문장)이다.
 
     2026-01-01, 2026.1.1., 2026. 1. 1., 2026/1/1, 2026년 1월 1일, 20260101을 본다. 달과 날 앞의 0은 있어도 없어도 된다.
+    '제2026-1-1호'처럼 번호 안에 든 숫자는 날짜로 보지 않는다.
     """
     y, m, d = day.split("-")
-    split = rf"(?<!\d){y}(?:[-./]|년)0?{int(m)}(?:[-./]|월)0?{int(d)}(?!\d)"
-    return bool(re.search(rf"{split}|(?<!\d){y}{m}{d}(?!\d)", doc))
+    split = rf"(?<![\d제]){y}(?:[-./]|년)0?{int(m)}(?:[-./]|월)0?{int(d)}(?![\d호])"
+    return bool(re.search(rf"{split}|(?<![\d제]){y}{m}{d}(?![\d호])", doc))
+
+
+def labeled_date(day: str, doc: str) -> bool:
+    """날짜가 원문에 '이름표 : 날짜' 꼴로 적혀 있는가 (예: 인가일 : 2026.10.20., 해체공사기간: 2023. 10. 4.).
+
+    실제 고시의 효력 날짜는 근거 문장보다 이런 항목 줄에 적힌다. 법 시행일 '(2020. 1. 1. 시행)'과
+    '접수번호 20200101'은 이 꼴이 아니라서 걸리지 않는다. 이름표에 '번호'가 들면 받지 않는다. doc은 띄어쓰기를 뺀 글이다.
+    """
+    y, m, d = day.split("-")
+    date = rf"{y}(?:[-./]|년)0?{int(m)}(?:[-./]|월)0?{int(d)}(?![\d호])"
+    return any("번호" not in mm.group(1) for mm in re.finditer(rf"([가-힣]{{2,12}}):{date}", doc))
 
 
 def secret_like(kinds: list[str]) -> bool:
@@ -226,10 +253,22 @@ def secret_like(kinds: list[str]) -> bool:
     return any(k.endswith(("_key", "_token")) or k in ("jwt", "password_kv") for k in kinds)
 
 
+# 모델 요약에서 글자만 남길 꼴: 마크다운 링크와 그림 [글](주소), 주소 꼴(javascript:, data:, https:// 등)
+MD_LINK = re.compile(r"!?\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)?")
+URL_LIKE = re.compile(r"(?i)<?\b(?:javascript|vbscript|data|file|https?|ftp|mailto)\s*:[^\s<>]*>?")
+# 검토자에게 결정을 권하는 말. 고시의 '인가', '승인'(사업시행계획 승인 등)은 걸리지 않게 권하는 꼴만 본다
+URGE = re.compile(r"승인\s*(?:해도|하면|하셔도|하십시오|하세요|하라|해라|바람|바랍니다|요망|할\s*것|을\s*권|이\s*필요\s*없|필요\s*없|불필요)"
+                  r"|바로\s*(?:승인|반려|적용)|자동\s*(?:승인|반려)|검토\s*(?:완료|끝|마침|마쳤|를\s*마|가\s*끝|필요\s*없|하지\s*않아도|불필요)"
+                  r"|확인\s*(?:했으니|하였으니|했으므로|하였으므로|했다|하였다|완료|을\s*마쳤|이\s*끝났)|반려\s*(?:해도|하면|하세요|하라|하십시오)"
+                  r"|문제\s*없(?:으니|으므로|음|다)|(?i:\b(?:approve|approved|lgtm|reviewed)\b)")
+
+
 def checked_summary(summary: str | None, fallback: str) -> tuple[str, list[str]]:
     """모델이 쓴 요약을 검토 화면과 그래프(dct:description)에 넣기 전에 본다. 쓸 수 없으면 코드가 만든 요약으로 바꾼다.
 
     길이 상한과 보이지 않는 글자를 보고, 입력 가드(check)가 막으면 버리고 검토면 flags에 남긴다.
+    마크다운 링크와 주소 꼴(javascript:, https:// 등)은 글자만 남기고, 검토자에게 결정을 권하는 말('승인해도 된다', '검토 완료')은
+    flags에 남긴다. 요약은 고시 내용을 적는 글이라 링크나 검토 결정이 들어갈 까닭이 없다.
     마지막으로 출력 가드(screen_output)로 개인정보와 비밀값을 가린다.
     """
     text = " ".join((summary or "").split())
@@ -239,10 +278,18 @@ def checked_summary(summary: str | None, fallback: str) -> tuple[str, list[str]]
         return fallback, [f"모델 요약이 {MAX_SUMMARY}자를 넘어 버리고 코드가 만든 요약을 썼다 (확인 필요)"]
     if any(unicodedata.category(ch) in BAD_CHARS for ch in text):
         return fallback, ["모델 요약에 보이지 않는 글자가 있어 버리고 코드가 만든 요약을 썼다 (확인 필요)"]
+    flags = []
+    plain = " ".join(URL_LIKE.sub(" ", MD_LINK.sub(lambda m: f" {m.group(1)} ", text)).split())
+    if plain != text:
+        flags.append("모델 요약의 링크나 주소 꼴을 지우고 글자만 남겼다 (확인 필요)")
+        text = plain
+        if not text:
+            return fallback, flags
+    if URGE.search(text):
+        flags.append("모델 요약에 검토자에게 결정을 권하는 말이 있다. 요약이 아니라 원문과 변경 내용으로 판단해야 한다 (확인 필요)")
     verdict = check(text, document=True)
     if verdict.blocked:
-        return fallback, [f"모델 요약을 입력 가드가 막아 버렸다: {', '.join(verdict.reasons) or verdict.score} (확인 필요)"]
-    flags = []
+        return fallback, flags + [f"모델 요약을 입력 가드가 막아 버렸다: {', '.join(verdict.reasons) or verdict.score} (확인 필요)"]
     if verdict.decision == "검토":
         flags.append(f"모델 요약에 입력 가드 경고 {verdict.score}점: {', '.join(verdict.reasons) or '숨은 글자나 인코딩'} (확인 필요)")
     text, kinds = screen_output(text, ("pii", "secret"))
@@ -343,6 +390,14 @@ class Resolver:
             if code[:5] in code_area:
                 self.place_area[name] = self.place_area[re.sub(r"제(\d)", r"\1", name)] = code_area[code[:5]]
         self.english = {v.lower() for col in ("sido_en", "sigungu_en", "emd_en") for v in jibun[col] if v}
+        # 주소에 남아도 되는 건물 이름 낱말. 원천 자료(objects.gpkg)의 건물과 시설 이름에서 뽑으므로 승인으로 늘릴 수 없다.
+        # 숫자만 쓴 낱말과 시도 이름은 빼서 '480 94'나 '부산' 같은 말이 건물 이름으로 지나가지 못하게 한다.
+        # '관리동', '주차장동'처럼 동으로 끝나는 건물 이름은 받는다. 범위 안 건물의 이름이라 다른 지역을 가리키지 않는다
+        names = [n for n in list(self.buildings["label"]) + list(self.facilities["label"]) if n]
+        self.name_words = {w for n in names for w in WORD_SPLIT.split(n)
+                           if w and not re.fullmatch(r"[\d.-]+", w)
+                           and not (w in SIDO or w in SIDO_SHORT or w.startswith(SIDO) or w.lower() in SIDO_ROMAN)}
+        self.address_chars = ADDRESS_CHARS | {ch for n in names for ch in n if not unicodedata.category(ch).startswith(("C", "Z"))}
         # 우편번호(기초구역 번호) -> 그 구역 건물의 시도, 시군구. 실제 원천(도로명주소 한글 DB, 서울)으로 보면 우편번호 하나는
         # 시군구 하나에만 속하고 강서구는 07500~07812, 양천구는 07900~08111이다. 여기서는 그래프 범위의 구역만 받는다
         zones = pd.read_csv(proc / "building_zone.csv", dtype=str, keep_default_na=False)
@@ -351,15 +406,26 @@ class Resolver:
             if z and u in area_of_building:
                 self.zone_area[z.rsplit("/", 1)[-1]].add(area_of_building[u])
 
-    def scope(self, text: str | None, home: tuple[str, str] | None = None) -> tuple[set[tuple[str, str]], str | None]:
-        """주소가 가리킬 수 있는 (시도, 시군구)와, 범위 밖이면 그 까닭. 주소 머리만 보지 않고 글 전체를 본다.
+    def known_word(self, word: str) -> bool:
+        """범위 안 이름을 뗀 뒤 남은 낱말이 주소에 남아도 되는 낱말인가(허용 목록)."""
+        return word in self.name_words or bool(ADDRESS_WORDS.fullmatch(word) or ROAD_NAME.fullmatch(word))
 
-        다른 시도나 시군구 이름, 모르는 동 이름, 범위 밖 우편번호가 어디에 있든 범위 밖이다.
+    def scope(self, text: str | None, home: tuple[str, str] | None = None) -> tuple[set[tuple[str, str]], str | None]:
+        """주소가 가리킬 수 있는 (시도, 시군구)와, 범위 밖이거나 모르는 말이 있으면 그 까닭. 글 전체를 본다.
+
+        허용 목록으로 본다. 도로명과 건물 번호, 동과 지번(뼈대)을 뗀 뒤 남은 낱말은 모두 아는 낱말이어야 한다:
+        범위 안 시도와 시군구(서울특별시, 서울시, 서울, 강서구 등), 범위 안 법정동과 행정동, 원천 자료의 건물 이름,
+        층, 호, 동 번호, 실제 고시에 나온 일대, 일원, 외, 등, 필지, 우편번호. 모르는 낱말('해운대구에', '부산.', 'Haeundaegu')이나
+        주소에 쓰지 않는 글자(한자, 자모, 보이지 않는 글자)가 하나라도 있으면 풀지 않는다.
+        다른 시도나 시군구, 모르는 동 이름은 '범위 밖 이름'으로, 그 밖은 '모르는 낱말'로 까닭을 적는다.
         시군구를 알 수 있는 말(시군구, 동, 우편번호)이 하나도 없으면 고시를 낸 시군구(home)로 본다.
         home도 없으면 범위를 정할 수 없어 찾지 않는다. 머리가 비었다고 범위 안으로 보지 않는다.
         """
         text = text or ""
         allowed, named = set(self.areas), False
+        odd = sorted({ch for ch in text if not "가" <= ch <= "힣" and ch not in self.address_chars})
+        if odd:
+            return set(), f"주소에 쓰지 않는 글자가 있다: {', '.join(repr(ch) for ch in odd[:3])}"
         if OLD_ZIP.search(text):
             return set(), "대조할 수 없는 옛 우편번호가 있다"
         for z in ZIP.findall(text):
@@ -367,6 +433,8 @@ class Resolver:
                 return set(), f"범위 밖 우편번호 {z}"
             allowed &= self.zone_area[z]
             named = True
+        text = ROAD_CORE.sub(lambda m: f" {m.group(1)} ", text)  # 뼈대를 떼고 도로명과 동 이름만 남긴다
+        text = DONG_CORE.sub(lambda m: f" {m.group(1)} ", text)
         for word in WORD_SPLIT.split(text):
             rest = word
             while rest:  # '서울특별시강서구'처럼 붙여 쓴 범위 안 이름을 앞에서부터 뗀다
@@ -382,8 +450,12 @@ class Resolver:
             if rest in self.place_area:
                 allowed &= {self.place_area[rest]}
                 named = True
+            elif self.known_word(rest):
+                continue
             elif alien_place(rest, self.english):
                 return set(), f"범위 밖 이름 '{word}'"
+            else:
+                return set(), f"모르는 낱말 '{word}'"
         if not named:
             if home is None:
                 return set(), "시군구를 정할 말이 없고 고시를 낸 시군구도 모른다"
@@ -596,11 +668,12 @@ def make_proposal(c: ExtractedChange, uri: str, how: str, meta: dict, store, doc
         day = clean_date(c.effective_date)
         if c.effective_date and not day:
             raise Rejected("효력 날짜가 올바른 날짜가 아니다")
-        # 원문에 없는 날짜는 쓰지 않고 제안도 만들지 않는다. 실제 고시 95건에서 모델이 뽑은 효력 날짜 33개는 모두 원문에 있었다.
-        # 고시일로 바꿔 넣으면 원문의 다른 날짜(표기를 못 읽은 날짜)를 틀린 폐지일로 넣을 수 있다. 근거 문장, 주소, 새 값처럼
-        # 원문에 없는 값은 제안을 만들지 않고 까닭을 문서 보고서에 남긴다. 파일 머리의 고시일과 같은 날짜는 받는다
-        if day and day != meta.get("날짜") and not date_in_source(day, doc):
-            raise Rejected(f"효력 날짜 {day}가 원문에 없다")
+        # 효력 날짜는 이 변경의 근거 문장(quote) 안에 있거나, 원문에 '이름표 : 날짜' 항목으로 적혀 있어야 쓴다.
+        # 원문의 다른 곳(법 시행일, 접수번호, 다른 고시의 날짜)에 있는 날짜를 가져다 쓰지 못하게 한다.
+        # 어느 쪽도 아니면 고시일로 바꿔 넣지 않고 제안도 만들지 않는다. 까닭은 문서 보고서에 남는다.
+        # 파일 머리의 고시일과 같은 날짜는 받는다. 날짜를 비워도 고시일을 쓰므로 결과가 같다
+        if day and day != meta.get("날짜") and not date_in_source(day, norm(c.quote)) and not labeled_date(day, doc):
+            raise Rejected(f"효력 날짜 {day}가 근거 문장이나 항목 줄에 없다")
         day = day or clean_date(meta.get("날짜"))
         if not day:
             raise Rejected("폐지일을 정할 날짜가 없다")

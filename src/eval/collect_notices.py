@@ -4,16 +4,18 @@
 출력: data/raw/notices/eval/{mgtNo}.txt  (원문은 커밋하지 않는다. 정답은 eval/notice_gold.yaml에 번호로 적는다)
 파일 머리에 제목, 번호, 날짜, 출처를 적어 src.llm.notice가 그대로 읽게 한다. 이미 받은 파일은 다시 받지 않는다.
 
-사람 눈에 보이는 글만 LLM에 가도록 HTML을 브라우저처럼 읽어 숨긴 글을 버린다:
+사람 눈에 보이는 글만 LLM에 가도록 HTML을 브라우저처럼 읽어 숨긴 글을 버린다. 숨기는 방법을 하나씩 막지 않고 허용 목록으로 본다:
+- 허용한 요소(ALLOWED_TAGS), 속성(ALLOWED_ATTRS), class(ALLOWED_CLASSES), CSS 속성과 값(SAFE_CSS) 밖의 것이 나오면
+  파일 머리에 '숨김의심:' 줄을 남긴다. src.llm.notice가 그 문서의 제안 flags에 넣고, flags가 있는 제안은 묶음 승인에서 빠진다.
+  허용 목록은 실제 강서구 고시 게시판 본문을 보고 정했다. 2026-11-03에 받은 95건의 본문은 모두
+  <div class="gosi-con"><pre>글</pre></div> 꼴이었고 style 속성은 없었다. 그 위에 보통 게시판 글에 나오는 요소만 더했다.
+- 허용 목록 밖 요소(svg, math, select, option, ruby, details, form 등)는 내용째 버린다. 그 안의 끝 태그는 바깥 요소를 닫지 못한다.
 - 주석과, 안의 태그를 글로 읽는 요소(script, style, textarea, title, xmp, iframe, noscript, noembed, noframes, plaintext)는
   내용째 버린다. 이 안의 '</div>'가 바깥의 숨긴 요소를 닫지 못하게 태그보다 먼저 지운다.
-- hidden, aria-hidden, template, 닫힌 details(첫 summary 빼고) 같은 요소는 안쪽까지 버린다.
-- style 속성은 여럿이면 모두 보고, CSS 주석과 이스케이프(\\6e, dis\\play)를 푼 뒤 본다. display, visibility, opacity, 글자 크기,
-  화면 밖 위치, 크기 0과 overflow, clip, clip-path, transform, 투명한 글자색을 숨김으로 본다.
+- 숨김이 분명한 것(display, visibility, hidden 속성, 작은 글자, 투명, 화면 밖 위치 등)은 거른다. 글자 크기, 불투명도,
+  여백은 바깥 요소부터 겹쳐 계산한다. 글자색은 바탕색과 WCAG 대비로 견준다. 같은 색이면 거르고, 대비가 낮으면 의심으로 남긴다.
 - 브라우저와 HTML 읽는 법이 어긋날 때는 더 많이 버리는 쪽을 고른다(숨긴 요소를 브라우저보다 늦게 닫는다).
-class로 숨긴 글이나 배경과 같은 글자색은 누리집의 CSS를 함께 봐야 해서 거르지 못한다. 그런 낌새(숨기는 이름의 class,
-흰색에 가까운 글자색, 본문 안의 숨기는 CSS 규칙, 계산식 CSS 값)가 보이면 파일 머리에 '숨김의심:' 줄로 남긴다.
-src.llm.notice가 그 문서의 제안 flags에 넣고, flags가 있는 제안은 묶음 승인에서 빠진다.
+class로 숨긴 글은 누리집의 CSS를 함께 봐야 해서 거르지 못하고 의심으로만 남긴다.
 """
 from __future__ import annotations
 
@@ -34,7 +36,6 @@ UNWRAP_ROUNDS = 5  # 엔티티를 겹겹이 싼 글을 푸는 횟수의 상한
 
 # 브라우저가 안의 '<'를 태그로 읽지 않는 요소. 화면에 글로 나오지 않거나 본문으로 읽을 글이 아니라서 내용째 버린다
 RAW_TAGS = {"script", "style", "textarea", "title", "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext"}
-HIDDEN_TAGS = {"head", "template", "canvas", "audio", "video", "object", "datalist"}  # 안의 글이 화면에 나오지 않는 요소
 VOID_TAGS = {"area", "base", "basefont", "bgsound", "br", "col", "embed", "frame", "hr", "img", "input", "keygen", "link", "meta",
              "param", "source", "track", "wbr"}  # 닫는 태그가 없는 요소
 # 끝 태그가 이 요소를 넘어 바깥 요소를 닫지 못한다 (HTML 표준의 scope 경계와 special 요소). 넘지 못하면 그 끝 태그는 버린다
@@ -70,6 +71,81 @@ WATCHED = {"display", "visibility", "content-visibility", "opacity", "filter", "
            "-webkit-text-fill-color"}
 HIDE_CLASS = re.compile(r"hid(?:e|den)|blind|sr-?only|screen-?reader|visually|invisib|off-?screen|d-none|display-?none|collapse|clip",
                         re.I)
+
+# ---- 허용 목록 ----
+# 글을 그대로 보여 주는 요소. 실제 게시판 본문(div, pre)에 보통 게시판 글의 문단, 표, 목록, 강조, 링크, 그림을 더했다
+ALLOWED_TAGS = {"div", "p", "span", "pre", "br", "hr", "strong", "b", "em", "i", "u", "sub", "sup", "ul", "ol", "li", "a", "img",
+                "table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "td", "th"}
+# 보이는 모양을 숨기지 않는 속성. hidden, aria-hidden, popover, bgcolor, id, data-* 등은 밖이다
+ALLOWED_ATTRS = {"style", "class", "href", "src", "alt", "title", "width", "height", "colspan", "rowspan", "align", "valign", "border",
+                 "cellpadding", "cellspacing", "scope", "target", "lang"}
+ALLOWED_CLASSES = {"gosi-con"}  # 실제 게시판 본문에 나온 class. 다른 class는 누리집 CSS가 숨길 수 있다
+LENGTH_UNITS = {"", "px", "pt", "pc", "in", "cm", "mm", "em", "rem", "%"}  # vw, vh처럼 화면 크기에 따르는 단위는 밖이다
+NAMED_COLORS = {"black": (0, 0, 0), "silver": (192, 192, 192), "gray": (128, 128, 128), "grey": (128, 128, 128), "white": (255, 255, 255),
+                "maroon": (128, 0, 0), "red": (255, 0, 0), "purple": (128, 0, 128), "fuchsia": (255, 0, 255), "green": (0, 128, 0),
+                "lime": (0, 255, 0), "olive": (128, 128, 0), "yellow": (255, 255, 0), "navy": (0, 0, 128), "blue": (0, 0, 255),
+                "teal": (0, 128, 128), "aqua": (0, 255, 255)}  # CSS 기본 16색. 다른 이름 색은 읽지 못한 색으로 본다
+MIN_CONTRAST = 3  # 글자색과 바탕색의 대비가 이보다 낮으면 의심한다. WCAG 2의 큰 글자 최소 대비(3:1)다
+BORDER_WORDS = {"none", "hidden", "solid", "dotted", "dashed", "double", "groove", "ridge", "inset", "outset", "thin", "medium", "thick"}
+FONT_WORDS = {"xx-small": 9, "x-small": 10, "small": 13, "medium": 16, "large": 18, "x-large": 24, "xx-large": 32}
+ROOT_FONT_PX = 16
+
+
+def lengths(value: str, negative: bool = True, words: frozenset = frozenset({"auto"})) -> bool:
+    """값이 허용한 단위의 길이(또는 words의 낱말)로만 되어 있는가."""
+    tokens = value.split()
+    for t in tokens:
+        if t in words:
+            continue
+        m = LENGTH.fullmatch(t)
+        if not m or m.group(2) not in LENGTH_UNITS or (not negative and float(m.group(1)) < 0):
+            return False
+    return bool(tokens)
+
+
+def one_of(*words: str):
+    return lambda v: v in words
+
+
+def border_ok(value: str) -> bool:
+    return all(t in BORDER_WORDS or lengths(t, negative=False) or color_of(t) is not None for t in value.split()) and bool(value)
+
+
+def line_height_ok(value: str) -> bool:
+    m = LENGTH.fullmatch(value)
+    return value == "normal" or bool(m and m.group(2) in LENGTH_UNITS and float(m.group(1)) > 0)
+
+
+def decoration_ok(value: str) -> bool:
+    words = {"none", "underline", "line-through", "overline", "solid", "double", "dotted", "dashed", "wavy"}
+    return all(t in words or color_of(t) is not None for t in value.split()) and bool(value)
+
+
+# 보이는 글을 숨기지 않는 CSS 속성과 그 값의 꼴. 글자 정렬, 굵기, 기울임, 밑줄, 줄바꿈, 여백, 테두리, 크기, 글자색과 바탕색, 글자 크기다.
+# 글자 크기, 여백, 색은 값만으로 숨김을 알 수 없어 VisibleText가 바깥 요소와 겹쳐 다시 본다
+SAFE_CSS = {
+    "text-align": one_of("left", "right", "center", "justify", "start", "end"),
+    "vertical-align": lambda v: v in {"top", "middle", "bottom", "baseline", "sub", "super", "text-top", "text-bottom"} or lengths(v),
+    "font-weight": lambda v: v in {"normal", "bold", "bolder", "lighter"} or bool(re.fullmatch(r"[1-9]00", v)),
+    "font-style": one_of("normal", "italic", "oblique"),
+    "text-decoration": decoration_ok, "text-decoration-line": decoration_ok,
+    "white-space": one_of("normal", "pre", "pre-wrap", "pre-line", "nowrap", "break-spaces"),
+    "word-break": one_of("normal", "keep-all", "break-all", "break-word"),
+    "overflow-wrap": one_of("normal", "break-word", "anywhere"), "word-wrap": one_of("normal", "break-word", "anywhere"),
+    "list-style-type": lambda v: bool(re.fullmatch(r"[a-z-]+", v)),
+    "border-collapse": one_of("collapse", "separate"),
+    "border-spacing": lambda v: lengths(v, negative=False, words=frozenset()),
+    "text-indent": lambda v: lengths(v, words=frozenset()),
+    "line-height": line_height_ok,
+    "font-size": lambda v: v in FONT_WORDS or v in ("smaller", "larger") or lengths(v, negative=False, words=frozenset()),
+    "color": lambda v: color_of(v) is not None, "background-color": lambda v: color_of(v) is not None,
+    "background": lambda v: v == "none" or color_of(v) is not None,
+}
+SAFE_CSS |= {name: lengths for name in ("margin", "margin-top", "margin-right", "margin-bottom", "margin-left")}
+SAFE_CSS |= {name: lambda v: lengths(v, negative=False) for name in ("padding", "padding-top", "padding-right", "padding-bottom", "padding-left")}
+SAFE_CSS |= {name: lambda v: lengths(v, negative=False, words=frozenset({"auto", "none"}))
+             for name in ("width", "height", "min-width", "min-height", "max-width", "max-height")}
+SAFE_CSS |= {f"border{side}{part}": border_ok for side in ("", "-top", "-right", "-bottom", "-left") for part in ("", "-width", "-style", "-color")}
 
 
 def get(url: str, tries: int = 4) -> str:
@@ -129,8 +205,8 @@ def color_of(value: str) -> tuple[float, float, float, float] | None:
     v = value.strip()
     if v == "transparent":
         return 0, 0, 0, 0
-    if v == "white":
-        return 255, 255, 255, 1
+    if v in NAMED_COLORS:
+        return *NAMED_COLORS[v], 1
     m = re.fullmatch(r"#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})", v)
     if m:
         h = m.group(1) if len(m.group(1)) > 4 else "".join(c * 2 for c in m.group(1))
@@ -143,8 +219,32 @@ def color_of(value: str) -> tuple[float, float, float, float] | None:
             alpha = float(parts[3].rstrip("%")) / (100 if parts[3].endswith("%") else 1) if len(parts) == 4 else 1
         except ValueError:
             return None
+        if not all(0 <= n <= 255 for n in nums) or not 0 <= alpha <= 1:
+            return None
         return nums[0], nums[1], nums[2], alpha
     return None
+
+
+def contrast(a: tuple, b: tuple) -> float:
+    """두 색의 WCAG 2 대비(1~21). 1이면 같은 밝기다."""
+    def luminance(c):
+        ch = [x / 255 for x in c[:3]]
+        ch = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in ch]
+        return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+    hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def css_outside(decls: list[tuple[str, str]]) -> set[str]:
+    """허용 목록(SAFE_CSS) 밖의 CSS 선언. 속성 이름이 밖이거나, 값이 허용한 꼴이 아니면 의심으로 남긴다."""
+    notes = set()
+    for name, value in decls:
+        check = SAFE_CSS.get(name)
+        if check is None:
+            notes.add(f"허용 목록 밖 CSS({clean_note(name)})")
+        elif not check(value):
+            notes.add(f"허용 목록 밖 CSS 값({clean_note(name)})")
+    return notes
 
 
 def color_problem(value: str, background: str | None = None) -> tuple[bool, set[str]]:
@@ -220,8 +320,8 @@ def css_hides(decls: list[tuple[str, str]]) -> tuple[bool, set[str]]:
 
 
 def style_sheet_notes(css: str) -> set[str]:
-    """본문 안 style 요소의 규칙 가운데 글을 숨기는 것. 어느 요소에 걸리는지는 흉내 내지 못해 의심으로만 남긴다."""
-    notes = set()
+    """본문 안 style 요소. 어느 요소에 걸리는지는 흉내 내지 못해 의심으로만 남긴다. 숨기는 규칙이 있으면 그것도 적는다."""
+    notes = {"허용 목록 밖 요소(style)"}
     for selector, block in re.findall(r"([^{}]*)\{([^{}]*)\}", CSS_COMMENT.sub(" ", css)):
         hide, more = css_hides(css_decls(block))
         if hide:
@@ -237,24 +337,108 @@ def clean_note(s: str) -> str:
 
 # ---- HTML 읽기 ----
 
-def hidden(tag: str, attrs: list[tuple[str, str]]) -> tuple[bool, set[str]]:
-    """이 요소가 안의 글을 숨기는가와, 거르지 못하는 숨김 낌새. style 속성이 여럿이면 모두 본다."""
+@dataclass
+class Look:
+    """바깥 요소부터 겹쳐 계산한 보이는 모양. 글자 크기와 불투명도는 곱해지고, 여백은 더해진다."""
+    font: float = ROOT_FONT_PX  # 글자 크기(px)
+    opacity: float = 1.0
+    dx: float = 0.0  # 가로로 민 거리(px): 왼쪽 여백, 안쪽 여백, 들여쓰기의 합
+    dy: float = 0.0  # 세로로 민 거리(px): 위쪽 여백의 합
+    color: tuple | None = None  # 글자색. None이면 기본 검정
+    backdrop: tuple | None = None  # 이 글 뒤의 바탕색. None이면 누리집 바탕(알 수 없어 흰색으로 본다)
+
+
+def side_of(values: list[float | None], side: int) -> float:
+    """margin, padding 줄임 값(1~4개)에서 한 쪽(0 위, 3 왼쪽)의 길이."""
+    v = [x for x in values]
+    if not v:
+        return 0
+    pick = {1: (0, 0, 0, 0), 2: (0, 1, 0, 1), 3: (0, 1, 2, 1), 4: (0, 1, 2, 3)}.get(len(v), (0, 1, 2, 3))[side]
+    return v[pick] or 0
+
+
+def font_px(value: str, parent: float) -> float | None:
+    """글자 크기 값의 픽셀. em과 %는 바깥 글자 크기에 곱한다. 읽지 못하면 None."""
+    if value in FONT_WORDS:
+        return FONT_WORDS[value]
+    if value in ("smaller", "larger"):
+        return parent * (0.83 if value == "smaller" else 1.2)
+    m = LENGTH.fullmatch(value)
+    if not m:
+        return None
+    n, unit = float(m.group(1)), m.group(2)
+    if unit == "em":
+        return n * parent
+    if unit == "%":
+        return n * parent / 100
+    if unit == "rem":
+        return n * ROOT_FONT_PX
+    return px(value, 0.16)
+
+
+def look_of(decls: list[tuple[str, str]], parent: Look) -> tuple[Look, bool, set[str]]:
+    """바깥 모양에 이 요소의 CSS를 얹은 모양, 그것으로 보아 숨겼는가, 의심."""
+    values: dict[str, list[str]] = {}
+    for name, value in decls:
+        values.setdefault(name, []).append(value)
+    look, hide, notes = Look(**vars(parent)), False, set()
+    for v in values.get("font-size", []):
+        n = font_px(v, parent.font)
+        if n is not None:
+            look.font = n
+    for v in values.get("opacity", []):
+        try:
+            look.opacity = parent.opacity * (float(v[:-1]) / 100 if v.endswith("%") else float(v))
+        except ValueError:
+            pass
+    nums = lambda name: [px(t) for v in values.get(name, []) for t in v.split()]
+    first = lambda name: next((n for n in nums(name) if n is not None), 0)
+    look.dx = parent.dx + (first("margin-left") or side_of(nums("margin"), 3)) + (first("padding-left") or side_of(nums("padding"), 3))         + first("text-indent") + first("left") - first("right")
+    look.dy = parent.dy + (first("margin-top") or side_of(nums("margin"), 0)) + first("top") - first("bottom")
+    for name in ("color", "-webkit-text-fill-color"):
+        for v in values.get(name, []):
+            look.color = color_of(v) or look.color
+    for v in values.get("background-color", []) + values.get("background", []):
+        c = color_of(v)
+        if c is not None and c[3] > 0:  # 투명한 바탕은 뒤의 바탕이 그대로 보인다
+            look.backdrop = c
+            if c[3] < 1:
+                notes.add("반투명 바탕색")
+    hide |= look.font < MIN_FONT_PX or look.opacity < MIN_OPACITY or far(look.dx) or far(look.dy)
+    if look.color is not None and MIN_OPACITY <= look.color[3] < 1:
+        notes.add("반투명 글자색")
+    if look.color is not None or look.backdrop is not None:
+        ratio = contrast(look.color or (0, 0, 0), look.backdrop or (255, 255, 255))
+        if ratio < 1.01 and look.backdrop is not None:  # 본문 안에서 정한 바탕과 같은 색이다
+            hide = True
+        elif ratio < MIN_CONTRAST:
+            notes.add("바탕과 대비가 낮은 글자색")
+    return look, hide, notes
+
+
+def judge(tag: str, attrs: list[tuple[str, str]], parent: Look) -> tuple[bool, set[str], Look]:
+    """허용한 요소가 안의 글을 숨기는가, 허용 목록 밖의 것(의심), 이 요소의 모양. style 속성이 여럿이면 모두 본다."""
     names = {k for k, _ in attrs}
-    if tag in HIDDEN_TAGS or "hidden" in names or (tag == "dialog" and "open" not in names):
-        return True, set()
-    if any(k == "aria-hidden" and v.strip().lower() == "true" for k, v in attrs):
-        return True, set()
-    hide, notes = False, set()
+    hide = "hidden" in names or "popover" in names or any(k == "aria-hidden" and v.strip().lower() == "true" for k, v in attrs)
+    notes = {f"허용 목록 밖 속성({clean_note(k)})" for k in names - ALLOWED_ATTRS}
+    decls = []
     for k, v in attrs:
         if k == "style":
-            h, n = css_hides(css_decls(v))
-            hide, notes = hide or h, notes | n
+            decls += css_decls(v)
         elif k == "class":
-            notes |= {f"숨기는 이름의 class({clean_note(c)})" for c in v.split() if HIDE_CLASS.search(c)}
-        elif k == "color" and tag == "font":
-            h, n = color_problem(" ".join(v.lower().split()))
-            hide, notes = hide or h, notes | n
-    return hide, notes
+            for c in v.split():
+                if HIDE_CLASS.search(c):
+                    notes.add(f"숨기는 이름의 class({clean_note(c)})")
+                elif c not in ALLOWED_CLASSES:
+                    notes.add(f"허용 목록 밖 class({clean_note(c)})")
+    h, n = css_hides(decls)
+    painted = decls + [("background-color", " ".join(v.lower().split())) for k, v in attrs if k == "bgcolor"]
+    look, h2, n2 = look_of(painted, parent)
+    notes |= n | n2 | css_outside(decls)
+    for name, value in decls:
+        if CALC.search(value):
+            notes.add(f"계산식 CSS 값({clean_note(name)})")
+    return hide or h or h2, notes, look
 
 
 def read_tag(src: str, pos: int) -> tuple[list[tuple[str, str]], int] | None:
@@ -317,14 +501,16 @@ def raw_end(src: str, pos: int, tag: str) -> int:
 class Element:
     tag: str
     hide: bool
-    shut: bool = False  # 닫힌 details: 첫 summary 말고는 보이지 않는다
-    summary: bool = False
+    look: Look
+    barrier: bool = False  # 허용 목록 밖 요소: 안의 끝 태그가 이 요소를 넘어 바깥 요소를 닫지 못한다
 
 
 class VisibleText:
     """보이는 글만 모은다. 숨긴 요소는 안쪽까지 버리고, 끝 태그가 경계를 넘지 못하면 닫지 않는다(브라우저와 같다).
 
-    브라우저가 끝 태그 없이 요소를 닫는 경우(<p> 뒤의 <div> 등)는 흉내 내지 않는다. 그때는 숨긴 요소가 더 오래 열려 있어 더 많이 버린다.
+    허용 목록 밖 요소는 내용째 버리고 의심으로 남긴다. 그 안의 끝 태그는 바깥을 닫지 못한다. 브라우저는 select 안의 '</div>'를
+    버리고, svg 안의 <p>처럼 요소를 일찍 닫기도 한다. 늦게 닫는 쪽이라 언제나 브라우저보다 더 많이 버린다.
+    브라우저가 끝 태그 없이 요소를 닫는 경우(<p> 뒤의 <div> 등)는 흉내 내지 않는다. 그때도 숨긴 요소가 더 오래 열려 있어 더 많이 버린다.
     """
 
     def __init__(self):
@@ -357,32 +543,34 @@ class VisibleText:
                     self.end(tag)
                 elif tag in RAW_TAGS:
                     end = raw_end(src, pos, tag)
-                    if tag == "style":
-                        self.notes |= style_sheet_notes(src[pos:end])
+                    self.notes |= style_sheet_notes(src[pos:end]) if tag == "style" else {f"허용 목록 밖 요소({tag})"}
                     pos = end
                 else:
                     self.start(tag, attrs)
         return "".join(self.parts)
 
     def data(self, text: str) -> None:
-        if text and not self.hidden and not (self.stack and self.stack[-1].shut):
+        if text and not self.hidden:
             self.parts.append(html.unescape(text))
 
     def start(self, tag: str, attrs: list[tuple[str, str]]) -> None:
+        parent = self.stack[-1].look if self.stack else Look()
         if tag in VOID_TAGS:  # 브라우저는 <div .../>의 /를 무시하지만 빈 요소는 열지 않는다
             if tag == "link" and "stylesheet" in " ".join(v.lower() for k, v in attrs if k == "rel"):
                 self.notes.add("본문 안에서 바깥 CSS를 불러온다")
+            if tag not in ALLOWED_TAGS:
+                self.notes.add(f"허용 목록 밖 요소({clean_note(tag)})")
             return
-        hide, notes = hidden(tag, attrs)
+        if tag not in ALLOWED_TAGS:  # svg, math, select, ruby, details 등. 안의 글이 보이는지 흉내 내지 않고 내용째 버린다
+            self.notes.add(f"허용 목록 밖 요소({clean_note(tag)})")
+            self.stack.append(Element(tag, True, parent, barrier=True))
+            self.hidden += 1
+            return
+        hide, notes, look = judge(tag, attrs, parent)
+        if hide:  # 숨긴 글은 거르지만, 숨기는 꼴이 나온 문서라는 것도 남긴다
+            notes.add("숨긴 요소를 걸렀다")
         self.notes |= notes
-        parent = self.stack[-1] if self.stack else None
-        if parent and parent.shut:  # 닫힌 details 안에서는 첫 summary만 보인다
-            if tag == "summary" and not parent.summary:
-                parent.summary = True
-            else:
-                hide = True
-        shut = tag == "details" and not any(k == "open" for k, _ in attrs)
-        self.stack.append(Element(tag, hide, shut))
+        self.stack.append(Element(tag, hide, look))
         self.hidden += hide
 
     def end(self, tag: str) -> None:
@@ -392,7 +580,7 @@ class VisibleText:
                 self.hidden -= sum(e.hide for e in self.stack[i:])
                 del self.stack[i:]
                 return
-            if self.stack[i].tag in stop:
+            if self.stack[i].barrier or self.stack[i].tag in stop:
                 return  # 열린 적 없거나 경계 너머에 있는 요소의 끝 태그는 버린다
 
 

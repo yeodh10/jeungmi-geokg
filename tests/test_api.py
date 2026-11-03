@@ -458,6 +458,11 @@ def check_host_origin(c, tmp, review_app) -> None:
     assert c.get("/api/status", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     assert c.get("/api/status", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 200
     assert c.get("/map", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 200
+    # 재현(재공격 보고 7): 대문자 SAME-SITE는 막지 않았다. 값은 대소문자를 가리지 않고, 같은 출처와 직접 연 요청만 받는다
+    for site in ("SAME-SITE", "Cross-Site", " cross-site ", "same-site", "unknown", ""):
+        assert c.get("/api/status", headers={"Sec-Fetch-Site": site}).status_code == 403, site
+    for site in ("Same-Origin", "NONE", "none"):
+        assert c.get("/api/status", headers={"Sec-Fetch-Site": site}).status_code == 200, site
 
 
 def check_group_holds(c, tmp, review_app) -> None:
@@ -1197,10 +1202,11 @@ def check_broken_file(c, tmp, review_app) -> None:
     """
     from fastapi.testclient import TestClient
 
+    from src.review.proposals import ProposalStore
     loose = TestClient(review_app.app, base_url=LOCAL, raise_server_exceptions=False)
     path = tmp.parent / "broken-whole.json"
     keep_proposals, keep_state = review_app.proposals, dict(review_app.state)
-    review_app.proposals = review_app.ServerProposals(path)
+    review_app.proposals = ProposalStore(path)  # 깨진 파일 판단은 저장소가 한다. 서버만의 하위 클래스가 아니다
     review_app.log.disabled = True
     calls = [("GET", "/api/proposals", None), ("GET", "/api/status", None), ("GET", "/api/proposals/x", None),
              ("GET", "/api/proposals/x/validate", None), ("GET", "/api/proposals/x/context", None),
@@ -1208,7 +1214,8 @@ def check_broken_file(c, tmp, review_app) -> None:
              ("GET", "/api/groups/check?group=x", None), ("POST", "/api/groups/decision", {**OK, "group": "x"}),
              ("GET", "/api/layers/building", None)]
     try:
-        for content in (b"{", b"", b"null", b"123", b'"[]"', b"{}", b'{"a": 1}', b"\xff\xfe[", b"[{"):
+        # 재현(재공격 보고 6): 목록이지만 기록이 하나도 읽히지 않는 파일은 승인 0건인 그래프가 200으로 떴다
+        for content in (b"{", b"", b"null", b"123", b'"[]"', b"{}", b'{"a": 1}', b"\xff\xfe[", b"[{", b"[1, 2, null]", b'[{"id": "x"}]'):
             path.write_bytes(content)
             review_app.state["store"] = None  # 서버를 새로 켠 것처럼 그래프도 파일에서 다시 불러온다
             for method, url, body in calls:

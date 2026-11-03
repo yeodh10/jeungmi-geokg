@@ -133,7 +133,11 @@ def check_wkt_values(g, props) -> None:
            "Z NaN": "POINT Z (126.86 37.55 nan)", "ZM NaN": "POINT ZM (126.86 37.55 0 nan)", "M 무한대": "POINT M (126.86 37.55 1e999)",
            "Z 높이": "POINT Z (126.86 37.55 10)", "LinearRing": "LINEARRING (126.86 37.55, 126.87 37.55, 126.87 37.56, 126.86 37.55)",
            "곡선": "CIRCULARSTRING (126.86 37.55, 126.87 37.56, 126.88 37.55)", "모음": "GEOMETRYCOLLECTION (POINT (126.86 37.55))",
-           "부분 NaN 선": "LINESTRING (126.86 37.55, NaN NaN, 126.87 37.56)", "빈 부분": "MULTIPOINT ((126.86 37.55), EMPTY)"}
+           "부분 NaN 선": "LINESTRING (126.86 37.55, NaN NaN, 126.87 37.56)", "빈 부분": "MULTIPOINT ((126.86 37.55), EMPTY)",
+           # 재현(new/n2.py w-nul, w-hex): GEOS는 NUL에서 읽기를 멈추고 16진 숫자도 읽어서, 뒤에 숨은 글과 OGC 밖 숫자가 승인됐다
+           "NUL 뒤 글": "POINT (126.8631 37.5499)\x00<img src=x onerror=alert(1)> 숨은 글", "16진 좌표": "POINT (0x7E.DD 37.5499)",
+           "16진 정수": "POINT (0x7E 37.55)", "점 두 개": "POINT (126.86.1 37.55)", "전각 숫자": "POINT (１２６.８６ ３７.５５)",
+           "특수 공백": "POINT (126.86\u00a037.55)", "세로 탭": "POINT (126.86\x0b37.55)"}
     passed, said = [], {}
     for name, value in bad.items():
         ok, res = check_proposal(g, make(a, ("remove", geom, GEO + "asWKT", wkt(now)), ("add", geom, GEO + "asWKT", wkt(value))))
@@ -145,6 +149,7 @@ def check_wkt_values(g, props) -> None:
     assert "숫자가 아니다" in said["부분 NaN 선"] and "교차" not in said["부분 NaN 선"], said["부분 NaN 선"]
     assert "숫자가 아니다" in said["Z NaN"] and "숫자가 아니다" in said["M 무한대"] and "2차원" in said["Z 높이"], said
     assert all("모양 종류" in said[n] for n in ("LinearRing", "곡선", "모음")), said
+    assert all("OGC" in said[n] for n in ("NUL 뒤 글", "16진 좌표", "16진 정수", "점 두 개", "전각 숫자", "특수 공백", "세로 탭")), said
     # 속성이 달라도 값의 종류가 WKT면 같이 본다
     ok, res = check_proposal(g, make(a, ("add", geom, JGK + "testShape", wkt("POINT (999 999)"))))
     assert not ok and any("WKT" in r["message"] for r in res), res
@@ -166,7 +171,8 @@ def check_any_wkt() -> None:
     rng = random.Random(20261103)
     values = ["", " ", "(", ")", "POINT", "POINT()", "POINT(())", "POINT (126.86 37.55", "POINT (126.86 37.55))", "\x00POINT (1 2)",
               "SRID=4326;POINT (126.86 37.55)", "<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POINT (126.86 37.55)",
-              "GEOMETRYCOLLECTION (" * 50 + "POINT (126.86 37.55)" + ")" * 50, "POINT (" + "1" * 400 + " 37.55)"]
+              "GEOMETRYCOLLECTION (" * 50 + "POINT (126.86 37.55)" + ")" * 50, "POINT (" + "1" * 400 + " 37.55)",
+              "POINT (126.86 37.55)\x00 숨은 글", "POINT (0x7E.DD 37.55)", "POINT (1e 37.55)", "POINT (- 37.55)", "POINT (126.86 37.55) x"]
     for _ in range(600):
         coords = lambda n: ", ".join(" ".join(rng.choice(nums) for _ in range(rng.choice([1, 2, 3, 4]))) for _ in range(n))
         body = rng.choice([f"({coords(rng.randint(1, 5))})", f"(({coords(rng.randint(1, 5))}))", f"((({coords(4)})))", "EMPTY",
@@ -182,6 +188,15 @@ def check_any_wkt() -> None:
             xy = shapely.get_coordinates(shape)
             assert shape is not None and not shape.has_z and np.isfinite(xy).all(), v
     assert not [v for v in good if wkt_problem(v)], [wkt_problem(v) for v in good]
+
+
+def check_graph_wkt(g) -> None:
+    """그래프에 있는 실제 WKT는 모두 OGC 문법 검사와 나머지 WKT 검사를 지난다(2026-11-03 모양 13,805개)."""
+    from src.graph.validate import wkt_problem
+    found = [q.object.value for q in g.quads_for_pattern(None, ox.NamedNode(GEO + "asWKT"), None, None)]
+    stuck = [(v[:60], wkt_problem(v)) for v in found if wkt_problem(v)]
+    assert len(found) > 10_000 and not stuck, (len(found), stuck[:3])
+    print("그래프 WKT 검사:", len(found), "개 모두 통과")
 
 
 def check_vocabulary(g, props) -> None:
@@ -260,6 +275,7 @@ def run() -> None:
     check_rules(g, props)
     check_wkt_values(g, props)
     check_any_wkt()
+    check_graph_wkt(g)
     check_vocabulary(g, props)
 
     # 화면 API: 규칙을 어기는 제안은 승인 409, 반려는 된다

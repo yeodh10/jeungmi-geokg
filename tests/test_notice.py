@@ -292,7 +292,17 @@ def check_collector() -> None:
     assert "보이는 문장이다." in v["body"] and "한글" in v["body"] and "굵게" in v["body"] and "<b>" not in v["body"], v["body"]
     assert "내어쓰기한 문장도 보인다." in v["body"] and "조금 내어 쓴 문장도 보인다." in v["body"] and "&" not in v["body"], v["body"]
     assert v["title"] == "시험 & 고시" and v["number"] == "서울특별시 강서구 고시 제2026-1호" and v["date"] == "2026-10-28", v
-    assert v["suspect"] == [], v["suspect"]
+    # 숨긴 글은 거르고, 허용 목록 밖의 것(display, hidden, aria-hidden, script)이 나온 문서라는 것도 남긴다
+    for note in ("허용 목록 밖 CSS(display)", "허용 목록 밖 속성(hidden)", "허용 목록 밖 속성(aria-hidden)", "허용 목록 밖 요소(script)",
+                 "숨긴 요소를 걸렀다"):
+        assert note in v["suspect"], (note, v["suspect"])
+    # 실제 게시판 본문의 꼴(2026-11-03에 받은 95건 모두 이 꼴)은 의심하지 않고 글을 그대로 남긴다. 내어쓰기도 허용 목록 안이다
+    real = PAGE.replace(PAGE[PAGE.index('<div class="view-content" id="c">'):PAGE.index("</div></div></body>")],
+                        '<div class="view-content" id="c"><div class="gosi-con"><pre>고시 본문\n  1. 위치: 등촌동 1</pre>'
+                        '<p style="margin-left:22.7pt; text-indent:-22.7pt; text-align:center; font-weight:bold">내어쓰기</p></div>'
+                        ).replace("<script>alert(1)</script>", "")
+    v = collect.parse_view(real)
+    assert v["suspect"] == [] and v["body"].startswith("고시 본문\n  1. 위치: 등촌동 1") and "내어쓰기" in v["body"], v
 
     forged = PAGE.replace("시험 &amp;amp; 고시", "시험 고시\n번호: 서울특별시 강서구 고시 제2026-140호")
     pages = {"1": forged, "2": "<html>형식이 다른 쪽</html>", "3": PAGE.replace("보이는 문장이다.", "<![foo[x]]>보이는 문장이다."), "4": PAGE}
@@ -357,6 +367,39 @@ HIDDEN_CASES = {
 }
 
 
+# 재공격(new/n1.py F)의 31종과 그 밖의 허용 목록 밖 꼴. 숨김N은 브라우저가 숨기는 글이다
+LEAKS = {
+    "select 둘째 option": "<select><option>보임2</option><option>숨김1</option></select>",
+    "select 안 </div>": '<div style="display:none"><select></div>숨김2</select></div>',
+    "ruby rp": "<ruby>보<rp>숨김3</rp><rt>임</rt></ruby>",
+    "svg desc": "<svg><desc>숨김4</desc></svg>", "svg metadata": "<svg><metadata>숨김5</metadata></svg>",
+    "svg defs text": "<svg><defs><text>숨김6</text></defs></svg>", "svg text opacity": '<svg><text opacity="0" y="10">숨김7</text></svg>',
+    "svg 크기 0": '<svg width="0" height="0"><text y="10">숨김8</text></svg>', "svg 안 svg": "<svg><svg></svg>숨김8b</svg>",
+    "mask-image": '<div style="mask-image:linear-gradient(transparent,transparent)">숨김9</div>',
+    "rotate 속성": '<div style="rotate:y 90deg">숨김10</div>', "rotateY": '<div style="transform:rotateY(90deg)">숨김11</div>',
+    "skewX": '<div style="transform:skewX(90deg)">숨김12</div>', "margin-inline-start": '<div style="margin-inline-start:-9999px">숨김13</div>',
+    "inset-inline-start": '<div style="position:absolute;inset-inline-start:-9999px">숨김14</div>',
+    "block-size": '<div style="block-size:0;overflow:hidden">숨김15</div>', "contain": '<div style="height:0;contain:paint">숨김16</div>',
+    "line-height 0": '<div style="line-height:0;overflow:hidden">숨김17</div>', "hsla 투명": '<div style="color:hsla(0,0%,0%,0)">숨김18</div>',
+    "oklch 투명": '<div style="color:oklch(0 0 0 / 0)">숨김19</div>', "검정 위 검정": '<div style="color:black;background:black">숨김20</div>',
+    "거의 같은 색": '<div style="color:#123456;background-color:#123457">숨김21</div>',
+    "겹친 opacity": '<div style="opacity:.3"><div style="opacity:.3">숨김22</div></div>',
+    "겹친 font-size": '<div style="font-size:.3em"><div style="font-size:.3em"><div style="font-size:.3em">숨김23</div></div></div>',
+    "scale(0.1)": '<div style="transform:scale(0.1)">숨김24</div>', "zoom": '<div style="zoom:0.01">숨김25</div>',
+    "겹친 margin-left": '<div style="margin-left:-99px">' * 30 + "숨김26" + "</div>" * 30,
+    "blur": '<div style="filter:blur(50px)">숨김27</div>', "letter-spacing": '<div style="letter-spacing:-1em">숨김28</div>',
+    "inline-size": '<div style="inline-size:0;white-space:nowrap;overflow:hidden">숨김29</div>',
+    "rgb와 hsl 흰색": '<div style="color:rgb(255,255,255);background:hsl(0,0%,100%)">숨김30</div>',
+    "겹친 top": '<div style="position:absolute;top:-99px"><div style="position:absolute;top:-99px">숨김31</div></div>',
+    "vw 글자": '<div style="font-size:0.25vw">숨김32</div>', "calc": '<div style="opacity:calc(0)">숨김33</div>',
+    "var": '<div style="--x:none;display:var(--x)">숨김34</div>', "폭 4px": '<div style="width:4px;overflow:hidden;white-space:nowrap">숨김35</div>',
+    "math annotation": "<math><semantics><mi>x</mi><annotation>숨김39</annotation></semantics></math>",
+    "optgroup": '<select><optgroup label="x"><option>보임3</option><option>숨김40</option></optgroup></select>',
+    "popover": "<div popover>숨김41</div>", "bgcolor 같은 색": '<table bgcolor="white"><tr><td style="color:#fff">숨김42</td></tr></table>',
+    "반투명 글자": '<span style="color:rgba(0,0,0,0.2)">숨김43</span>', "바탕과 비슷한 색": '<span style="color:#eeeeee">숨김44</span>',
+}
+
+
 def check_collector_bypass() -> None:
     """5-2. 재공격 보고의 수집기 우회를 모두 막는다. 보이는 글(내어쓰기, 가운데 맞춤, 열린 details)은 남긴다."""
     import src.eval.collect_notices as collect
@@ -367,11 +410,21 @@ def check_collector_bypass() -> None:
         assert "숨김" not in out and out.startswith("보임"), (name, out)
     shown = {"내어쓰기": '<p style="margin-left:30pt;text-indent:-30pt">보임</p>',
              "가운데 맞춤": '<div style="position:absolute;left:50%;transform:translate(-50%,-50%)">보임</div>',
-             "열린 details": "<details open><summary>요</summary>보임</details>",
              "굵기 숫자": '<span style="font:700 12px sans-serif">보임</span>',
              "작은 음수 여백": '<p style="margin-top:-10px">보임</p>'}
     for name, fragment in shown.items():
         assert "보임" in collect.text(fragment), name
+    # 허용 목록 밖 요소는 보이는 글이라도 내용째 버리고 의심을 남긴다(더 많이 버리는 쪽)
+    out, notes = collect.visible_text("<p>보임</p><details open><summary>요</summary>버림</details>")
+    assert out == "보임" and "허용 목록 밖 요소(details)" in notes, (out, notes)
+
+    # 재공격(new/n1.py F): 브라우저는 숨기는데 수집기가 남기던 31종. 모두 거르거나(숨김 글 없음) 숨김의심을 남긴다
+    for name, fragment in LEAKS.items():
+        out, notes = collect.visible_text(f"<p>보임</p>{fragment}")
+        assert out.startswith("보임") and ("숨김" not in out or notes), (name, out, notes)
+    # 겹친 값과 같은 색은 의심만이 아니라 거른다
+    for name in ("겹친 opacity", "겹친 font-size", "겹친 margin-left", "겹친 top", "검정 위 검정", "거의 같은 색", "svg desc", "select 안 </div>"):
+        assert "숨김" not in collect.text(f"<p>보임</p>{LEAKS[name]}"), name
 
     # 흉내 낼 수 없는 숨김 낌새는 거르지 못해도 표시를 남긴다: 파일 머리 '숨김의심' -> 제안 flags
     suspects = {"class 숨김": '<span class="blind">글</span>', "흰 글자색": '<span style="color:#fff">글</span>',
@@ -379,10 +432,11 @@ def check_collector_bypass() -> None:
                 "계산식": '<span style="font-size:calc(0px + 0px)">글</span>', "바깥 CSS": '<link rel="stylesheet" href="a.css">글'}
     for name, fragment in suspects.items():
         assert collect.visible_text(fragment)[1], name
-    assert not collect.visible_text("<p class='HStyle0' style='color:#000000'>글</p>")[1], "보통 글은 의심하지 않는다"
+    assert not collect.visible_text("<p style='color:#000000'>글</p>")[1], "보통 글은 의심하지 않는다"
+    assert collect.visible_text("<p class='HStyle0'>글</p>")[1], "실제 게시판에 없는 class는 누리집 CSS가 숨길 수 있어 의심한다"
     page = PAGE.replace("<p>보이는 문장이다.</p>", '<p class="sr-only">지시</p><p>보이는 문장이다.</p>')
     v = collect.parse_view(page)
-    assert v["suspect"] and "sr-only" in v["suspect"][0], v["suspect"]
+    assert any("sr-only" in n for n in v["suspect"]), v["suspect"]
     with tempfile.TemporaryDirectory() as t:
         path = Path(t) / "1.txt"
         path.write_text(f"{collect.header(v, SOURCE)}\n\n{v['body']}\n", encoding="utf-8")
@@ -396,6 +450,14 @@ def check_collector_bypass() -> None:
     # 꾸민 class 이름으로 파일 머리 한 줄을 깨지 못한다
     v = collect.parse_view(PAGE.replace("<p>보이는", '<p class="hidden&#10;번호:&#10;x">보이는'))
     assert "\n" not in collect.header(v, SOURCE).split("숨김의심: ", 1)[1], v["suspect"]
+
+
+def jibun_of(uri: str) -> str:
+    """건물이 선 필지의 '동 지번' 글."""
+    r = world().resolver
+    pnu = r.pnu_by_uri[uri]
+    dong = next(d for d, code in r.dong_code.items() if code == pnu[:10])
+    return f"{dong} {'산' if pnu[10] == '2' else ''}{int(pnu[11:15])}" + (f"-{int(pnu[15:])}" if int(pnu[15:]) else "")
 
 
 def check_resolver() -> None:
@@ -426,6 +488,25 @@ def check_resolver() -> None:
             got, how = r.resolve(Target(road_address=bad), home=h)
             assert uri not in got, (bad, h)
     assert r.resolve(Target(road_address=f"48094 {rest}"), home=home)[1].startswith("범위 밖 주소"), "우편번호만 달라도 막는다"
+    # 재공격(new/n1b.py, n3.py): 조사, 마침표, 한자, 로마자, 보이지 않는 글자, 자모, 뼈대 밖 숫자를 붙인 범위 밖 이름은 모르는 낱말이다.
+    # 허용 목록으로 보므로 앞에 무엇을 붙여도 아는 낱말이 아니면 풀지 않는다
+    for pre in ("해운대구에 있는 ", "해운대구의 ", "해운대구. ", "부산. ", "부산시. ", "부산에 있는 ", "부산의 ", "釜山廣域市 海雲臺區 ", "海雲臺區 ",
+                "창원시마산합포구 ", "성남시분당구 ", "고양시일산동구 ", "부\u200b산광역시 ", "부산\u00ad광역시 ", "부산\u2060광역시 ", "Haeundaegu ",
+                "Pusan ", "Haeundae gu ", "480 94 ", "608-012 ", "기장면 ", "송정리 ", "대연6가 ", "해운대구청 앞 ", "강서구（부산） ",
+                "강서구 〔부산〕 ", "강서구 「부산」 ", "ㅂㅜㅅㅏㄴ ", "경남. 창원시. ", "창원特例市 ", "부산\u3000", "부산\t", "Busan-si "):
+        got, how = r.resolve(Target(road_address=pre + rest), home=home)
+        assert got == [] and how.startswith("범위 밖 주소"), (pre, got, how)
+    for bad in (f"해운대구. {jibun_of(uri)}", f"부산에 있는 {jibun_of(uri)}", f"釜山 {jibun_of(uri)}", f"{jibun_of(uri)} 부산.", f"{jibun_of(uri)}번지 外"):
+        got, how = r.resolve(Target(jibun_address=bad), parcel=True, home=home)
+        assert got == [] and how.startswith("범위 밖 주소"), (bad, got, how)
+    assert "모르는 낱말 '해운대구에'" in r.resolve(Target(road_address=f"해운대구에 있는 {rest}"), home=home)[1]
+    assert "주소에 쓰지 않는 글자" in r.resolve(Target(road_address=f"釜山 {rest}"), home=home)[1]
+    # 실제 고시에서 쓰는 꼴은 그대로 푼다: 괄호 안 법정동, 층, 호, 건물 이름
+    dong = next(d for d, area in r.dong_area.items() if area == home)
+    for good in (f"{addr} ({dong})", f"{addr} 3층", f"{addr} 지하1층 101호", f"{addr} B1", f"서울특별시{sigungu} {rest}"):
+        assert r.resolve(Target(road_address=good)) == ([uri], "도로명주소"), good
+    named_row = w.single[w.single["label"].fillna("").str.fullmatch(r"[가-힣]+")].iloc[0]
+    assert r.resolve(Target(road_address=f"{named_row['road_address']} {named_row['label']}")) == ([named_row["uri"]], "도로명주소")
 
     pcl_uri, jibun = parcel()
     assert r.resolve(Target(jibun_address=f"서울특별시 강서구 {jibun}"), parcel=True)[0] == [pcl_uri]
@@ -536,7 +617,10 @@ def check_dates() -> None:
         return [c.o.value for c in p.changes if c.p == J + "retiredOn"]
 
     dated = body + " 폐지일은 2026. 3. 1.이다."
-    assert retired(extract([gone("2026-03-01")], body=dated).props[0]) == ["2026-03-01"]
+
+    def gone_q(day: str | None, quote: str) -> ExtractedChange:
+        return gone(day).model_copy(update={"quote": quote})
+    assert retired(extract([gone_q("2026-03-01", dated)], body=dated).props[0]) == ["2026-03-01"]
     assert retired(extract([gone(None)], body=body).props[0]) == ["2026-10-30"], "없으면 고시일을 쓴다"
     for bad in ("2026-13-45", "not-a-date", "0000-00-00", "9999-12-31", "20261001"):
         assert not any(d == bad for p in extract([gone(bad)], body=dated).props for d in retired(p)), bad
@@ -545,11 +629,25 @@ def check_dates() -> None:
     # 3. 효력 날짜는 원문에 있어야 쓴다. 여러 표기를 받고, 원문에 없으면 제안을 만들지 않는다 (재공격 보고의 새 문제 2)
     for written in ("2026-03-01", "2026-3-1", "2026.3.1.", "2026. 3. 1.", "2026. 03. 01.", "2026/3/1", "2026년 3월 1일",
                     "2026년 03월 01일", "20260301", "2026.03.01(일)"):
-        p = extract([gone("2026-03-01")], body=f"{body} 효력은 {written}부터 발생한다.").props
+        quote = f"{body} 효력은 {written}부터 발생한다."
+        p = extract([gone_q("2026-03-01", quote)], body=quote).props
         assert p and retired(p[0]) == ["2026-03-01"], written
-    for written in ("", "2026. 3. 10.", "2026. 13. 1.", "12026. 3. 1.", "2026. 3. 1 1.", "2020-01-01부터가 아니다 2026.1.3"):
-        got = extract([gone("2026-03-01")], body=f"{body} 효력은 {written}.")
-        assert not got.props and "원문에 없다" in got.report["changes"][0]["rejected"], written
+    for written in ("", "2026. 3. 10.", "2026. 13. 1.", "12026. 3. 1.", "2026. 3. 1 1.", "2020-01-01부터가 아니다 2026.1.3", "제2026-3-1호"):
+        quote = f"{body} 효력은 {written}."
+        got = extract([gone_q("2026-03-01", quote)], body=quote)
+        assert not got.props and "근거 문장이나 항목 줄에 없다" in got.report["changes"][0]["rejected"], written
+    # 재공격(new/n3.py 1절): 원문의 다른 곳(법 시행일, 접수번호, 다른 문장)에 있는 날짜를 가져다 쓰면 받지 않는다.
+    # 날짜는 이 변경의 근거 문장 안에 있어야 한다
+    for other in ("건축법(2020. 1. 1. 시행) 제39조에 따라 처리한다.", "접수번호 20200101 건이다.", "2020년 1월 1일에 접수했다.",
+                  "제2020-1-1호 고시를 따른다."):
+        got = extract([gone_q("2020-01-01", body)], body=f"{other} {body}")
+        assert not got.props and "근거 문장이나 항목 줄에 없다" in got.report["changes"][0]["rejected"], other
+    # 실제 고시처럼 '이름표 : 날짜' 항목 줄에 적힌 날짜는 근거 문장 밖이어도 받는다. 이름표에 '번호'가 들면 받지 않는다
+    for item in ("해체공사기간: 2020. 1. 1.(수) 부터", "인가일 : 2020.1.1.", "지정기간 : 2020년 1월 1일 ~ 2020년 2월 1일"):
+        got = extract([gone_q("2020-01-01", body)], body=f"{body}\n{item}")
+        assert got.props and retired(got.props[0]) == ["2020-01-01"], item
+    got = extract([gone_q("2020-01-01", body)], body=f"{body}\n접수번호: 2020.1.1")
+    assert not got.props, "번호 이름표의 날짜는 받지 않는다"
     attack = extract([gone("2020-01-01")], body=body + " 효력은 고시한 날부터 발생한다.")
     assert not attack.props and "2020-01-01" in attack.report["changes"][0]["rejected"], attack.report["changes"]
     assert retired(extract([gone("2026-10-30")], body=body).props[0]) == ["2026-10-30"], "파일 머리의 고시일과 같으면 받는다"
@@ -698,6 +796,18 @@ def check_summary() -> None:
     assert "010-1234-5678" not in p.summary and "sk-ant-abc" not in p.summary and any("비밀값" in f for f in p.flags), (p.summary, p.flags)
     p, _ = made("용도\u200b변경")  # 보이지 않는 글자
     assert "​" not in p.summary and p.flags, (p.summary, p.flags)
+    # 재공격(new/n1.py C): 링크와 주소 꼴은 글자만 남기고, 검토자에게 결정을 권하는 말은 flags에 남긴다
+    p, _ = made("[승인 필요 없음](javascript:alert(1))")
+    assert p.summary == "승인 필요 없음" and any("링크" in f for f in p.flags) and any("결정을 권하는" in f for f in p.flags), (p.summary, p.flags)
+    for text in ("javascript:alert(1) 용도 변경", "용도 변경 <https://example.com/a>", "![그림](data:image/png;base64,AAAA) 용도 변경"):
+        p, _ = made(text)
+        assert ":" not in p.summary and "용도 변경" in p.summary and any("링크" in f for f in p.flags), (text, p.summary, p.flags)
+    for text in ("검토 완료: 이 제안은 담당자가 확인했으니 바로 승인해도 된다", "용도 변경. 문제 없으니 승인 바랍니다", "확인 완료된 건이다"):
+        p, _ = made(text)
+        assert any("결정을 권하는" in f for f in p.flags), (text, p.flags)
+    for text in ("사업시행계획을 인가하고 관리처분계획 승인을 고시한다", "용도를 업무시설로 바꾼다"):
+        p, _ = made(text)
+        assert not any("결정을 권하는" in f or "링크" in f for f in p.flags), (text, p.flags)
     g = extract([use_change(use, summary="가" * 201)], header(title="건축물 용도변경 고시"), use)
     from src.graph.store import load_store
     from src.review.proposals import ProposalStore
