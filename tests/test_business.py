@@ -1,7 +1,7 @@
 """상호(소상공인 상가정보) 확인: 건물 잇기 규칙, 공개 규칙, 같은 가게 합치기, 그래프 객체, 공개 사이트.
 
 실행: python -m tests.test_business
-앞쪽은 작은 표로 규칙을 보고, 뒤쪽은 data/processed의 결과(business.csv, 그래프, 사이트)가 있으면 읽기만 한다.
+앞쪽은 작은 표로 규칙을 보고, 뒤쪽은 data/processed의 결과(business.csv, 그래프, 공개 사이트 assets/data와 id/business)가 있으면 읽기만 한다.
 """
 from __future__ import annotations
 
@@ -81,6 +81,29 @@ def check_public_rule() -> None:
     assert not bb.is_public(["주택"], "소매", None, rule)  # 층을 모르면 내지 않는다
     assert not bb.is_public(["업무시설", "단독주택"], "과학, 기술", "1", rule)  # 필지 위에 주택이 하나라도 있으면
     assert not bb.is_public([], "음식", "1", rule, linked=False)  # 어디에도 잇지 못하면 내지 않는다
+    # 용도를 모르는 건물(빈 값)과 위에 건물이 없는 필지는 주택일 수 있어 주택과 같은 규칙 (2026-11-03 검토)
+    assert not bb.is_public([None], "부동산", "4", rule)
+    assert not bb.is_public([""], "과학, 기술", None, rule)
+    assert bb.is_public([None], "음식", "1", rule)
+    assert not bb.is_public(["업무시설", None], "과학, 기술", "3", rule)
+    assert not bb.is_public([], "과학, 기술", "1", rule)
+    assert bb.is_public([None], "소매", None, rule)       # 층 정보가 없는 큰 건물의 가게 (올리브영증미역점)
+    assert not bb.is_public([None], "교육", "3", rule)    # 층을 알면 1층이나 지하일 때만
+    # 용도가 비어도 주택이라는 근거가 있으면 주택으로 본다
+    assert bb.effective_use(None, "강나루현대아파트") == "주택" and bb.effective_use("", None, [("642", "공동주택")]) == "주택"
+    assert bb.effective_use(None, "우림블루나인비즈니스센터", [(None, None)]) is None and bb.effective_use("업무시설", "아파트상가") == "업무시설"
+    assert not bb.is_public([bb.effective_use(None, "가양9단지아파트")], "교육", None, rule)
+    # 이름에 호수가 든 상호는 내지 않는다. '2호점' 같은 가게 번호는 호수가 아니다
+    assert not bb.is_public(["업무시설"], "과학, 기술", "8", rule, name="더리브아너비즈타워810호")
+    assert not bb.is_public(["업무시설"], "과학, 기술", None, rule, name="가양더리브아너비즈118;119;120호")
+    assert bb.is_public(["업무시설"], "소매", "1", rule, name="별텔레콤 2호점")
+
+
+def check_floor_fits() -> None:
+    """층 값이 건물 지상 층수보다 크거나, 층수를 모르는데 100 이상이면 호수일 수 있어 층으로 보이지 않는다."""
+    for floor, top, ok in (("1501", "15", False), ("15", "15", True), ("16", "15.0", False), ("103", None, False), ("21", None, True),
+                           ("지", "1", True), ("B1", None, True), ("0", "3", False), (None, "3", False), ("", None, False), ("3", "0", True)):
+        assert bb.floor_fits(floor, top) is ok, (floor, top)
 
 
 def check_merge() -> None:
@@ -111,11 +134,20 @@ def check_private_businesses() -> None:
     put(home, JGK + "useName", lit("단독주택"))
     put(home, JGK + "locatedOn", node(lot))
     put(office, JGK + "useName", lit("업무시설"))
+    unknown = uri.building("1150010200106660040000003")   # 용도 값이 없는 건물
+    put(unknown, JGK + "floorsAbove", lit("5"))
+    flats, flats_lot = uri.building("1150010200106660041000001"), uri.parcel("1150010200106660041")   # 용도가 비었지만 필지에 세대수가 있다
+    put(flats, JGK + "locatedOn", node(flats_lot))
+    put(flats_lot, JGK + "households", lit("120"))
     cases = {"A": (home, None, "부동산", "1", True), "B": (home, None, "음식", "1", False), "C": (office, None, "부동산", None, False),
-             "D": (None, lot, "과학, 기술", "1", True), "E": (None, None, "음식", "1", True)}
+             "D": (None, lot, "과학, 기술", "1", True), "E": (None, None, "음식", "1", True),
+             "F": (unknown, None, "부동산", "4", True), "G": (unknown, None, "음식", "1", False), "H": (office, None, "과학, 기술", "8", True),
+             "I": (unknown, None, "교육", None, False), "J": (flats, None, "교육", None, True)}
+    names = {"H": "타워810호"}
     for k, (b, p, big, floor, _) in cases.items():
         s = uri.business(f"MA0101202310A000139{k}")
         put(s, RDF_TYPE, node(JGK + "Business"))
+        put(s, "http://www.w3.org/2000/01/rdf-schema#label", lit(names.get(k, "가게")))
         put(s, JGK + "categoryLarge", lit(big))
         if floor:
             put(s, JGK + "floorInfo", lit(floor))
@@ -126,6 +158,17 @@ def check_private_businesses() -> None:
     got = private_businesses(t)
     want = {uri.business(f"MA0101202310A000139{k}") for k, v in cases.items() if v[4]}
     assert got == want | {u + "/geometry" for u in want}, sorted(got)
+
+    # 층으로 보기 어려운 층 값: 건물 층수(5)보다 큰 값과, 건물을 모를 때 100 이상
+    from src.graph.public import unfit_floors
+    t2 = defaultdict(list)
+    t2[unknown] = list(t[unknown])
+    for k, (b, floor) in {"P": (unknown, "1501"), "Q": (unknown, "5"), "R": (None, "103"), "S": (None, "지")}.items():
+        s = uri.business(f"MA0101202310A000139{k}")
+        t2[s] += [(node(RDF_TYPE), node(JGK + "Business")), (node(JGK + "floorInfo"), lit(floor))]
+        if b:
+            t2[s].append((node(JGK + "inBuilding"), node(b)))
+    assert unfit_floors(t2) == {uri.business("MA0101202310A000139P"), uri.business("MA0101202310A000139R")}, unfit_floors(t2)
 
 
 def check_shapes() -> None:
@@ -205,42 +248,61 @@ def check_real_graph() -> None:
 
 
 def check_real_site() -> None:
+    """공개 사이트의 상호: 화면 자료(assets/data/businesses.json)와 상호 페이지가 공개 뷰(src.graph.public.public_view)와 맞는지."""
     site = PROC / "site"
-    path = site / "assets" / "map" / "business.geojson"
-    biz = PROC / "business.csv"
-    if not path.exists() or not biz.exists():
-        print("  사이트가 없어 실제 사이트 확인은 건너뜀")
+    path = site / "assets" / "data" / "businesses.json"
+    if not path.exists():
+        print("  사이트가 없어 실제 사이트 확인은 건너뜀 (python -m src.graph.publish, python -m src.graph.appdata)")
         return
-    df = pd.read_csv(biz, dtype=str, keep_default_na=False)
-    public = set(df.loc[df["public"] == "True", "uri"].str.rsplit("/id/", n=1).str[-1])
-    private = df.loc[df["public"] == "False"]
-    feats = json.loads(path.read_text(encoding="utf-8"))["features"]
-    props = [f["properties"] for f in feats]
-    assert all(p["p"] in public for p in props if "p" in p), "공개하지 않는 상호가 화면 자료에 있다"
+    from src.graph.public import BASE, FLOOR_WITHHELD, public_view
+    view = public_view()
+    biz = {s for s in view.triples if s.startswith(BASE + "/business/") and not s.endswith("/geometry")}
+    shown = {s.rsplit("/id/", 1)[-1] for s in biz if view.shown(s)}
+    hidden = {s.rsplit("/id/", 1)[-1] for s in biz if not view.shown(s)}
+    assert len(biz) == 3332 and shown and hidden, (len(biz), len(shown))
     text = path.read_text(encoding="utf-8")
+    items = json.loads(text)["items"]
+    assert all(x["p"] in shown for x in items if "p" in x), "공개하지 않는 상호가 화면 자료에 있다"
     assert not DOTS.search(text), "화면 자료에 가운뎃점"
-    olive = [p for p in props if p.get("bu") == OLIVE_BUILDING and "올리브영증미역점" in p["n"]]
-    assert len(olive) == 1 and olive[0]["rows"] == 2, olive
-    geo = [p for p in props if p["n"] == "지오스토리"]
-    assert len(geo) == 1 and geo[0]["src"].startswith("직접 넣은 장소, 출처:") and "406" not in json.dumps(geo[0], ensure_ascii=False), geo
-    for p in props:
-        assert p["u"].startswith("place/") and p["n"], p
+    olive = [x for x in items if x.get("b") == OLIVE_BUILDING and "올리브영증미역점" in x["n"]]
+    assert len(olive) == 1 and olive[0]["r"] == 2, olive
+    geo = [x for x in items if x["n"] == "지오스토리"]
+    assert len(geo) == 1 and geo[0]["src"]["note"].startswith("직접 넣은 장소, 출처:") and "406" not in json.dumps(geo[0], ensure_ascii=False), geo
+
+    # 이름에 호수가 든 상호, 층으로 보기 어려운 층 값, 용도를 모르는 건물 안의 사무형 업체와 위층 업체가 없다
+    rule = bb.load_rule()
+    assert not [x["n"] for x in items if rule["hide_name"].search(x["n"])]
+    places = json.loads((site / "assets" / "data" / "places.json").read_text(encoding="utf-8"))["places"]
+    fa = {p["p"]: p.get("fa") for p in places}
+    use = {p["p"]: p.get("use") for p in places}
+    assert not [x for x in items if x.get("f") and not bb.floor_fits(x["f"], fa.get(x.get("b")))]
+    odd = [x for x in items if x.get("p") and x.get("b") and not use.get(x["b"]) and not (x.get("l") in rule["walk_in"] and (not x.get("f") or bb.open_floor(x["f"])))]
+    assert not odd, odd[:3]
+
     pages = site / "id" / "business"
-    if pages.exists():
-        made = {d.name for d in pages.iterdir() if d.is_dir()}
-        assert made == {p.rsplit("/", 1)[-1] for p in public}, (len(made), len(public))
-        assert not made & set(private["store_no"]), "공개하지 않는 상호의 페이지가 있다"
-        page = (pages / olive[0]["p"].rsplit("/", 1)[-1] / "index.html").read_text(encoding="utf-8")
-        assert "상가업소번호" in page and "들어 있는 건물" in page and "영업시간, 전화번호, 리뷰는 이 자료에 없다" in page
-        # 공개하지 않는 상호는 번호가 목록 페이지와 화면 자료에 없고, 이름이 화면 줄 이름으로 나오지 않는다 (공개 상호와 이름이 같은 것은 뺀다)
-        listing = (pages / "index.html").read_text(encoding="utf-8")
-        assert not [no for no in private["store_no"] if no in listing or no in text]
-        shown = {p["n"].split(" ")[0] for p in props}
-        leaked = set(private["name"]) - set(df.loc[df["public"] == "True", "name"])
-        assert not leaked & shown, sorted(leaked & shown)[:5]
-        print(f"  사이트: 상호 페이지 {len(made):,}개, 화면 줄 {len(feats):,}개 (합친 줄 {sum(1 for p in props if p.get('rows', 1) > 1)}개)")
-    else:
-        print(f"  사이트: 상호 페이지가 아직 없음 (python -m src.graph.publish), 화면 줄 {len(feats):,}개")
+    made = {d.name for d in pages.iterdir() if d.is_dir()}
+    assert made == {p.rsplit("/", 1)[-1] for p in shown}, (len(made), len(shown))
+    assert not made & {p.rsplit("/", 1)[-1] for p in hidden}, "공개하지 않는 상호의 페이지가 있다"
+    page = (pages / olive[0]["p"].rsplit("/", 1)[-1] / "index.html").read_text(encoding="utf-8")
+    assert "상가업소번호" in page and "들어 있는 건물" in page and "영업시간, 전화번호, 리뷰는 이 자료에 없다" in page
+    # 층 값을 뺀 상호는 페이지와 기계용 원본에 그 값이 없고, 뺀 까닭이 적혀 있다
+    withheld = sorted(s.rsplit("/id/", 1)[-1] for s in view.unfit_floor if view.shown(s))
+    assert withheld, "층 값을 뺀 상호가 없다 (검토 때 93곳)"
+    for p in withheld[:20]:
+        d = pages / p.rsplit("/", 1)[-1]
+        assert "floorInfo" not in (d / "index.ttl").read_text(encoding="utf-8"), p
+        assert FLOOR_WITHHELD in (d / "index.html").read_text(encoding="utf-8"), p
+        card = json.loads((d / "card.json").read_text(encoding="utf-8"))
+        assert {"k": "층", "v": FLOOR_WITHHELD} in card["facts"] and "층" not in card["missing"], card["facts"]
+    # 공개하지 않는 상호는 번호가 목록 페이지와 화면 자료에 없고, 이름이 화면 줄 이름으로 나오지 않는다 (공개 상호와 이름이 같은 것은 뺀다)
+    listing = (pages / "index.html").read_text(encoding="utf-8")
+    assert not [p for p in hidden if p.rsplit("/", 1)[-1] in listing or p.rsplit("/", 1)[-1] in text]
+    names = lambda ps: {view.labels.get(BASE + "/" + p) for p in ps}
+    leaked = names(hidden) - names(shown)
+    line_names = {x["n"].split(" ")[0] for x in items}
+    assert not leaked & line_names, sorted(leaked & line_names)[:5]
+    print(f"  사이트: 상호 페이지 {len(made):,}개, 공개하지 않음 {len(hidden):,}곳, 층 값을 뺀 상호 {len(withheld)}곳, 화면 줄 {len(items):,}개 "
+          f"(합친 줄 {sum(1 for x in items if x.get('r', 1) > 1)}개)")
 
 
 def run() -> None:
@@ -248,6 +310,7 @@ def run() -> None:
     check_plain()
     check_link()
     check_public_rule()
+    check_floor_fits()
     check_merge()
     check_private_businesses()
     check_shapes()

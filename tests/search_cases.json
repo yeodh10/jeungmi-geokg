@@ -55,7 +55,8 @@
     {"q": "버스", "kind": "absent"},
     {"q": "여의도", "kind": "outside"},
     {"q": "ㅁㄴㅇㄹ", "kind": "none"},
-    {"q": "병원", "kind": "partial"}
+    {"q": "병원", "kind": "partial"},
+    {"q": "은행", "kind": "partial"}
   ],
   "chips": [
     {"key": "school", "n": 16},

@@ -26,6 +26,8 @@ SITE = BASE.rsplit("/id", 1)[0]  # https://yeodh10.github.io/jeungmi-geokg
 JGK = SITE + "/def#"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
+# 원천 층 값이 건물 층수보다 크거나 호수처럼 보일 때 화면에 적는 말 (unfit_floors). 값 자체는 싣지 않는다
+FLOOR_WITHHELD = "원천 층 값이 이 건물 층수와 맞지 않아 싣지 않았습니다 (호수일 수 있습니다)"
 RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 DCT_SOURCE = "http://purl.org/dc/terms/source"
 PROV_INFLUENCED = "http://www.w3.org/ns/prov#wasInfluencedBy"
@@ -83,30 +85,59 @@ def public_nodes(triples: dict, hold: set[str], given: dict[str, set[str]] | Non
 
 
 def private_businesses(triples: dict) -> set[str]:
-    """공개 사이트에 내지 않는 상호와 그 모양 노드. 주택 건물 안 업체는 개인 집 주소일 수 있어서다.
+    """공개 사이트에 내지 않는 상호와 그 모양 노드. 주택이나 용도를 모르는 건물 안 업체는 개인 집 주소일 수 있어서다.
 
     규칙은 config/area.yaml의 publish.business이고 판단은 화면 자료와 같은 함수(src.model.build_business.is_public)로 한다.
-    필지에만 이은 상호는 그 필지 위 모든 건물의 용도를 본다.
+    건물 용도가 비었으면 이름의 '아파트', 선 필지의 세대수나 단지 주용도를 근거로 주택인지 본다(effective_use).
+    필지에만 이은 상호는 그 필지 위 모든 건물의 용도를 본다. 이름에 호수가 든 상호도 뺀다.
     """
-    from src.model.build_business import is_public, load_rule
+    from src.model.build_business import effective_use, is_public, load_rule
     rule = load_rule()
 
     def val(s, name):
         return next((o.value for p, o in triples.get(s, []) if p.value == JGK + name), None)
 
+    def label(s):
+        return next((o.value for p, o in triples.get(s, []) if p.value == RDFS_LABEL), None)
+
+    def lot_facts(lot):
+        return (val(lot, "households"), val(lot, "complexMainUse"))
+
+    def use_of(b):
+        lots = [o.value for p, o in triples.get(b, []) if p.value == JGK + "locatedOn"]
+        return effective_use(val(b, "useName"), label(b), [lot_facts(x) for x in lots])
+
     lot_uses = defaultdict(list)
     for s, plist in triples.items():
         for p, o in plist:
             if p.value == JGK + "locatedOn":
-                lot_uses[o.value].append(val(s, "useName"))
+                lot_uses[o.value].append(use_of(s))
     out = set()
     for s, plist in triples.items():
         if not any(p.value == RDF_TYPE and o.value == JGK + "Business" for p, o in plist):
             continue
         b, lot = val(s, "inBuilding"), val(s, "onParcel")
-        uses = [val(b, "useName")] if b else lot_uses.get(lot, [])
-        if not is_public(uses, val(s, "categoryLarge"), val(s, "floorInfo"), rule, linked=bool(b or lot)):
+        uses = [use_of(b)] if b else (lot_uses.get(lot) or [effective_use(None, None, [lot_facts(lot)])] if lot else [])
+        if not is_public(uses, val(s, "categoryLarge"), val(s, "floorInfo"), rule, linked=bool(b or lot), name=label(s)):
             out |= {s, s + "/geometry"}
+    return out
+
+
+def unfit_floors(triples: dict) -> set[str]:
+    """층 값을 층으로 보여 주지 않을 상호 (src.model.build_business.floor_fits). 숫자 층이 이은 건물의 지상 층수보다 크거나,
+    건물 층수를 모르는데 100 이상이면 호수('1501')일 수 있다. 공개 뷰는 이 상호의 층 값을 그래프에서 뺀다."""
+    from src.model.build_business import floor_fits
+
+    def val(s, name):
+        return next((o.value for p, o in triples.get(s, []) if p.value == JGK + name), None)
+    out = set()
+    for s, plist in triples.items():
+        if not any(p.value == RDF_TYPE and o.value == JGK + "Business" for p, o in plist):
+            continue
+        fl = val(s, "floorInfo")
+        b = val(s, "inBuilding")
+        if fl and not floor_fits(fl, val(b, "floorsAbove") if b else None):
+            out.add(s)
     return out
 
 
@@ -119,6 +150,7 @@ class GraphView:
     addrs: dict                # 주어 -> 도로명주소
     comments: dict             # 주어 -> rdfs:comment
     private: set[str] = field(default_factory=set)  # 공개하지 않는 상호와 그 모양 (held에도 들어 있다)
+    unfit_floor: set[str] = field(default_factory=set)  # 층 값을 층으로 보여 주지 않는 상호 (공개 뷰는 그 층 값을 뺐다)
     _cache: dict = field(default_factory=dict, repr=False)
 
     def shown(self, uri: str) -> bool:
@@ -128,6 +160,10 @@ class GraphView:
     def value(self, s: str, name: str) -> str | None:
         """주어의 jgk 속성 값 하나 (없으면 None)."""
         return next((o.value for p, o in self.triples.get(s, []) if p.value == JGK + name), None)
+
+    def floor_of(self, business: str) -> str | None:
+        """상호의 층 값. 층으로 보기 어려운 값(unfit_floor)이면 None."""
+        return None if business in self.unfit_floor else self.value(business, "floorInfo")
 
     def values(self, s: str, name: str) -> list[str]:
         return [o.value for p, o in self.triples.get(s, []) if p.value == JGK + name]
@@ -209,7 +245,7 @@ def _view(store: ox.Store, held: set[str] | None = None, private: set[str] | Non
                 comments.setdefault(s, o.value)
             if p.value == JGK + "roadAddress":
                 addrs.setdefault(s, o.value)
-    return GraphView(store, triples, held or set(), labels, addrs, comments, private or set())
+    return GraphView(store, triples, held or set(), labels, addrs, comments, private or set(), unfit_floors(triples))
 
 
 def public_view() -> GraphView:
@@ -226,6 +262,9 @@ def public_view() -> GraphView:
     pub = public_nodes(view.triples, hold, given) - private
     view.held = {s for s in view.triples if s.startswith(BASE + "/")} - pub
     view.private = private
+    # 층으로 보기 어려운 층 값(호수일 수 있다)은 공개 페이지, 기계용 원본, 화면 자료 어디에도 내지 않는다
+    for s in view.unfit_floor:
+        view.triples[s] = [(p, o) for p, o in view.triples[s] if p.value != JGK + "floorInfo"]
     return view
 
 

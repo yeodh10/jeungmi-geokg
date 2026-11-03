@@ -2,7 +2,8 @@
 
 실행: python -m src.graph.appdata      (python -m src.graph.publish 뒤에. publish가 사이트 폴더를 새로 만든다)
 출력: data/processed/site/
-  assets/data/places.json       건물 행, 묶음, 길, 동네, 우편구역, 위에 건물이 없는 필지, 센서, 역, 칩, 찾기 낱말
+  assets/data/places.json       건물 행, 묶음, 길, 동네, 우편구역, 위에 건물이 없는 필지, 센서, 역, 칩, 찾기 낱말,
+                                홈의 대표 질문 줄(featured)과 지도 아래 기준 표기(basis). 그래서 첫 화면은 questions, sources를 받지 않는다
   assets/data/shapes.geojson    면 건물 모양
   assets/data/entrances.json    건물별 입구
   assets/data/businesses.json   상호 찾기 (찾기창에 처음 입력할 때 받는다)
@@ -43,7 +44,17 @@ def build_sources(hidden_business: int) -> dict:
     return {"v": 1, "basis": cfg["basis"], "sources": sources, "absent": cfg["absent"], "principle": cfg["principle"],
             "scope": cfg["scope"].strip(), "history": cfg["history"], "credits": cfg["credits"], "creditsNote": cfg["credits_note"],
             "hiddenBusinesses": hidden_business,
-            "hiddenBusinessesNote": f"주택 건물 안 상호 {hidden_business:,}곳은 개인 집 주소일 수 있어 싣지 않았습니다."}
+            "hiddenBusinessesNote": f"주택이나 용도를 모르는 건물 안 상호, 이름에 호수가 든 상호 {hidden_business:,}곳은 개인 집 주소일 수 있어 싣지 않았습니다."}
+
+
+# 첫 화면이 받는 자료 (라이브러리, 배경, 앱 코드 제외). 명세 11절의 300KB 기준은 이 합계다
+FIRST_SCREEN = ("places.json", "shapes.geojson", "area.geojson")
+
+
+def first_screen_gzip(out: Path, sizes: dict) -> int:
+    area = out / "assets" / "data" / "area.geojson"
+    extra = len(gzip.compress(area.read_bytes(), 6)) if area.exists() else 0
+    return sum(sizes[n]["gzip"] for n in FIRST_SCREEN if n in sizes) + extra
 
 
 def write(out: Path = OUT) -> dict:
@@ -61,6 +72,9 @@ def write(out: Path = OUT) -> dict:
     questions = build_questions(view, qstore)
     hidden = len([s for s in view.private if not s.endswith("/geometry")])
     sources = build_sources(hidden)
+    # 첫 화면 300KB 기준 (명세 11절): 홈의 대표 질문과 기준 표기는 places.json에 넣고, questions와 sources는 탭을 열 때 받는다
+    places["featured"] = [{"id": x["id"], "q": x["q"], "n": x["n"]} for x in questions["items"] if x.get("featured")]
+    places["basis"] = sources["basis"]
     data = out / "assets" / "data"
     data.mkdir(parents=True, exist_ok=True)
     sizes = {}
@@ -83,7 +97,7 @@ def write(out: Path = OUT) -> dict:
     report = {"built": built, "buildings": places["count"]["buildings"], "places": places["count"]["places"],
               "groups": places["count"]["groups"], "questions": len(questions["items"]), "businessLines": len(businesses["items"]),
               "hiddenBusinesses": hidden, "cards": n, "cardBytes": total, "files": sizes,
-              "firstScreenGzip": sizes["places.json"]["gzip"] + sizes["shapes.geojson"]["gzip"],
+              "firstScreenGzip": first_screen_gzip(out, sizes),
               "seconds": round(time.perf_counter() - t0, 1)}
     return report
 

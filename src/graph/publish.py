@@ -31,7 +31,7 @@ import yaml
 from shapely.geometry import mapping
 
 from src.graph.app_shell import SITE_PATH, build_stamp, render_app_html
-from src.graph.public import (DCT_SOURCE, JGK, RDF_TYPE, RDFS_COMMENT, RDFS_LABEL, SITE, GraphView, display_name, hold_sources,
+from src.graph.public import (DCT_SOURCE, FLOOR_WITHHELD, JGK, RDF_TYPE, RDFS_COMMENT, RDFS_LABEL, SITE, GraphView, display_name, hold_sources,
                               kind_of, private_businesses, public_nodes, public_view, short_address)
 from src.graph.store import ALIGNMENT, ONTOLOGY
 from src.model.uri import BASE
@@ -410,6 +410,8 @@ def main() -> None:
             vals = [x for x in (info_value(p, o) for o in by_p[p]) if x]
             if vals:
                 info_rows.append(f'<tr><td class="k">{e(pname(p))}</td><td>{", ".join(vals)}</td></tr>')
+        if s in view.unfit_floor:   # 층으로 보기 어려운 층 값은 공개 뷰에서 뺐다 (호수일 수 있다)
+            info_rows.append(f'<tr><td class="k">층</td><td class="muted">{e(FLOOR_WITHHELD)}</td></tr>')
         for x in status:
             if x in STATUS_SHOW:
                 info_rows.append(f'<tr><td class="k">상태 (원래 값)</td><td>{e(x)}</td></tr>')
@@ -432,9 +434,9 @@ def main() -> None:
             for p, srcs in sorted(back.items(), key=lambda t: pname(t[0])))
         tenant_sec = ""
         if tenants:
-            tenants.sort(key=lambda u: (floor_key(view.value(u, "floorInfo")), nm(u)))
+            tenants.sort(key=lambda u: (floor_key(view.floor_of(u)), nm(u)))
             rows = "".join(
-                f'<tr><td>{link(u)}</td><td>{e(floor_text(view.value(u, "floorInfo"))) if view.value(u, "floorInfo") else "<span class=muted>층 정보 없음</span>"}</td>'
+                f'<tr><td>{link(u)}</td><td>{e(floor_text(view.floor_of(u))) if view.floor_of(u) else "<span class=muted>층 정보 없음</span>"}</td>'
                 f'<td>{e(view.value(u, "categorySmall") or view.value(u, "categoryMiddle") or "")}</td><td class="muted">{e(view.value(u, "linkedBy") or "")}</td></tr>'
                 for u in tenants)
             tenant_sec = (f'<section class="card sec"><h2>입점 상호 <span class="muted">{len(tenants):,}곳</span></h2>'
@@ -442,7 +444,7 @@ def main() -> None:
                           f'<div class="tablewrap"><table class="kv listing"><thead><tr><th>상호</th><th>층</th><th>업종</th><th>이은 방법</th></tr></thead>{rows}</table></div></section>')
 
         # 없는 정보
-        missing = [label for prop, label in EXPECT.get(kind, []) if not is_geom and not [
+        missing = [label for prop, label in EXPECT.get(kind, []) if not is_geom and not (prop == "floorInfo" and s in view.unfit_floor) and not [
             o for o in by_p.get(JGK + prop, []) if o.value not in ("", "0")]]
         absent = [] if is_geom else [x for x in ABSENT.get(kind, []) if not (x == "경계 모양" and wkt)]
         missing_sec = (f'<section class="card sec missing"><h2>없는 정보</h2><p>{e(", ".join(missing + absent))}</p></section>'

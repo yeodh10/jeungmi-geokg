@@ -23,7 +23,7 @@ export function init(ctx) {
       const srcRow = x => `<li><p class="nm">${esc(x.name)} <span class="chip ${x.public ? "pub" : "held"}">${x.public ? "공개" : "공개하지 않음"}</span></p>
         <p>${esc(x.by || "")}${x.as_of ? (/기준|받은 날|내려받기|제작/.test(x.as_of) ? `, ${esc(x.as_of)}` : `, ${esc(x.as_of)} 기준`) : ""}</p>
         ${x.public ? `<p>쓴 곳: ${esc(x.used_for || "")}</p>${x.license ? `<p>이용 조건: ${esc(x.license)}</p>` : ""}${x.note ? `<p>${esc(x.note)}</p>` : ""}
-          ${x.url ? `<p><a href="${esc(x.url)}" target="_blank" rel="noopener">자료 안내 ${ui.icon("external", 12)}</a></p>` : ""}`
+          ${safeUrl(x.url) ? `<p><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">자료 안내 ${ui.icon("external", 12)}</a></p>` : ""}`
           : `<p>까닭: ${esc(x.reason || "")}</p>`}</li>`;
       const pub = s.sources.filter(x => x.public), held = s.sources.filter(x => !x.public);
       el.innerHTML = `
@@ -38,7 +38,7 @@ export function init(ctx) {
           <p class="dt-p">장소마다 고유 주소 (URI)가 있습니다. 카드 맨 아래의 고유 주소를 열면 같은 장소의 페이지와 기계용 원본 (Turtle)이 나옵니다.</p></section>
         <section class="dt-sec"><h3 class="dt-h">건물 색 (용도)</h3>${legend()}</section>
         <section class="dt-sec dt-credits"><h3 class="dt-h">지도 자료 표기</h3>
-          <p class="dt-p">${(s.credits || []).map(c => `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.name)}</a>`).join("")}</p>
+          <p class="dt-p">${(s.credits || []).map(c => safeUrl(c.url) ? `<a href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener">${esc(c.name)}</a>` : `<span>${esc(c.name)}</span>`).join("")}</p>
           <p class="dt-p">${esc(s.creditsNote || "")}</p>
           <p class="dt-p"><a href="${esc(cfg.mode === "public" ? cfg.root : "https://yeodh10.github.io/jeungmi-geokg")}/about/">소개 페이지</a>에 그래프 쓰는 법이 있습니다.</p></section>`;
     }).catch(() => {
@@ -87,12 +87,15 @@ export function init(ctx) {
       const h = panel.el.querySelector("#pane-data h2");
       if (h) h.focus({ preventScroll: true });
     });
+    // 대표 질문 줄은 places.json의 featured를 쓴다 (첫 화면에서 questions.json을 받지 않는다. 명세 11절 300KB)
     const qs = el.querySelector(".home-qs ul");
-    if (qs && ctx.questions) ctx.questions().then(q => {
-      const top = q.items.filter(x => x.featured).slice(0, 3);
-      qs.innerHTML = top.map(x => `<li><button type="button" class="ask-q" data-id="${esc(x.id)}"><span>${esc(x.q)}</span><span class="n">${nf(x.n)}</span></button></li>`).join("");
+    const draw = list => {
+      qs.innerHTML = list.slice(0, 3).map(x => `<li><button type="button" class="ask-q" data-id="${esc(x.id)}"><span>${esc(x.q)}</span><span class="n">${nf(x.n)}</span></button></li>`).join("");
       qs.querySelectorAll(".ask-q").forEach(b => b.addEventListener("click", () => bus.emit("ask:open", { id: b.dataset.id })));
-    }).catch(() => { qs.innerHTML = `<li class="muted small">질문을 받지 못했습니다. 묻기 탭에서 다시 해 보세요.</li>`; });
+    };
+    if (qs && Array.isArray(data.featured)) draw(data.featured);
+    else if (qs && ctx.questions) ctx.questions().then(q => draw(q.items.filter(x => x.featured)))
+      .catch(() => { qs.innerHTML = `<li class="muted small">질문을 받지 못했습니다. 묻기 탭에서 다시 해 보세요.</li>`; });
   }
   panel.setHome(home);
 }

@@ -26,6 +26,23 @@ export function init(ctx) {
   let popup = null;
   const close = () => { if (popup) { const p = popup; popup = null; p.remove(); } };
 
+  // 짧은 요약: 건물은 지상 층수와 사용승인일, 단지는 동 수와 층수, 사용승인 연도의 범위 (값이 있는 것만)
+  const nf = n => Number(n).toLocaleString("ko-KR");
+  const span = (a, b, unit) => (a === b ? `${a}${unit}` : `${a}~${b}${unit}`);
+  function summary(sel) {
+    if (sel.group != null) {
+      const g = data.groupById.get(Number(sel.group));
+      if (!g) return "";
+      const ms = g.m.map(i => data.byIndex[i]).filter(Boolean);
+      const fa = ms.map(m => m.fa).filter(x => x > 0), ys = ms.map(m => Number(String(m.ad || "").slice(0, 4))).filter(Number.isFinite).filter(y => y > 0);
+      return [`${nf(ms.length)}동`, fa.length ? `지상 ${span(Math.min(...fa), Math.max(...fa), "층")}` : "",
+        ys.length ? `사용승인 ${span(Math.min(...ys), Math.max(...ys), "년")}` : ""].filter(Boolean).join(", ");
+    }
+    const p = sel.path ? data.byPath.get(sel.path) : null;
+    if (!p || !/^building/.test(sel.path)) return "";
+    return [p.fa > 0 ? `지상 ${p.fa}층` : "", p.ad ? `사용승인 ${p.ad}` : ""].filter(Boolean).join(", ");
+  }
+
   function where(sel) {
     if (sel.group != null) { const g = data.groupById.get(Number(sel.group)); return g ? { pt: g.pt, name: g.n, kind: "단지" } : null; }
     const p = sel.path ? data.byPath.get(sel.path) : null;
@@ -53,8 +70,9 @@ export function init(ctx) {
     if (!w) return;
     const box = document.createElement("div");
     box.className = "pp-box";
+    const sub = summary(sel || {});
     box.innerHTML = `<p class="pp-kind"><span class="chip type">${esc(w.kind)}</span></p><p class="pp-name">${esc(w.name)}</p>
-      <button type="button" class="btn ghost mini pp-more">자세히</button>`;
+      ${sub ? `<p class="pp-sub">${esc(sub)}</p>` : ""}<button type="button" class="btn ghost mini pp-more">자세히</button>`;
     box.querySelector(".pp-more").addEventListener("click", detail);
     popup = new maplibregl.Popup({ className: "pp", closeButton: true, closeOnClick: false, focusAfterOpen: false, offset: 14, maxWidth: "260px" })
       .setLngLat(w.pt).setDOMContent(box).addTo(map);

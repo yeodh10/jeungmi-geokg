@@ -15,6 +15,10 @@ function read() {
   }
   // 옛 지도 링크 /map/?u=building/... 는 focus로 읽는다
   if (!s.focus && sp.get("u")) s.focus = sp.get("u");
+  // 꼴이 맞지 않는 값은 읽지 않는다 (주소창에도 남기지 않는다). 있는 칩과 탭인지는 칩, 패널 모듈이 다시 본다
+  if (s.unit && s.unit !== "group") delete s.unit;
+  if (s.cat && !/^[a-z0-9][a-z0-9_-]{0,39}$/.test(s.cat)) delete s.cat;
+  if (s.tab && !/^[a-z][a-z0-9-]{0,23}$/.test(s.tab)) delete s.tab;
   return s;
 }
 

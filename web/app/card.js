@@ -237,7 +237,8 @@ export function init(ctx) {
         : `<span>${nf(ents.length)}곳</span> ${ents.map((e, k) => `<button type="button" class="linkish g-open" data-path="${esc(e.path)}">${k + 1}</button>`).join(" ")}`}</span></li>`);
     }
     for (const x of external || []) {
-      rows.push(`<li><span class="g-rel">${esc(x.rel)}</span><span class="g-main"><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)} ${ui.icon("external", 14)}</a></span></li>`);
+      const url = safeUrl(x.url);   // http, https만 링크로 만든다
+      rows.push(`<li><span class="g-rel">${esc(x.rel)}</span><span class="g-main">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(x.name)} ${ui.icon("external", 14)}</a>` : esc(x.name)}</span></li>`);
     }
     return rows.length ? `<section class="cd-sec g-sec"><h3 class="cd-h g-h">이어진 것</h3><ul class="g-links">${rows.join("")}</ul></section>` : "";
   }
@@ -364,12 +365,21 @@ export function init(ctx) {
     const rep = members[0] || {};
     const part = new Set(g.part || []);
     const facts = [{ k: "동 수", v: `${nf(members.length)}동` }];
+    // 동마다의 지상 층수와 사용승인일 범위 (값이 있는 동만). 동 하나의 값은 동 목록에서 그 동을 눌러 봅니다
+    const fa = members.map(m => m.fa).filter(x => x > 0);
+    const ad = members.map(m => m.ad).filter(Boolean).sort();
+    const range = (a, b) => (a === b ? a : `${a} ~ ${b}`);
+    if (fa.length) facts.push({ k: "지상 층수", v: `${range(Math.min(...fa), Math.max(...fa))}층`, note: fa.length < members.length ? `${nf(fa.length)}동만 값이 있습니다` : "" });
+    if (ad.length) facts.push({ k: "사용승인일", v: range(ad[0], ad[ad.length - 1]), note: `2018년까지의 자료입니다${ad.length < members.length ? `. ${nf(ad.length)}동만 값이 있습니다` : ""}` });
     if (g.hh) facts.push({ k: "세대수", v: `${nf(g.hh)}세대`, note: part.has("hh") ? "일부 필지만 값이 있습니다" : "건축물대장 총괄표제부의 필지 값을 더했습니다" });
     if (g.site) facts.push({ k: "대지면적", v: `${nf(g.site)}㎡`, note: part.has("site") ? "일부 필지만 값이 있습니다" : "필지 값을 더했습니다" });
     const pnus = (g.pnu || []).map(x => data.byPath.get("parcel/" + x)).filter(Boolean);
     const link = () => viewUrl({ focus: rep.p, unit: "group" });
     const addr = rep.a ? short(rep.a) : null;
-    const memberRows = members.map(m => `<li><button type="button" class="linkish cd-open" data-path="${esc(m.p)}">${esc(m.n)}</button>${m.fa ? ` <span class="muted">${nf(m.fa)}층</span>` : ""}</li>`).join("");
+    const memberRows = members.map(m => {
+      const bits = [m.fa ? `${nf(m.fa)}층` : "", m.ad ? `${String(m.ad).slice(0, 4)}년` : ""].filter(Boolean).join(", ");
+      return `<li><button type="button" class="linkish cd-open" data-path="${esc(m.p)}">${esc(m.n)}</button>${bits ? ` <span class="muted">${esc(bits)}</span>` : ""}</li>`;
+    }).join("");
     el.innerHTML = `<article class="cd">${head(sel, { kindLabel: "단지" })}<div class="cd-rest">
       ${addrBlock(rep.a ? `${rep.a} (대표 동)` : null, null, g.pt && data.station && data.station.pt ? Math.round(meters(g.pt, data.station.pt)) : null)}
       ${actions({ pt: g.pt, label: g.n, link, addr, ttl: null, why: { addr: "단지에는 주소가 없고 대표 동에도 도로명주소가 없습니다", ttl: "단지는 화면용 묶음이라 기계용 원본이 없습니다" } })}

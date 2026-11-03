@@ -455,7 +455,7 @@ def business_rows(view: GraphView) -> list[dict]:
         w = wkt_of(view, s)
         r = {"n": name + (f" {branch}" if branch else ""), "key": tidy(name) + tidy(branch), "p": path_of(s),
              "big": view.value(s, "categoryLarge") or "", "mid": view.value(s, "categoryMiddle") or "", "cat": view.value(s, "categorySmall") or "",
-             "floor": view.value(s, "floorInfo") or "", "addr": view.value(s, "roadAddress") or "",
+             "floor": view.floor_of(s) or "", "addr": view.value(s, "roadAddress") or "",
              "bu": path_of(b) if b and view.shown(b) else "", "lot": path_of(lot) if lot and view.shown(lot) else "",
              "by": view.value(s, "linkedBy") or ""}
         if w:

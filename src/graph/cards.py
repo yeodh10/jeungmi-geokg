@@ -21,7 +21,7 @@ from statistics import mean
 import shapely
 
 from src.graph.places import path_of, point_of, straight_m, wkt_of
-from src.graph.public import (BASE, DCT_SOURCE, JGK, RDF_TYPE, GraphView, display_name, kind_of, short_address)
+from src.graph.public import (BASE, DCT_SOURCE, FLOOR_WITHHELD, JGK, RDF_TYPE, GraphView, display_name, kind_of, short_address)
 
 SOSA = "http://www.w3.org/ns/sosa/"
 OWL_SAME = "http://www.w3.org/2002/07/owl#sameAs"
@@ -182,7 +182,7 @@ class CardMaker:
         facts, links, missing, lead = [], [], [], []
         getattr(self, "_" + kind.replace("-", "_"), self._other)(uri, c, facts, links, lead)
         for prop, label in EXPECT.get(kind, []):
-            if v.value(uri, prop) in (None, "", "0"):
+            if v.value(uri, prop) in (None, "", "0") and not (prop == "floorInfo" and uri in v.unfit_floor):
                 missing.append(label)
         if kind == "sensor" and "sensor" not in c:
             missing.append("관측값")
@@ -271,7 +271,7 @@ class CardMaker:
                 if p in (JGK + "inBuilding", JGK + "onParcel") and kind_of(s) == "business":
                     v = self.view
                     lines.append({"p": path_of(s), "n": self.name(s) + (f" {v.value(s, 'branchName')}" if v.value(s, "branchName") else ""),
-                                  "f": v.value(s, "floorInfo") or "", "c": v.value(s, "categorySmall") or "", "by": v.value(s, "linkedBy") or ""})
+                                  "f": v.floor_of(s) or "", "c": v.value(s, "categorySmall") or "", "by": v.value(s, "linkedBy") or ""})
         if not lines:
             return
         out = []
@@ -383,9 +383,11 @@ class CardMaker:
         cats = [v.value(uri, x) for x in ("categoryLarge", "categoryMiddle", "categorySmall")]
         if any(cats):
             facts.append({"k": "업종", "v": cats[2] or cats[1] or cats[0], "raw": " > ".join(x for x in cats if x)})
-        fl = v.value(uri, "floorInfo")
+        fl = v.floor_of(uri)
         if fl:
             facts.append({"k": "층", "v": floor_text(fl)})
+        elif uri in v.unfit_floor:
+            facts.append({"k": "층", "v": FLOOR_WITHHELD})
         self._num_fact(uri, "linkedBy", "건물과 이은 방법", facts)
         lead.append(BUSINESS_NOTE)
         b, lot = v.value(uri, "inBuilding"), v.value(uri, "onParcel")

@@ -355,8 +355,8 @@ export async function init(ctx) {
     const all2 = el.querySelector(".res-all2");
     if (all2) all2.onclick = () => { R.items = R.base; R.bounds = null; R.page = 1; rerender(); emitMarkers(); fitArea(); };
     const qs = el.querySelector(".res-qs");
-    if (qs && ctx.source.questions && ctx.features.has("ask")) {
-      ctx.source.questions().then(d => {
+    if (qs && ctx.features.has("ask") && (Array.isArray(ctx.data.featured) || ctx.source.questions)) {
+      (Array.isArray(ctx.data.featured) ? Promise.resolve({ items: ctx.data.featured.map(x => ({ ...x, featured: true })) }) : ctx.source.questions()).then(d => {
         const items = (d && d.items || []).filter(x => x.featured).slice(0, 3);
         if (!items.length || !document.contains(qs)) return;
         qs.querySelector("ul").innerHTML = items.map(x => `<li><button type="button" class="linkish" data-ask="${esc(x.id)}">${esc(x.q || x.id)}</button></li>`).join("");
@@ -451,8 +451,9 @@ export async function init(ctx) {
     show({ kind: "query", q, title: `'${q}' 찾은 결과`, items: r.items, note: r.note, sort: "score", focus: !restore && (!auto || !r.items.length), quiet: restore && !!state.get("focus") });
     if (restore) { reopenFocus(); return r; }
     if (!index.biz) R.extraNote = "상호 자료를 받지 못해 건물과 주소만 찾았습니다.";
-    // 찾기말 결과는 첫 결과를 자동으로 고르고 지도를 옮긴다 (칩 결과는 고르지 않는다)
-    if (auto && r.items.length && !(r.note && r.note.kind === "absent")) {
+    // 찾기말 결과는 첫 결과를 자동으로 고르고 지도를 옮긴다 (칩 결과는 고르지 않는다).
+    // 일부만 찾는 낱말(병원, 은행 등)은 '이름에 낱말이 든 곳만'이라는 안내가 카드에 가리지 않게 목록만 보여 준다
+    if (auto && r.items.length && !(r.note && (r.note.kind === "absent" || r.note.kind === "partial"))) {
       const first = shown()[0];
       setRowActive(1);
       openItem(first, { from: "search", no: 1 });

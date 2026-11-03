@@ -242,6 +242,19 @@ export function createMapApi(ctx, map) {
     });
   }
 
+  // 고른 장소의 글자(sel-label)를 그릴 때 그 장소의 평소 글자를 숨긴다. 묶음은 묶음 글자(k=g), 장소는 자기 글자(k=p)
+  function hideOwnLabel(label) {
+    let not = null;
+    if (label && label.group != null) not = ["!", ["all", ["==", ["get", "k"], "g"], ["==", ["get", "g"], Number(label.group)]]];
+    else if (label && label.path) not = ["!", ["all", ["==", ["get", "k"], "p"], ["==", ["get", "path"], String(label.path)]]];
+    for (const [t] of TIERS) {
+      const id = `label-${t}`;
+      if (!map.getLayer(id)) continue;
+      const base = ["==", ["get", "t"], t];
+      map.setFilter(id, not ? ["all", base, not] : base);
+    }
+  }
+
   // ---- 화면에서 쓰는 api (명세 5.2절)
   const setData = (id, value) => whenReady(() => { const s = map.getSource(id); if (s) s.setData(value); });
   const pts = paths => {
@@ -281,10 +294,17 @@ export function createMapApi(ctx, map) {
     },
     // style: select(파랑, 고른 장소) 또는 graph(보라, 번짐). label이 {pt, text}면 고른 장소 글자를 늘 보이게 한다.
     // pt는 places.json에 없는 장소(입구, 상호)를 점으로 그릴 때 준다
+    // label.path, label.group을 주면 같은 장소의 평소 글자(label-1~3)를 숨겨 이름이 두 번 그려지지 않게 한다
     highlight(paths, { style = "select", label = null, pt = null } = {}) {
-      whenReady(() => map.getSource(style === "graph" ? "spread" : "sel").setData(fc(featuresFor(paths, { label, pt }))));
+      whenReady(() => {
+        map.getSource(style === "graph" ? "spread" : "sel").setData(fc(featuresFor(paths, { label, pt })));
+        if (style !== "graph") hideOwnLabel(label);
+      });
     },
-    clearHighlight(style = "select") { setData(style === "graph" ? "spread" : "sel", EMPTY); },
+    clearHighlight(style = "select") {
+      setData(style === "graph" ? "spread" : "sel", EMPTY);
+      if (style !== "graph") whenReady(() => hideOwnLabel(null));
+    },
     setMarkers(items) {
       markers = (items || []).filter(x => x && x.pt);
       activeNo = null;

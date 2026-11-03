@@ -102,6 +102,13 @@ def make_handler(site: Path, fail: set[str]):
     return Handler
 
 
+class SiteServer(ThreadingHTTPServer):
+    """접속 대기열을 늘린 서버. 기본값 5로는 첫 화면이 파일 수십 개를 한꺼번에 받을 때 연결이 거절되어
+    앱 모듈과 글꼴이 통째로 빠지는 일이 있었다 (ERR_CONNECTION_REFUSED)."""
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="공개 사이트 확인 서버")
     ap.add_argument("port", nargs="?", type=int, default=8772)
@@ -109,7 +116,7 @@ def main(argv=None) -> None:
     ap.add_argument("--site", type=Path, default=SITE_DIR, help="열 폴더 (기본 data/processed/site)")
     args = ap.parse_args(argv)
     fail = {f.strip().lstrip("/").removeprefix(SITE_PATH.lstrip("/") + "/").rstrip("/") for f in args.fail}
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(args.site, fail))
+    server = SiteServer(("127.0.0.1", args.port), make_handler(args.site, fail))
     print(f"http://127.0.0.1:{args.port}{SITE_PATH}/ 에서 {args.site} 를 엽니다" + (f" (첫 요청 실패: {', '.join(sorted(fail))})" if fail else ""), flush=True)
     try:
         server.serve_forever()

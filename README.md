@@ -182,8 +182,11 @@ git worktree remove ../jeungmi-geokg-pages
 테스트 (LLM 부분은 가짜 클라이언트로 돌아서 키가 없어도 됩니다. 제안 기록은 임시 복사본만 씁니다):
 
 ```bash
-for t in test_business test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api test_basemap_link test_eval test_sensors test_interop test_editions test_bim_link test_guard test_objects test_publish; do .venv/Scripts/python -m tests.$t; done
+for t in test_business test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api test_basemap_link test_eval test_sensors test_interop test_editions test_bim_link test_guard test_objects test_publish test_public_view test_places test_cards test_public_output; do .venv/Scripts/python -m tests.$t; done
+node tests/search_check.mjs
 ```
+
+공개 사이트를 다시 올리기 전에는 위 줄을 모두 돌립니다. `test_public_output`이 공개 파일에서 쓰면 안 되는 이름을 찾고, `search_check`가 찾기 1순위를 봅니다. 가상환경에 pytest를 따로 넣지 않았으므로 각 시험을 모듈로 돌립니다.
 
 ## 주요 기능
 

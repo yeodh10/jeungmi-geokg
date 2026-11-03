@@ -68,7 +68,7 @@ export async function init(ctx) {
   // restore: 뒤로 가기나 첫 화면에서 주소창 값대로 목록만 다시 세운다 (주소창은 그대로, 열려 있던 장소는 목록 위에 다시 연다)
   async function pick(key, { push = true, toggle = true, restore = false } = {}) {
     const c = byKey.get(key);
-    if (!c) return;
+    if (!c) { if (restore && state.get("cat") === key) state.set({ cat: null }, { silent: true }); return; }   // 없는 칩은 주소창에서 지운다
     if (toggle && current === key) { ctx.results.close({ push: true }); return; }
     current = key;
     syncPressed();

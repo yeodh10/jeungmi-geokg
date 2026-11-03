@@ -115,9 +115,12 @@ def check_real() -> None:
         assert k in chips and chips[k]["n"] >= 5, k
     assert all(c["n"] >= 5 for c in d["chips"])
     assert d["words"]["absent"] and d["words"]["partial"] and d["words"]["outside"]
-    shapes = (DATA / "shapes.geojson").read_bytes()
-    first = len(gzip.compress(raw, 6)) + len(gzip.compress(shapes, 6))
+    # 첫 화면이 받는 자료 전부 (places, shapes, area). 홈의 대표 질문과 기준 표기는 places.json에 들어 있어
+    # questions.json, sources.json은 첫 화면에서 받지 않는다 (web/app/datatab.js, app.js)
+    first = sum(len(gzip.compress((DATA / n).read_bytes() if n != "places.json" else raw, 6)) for n in ("places.json", "shapes.geojson", "area.geojson"))
     assert first <= 300_000, f"첫 화면 자료 압축 {first:,}바이트"
+    assert len(d["featured"]) >= 3 and all(q["id"] and q["q"] and q["n"] for q in d["featured"]), d.get("featured")
+    assert d["basis"].startswith("건물 "), d.get("basis")
     biz = json.loads((DATA / "businesses.json").read_text(encoding="utf-8"))
     names = [x["n"] for x in biz["items"]]
     assert any("올리브영" in n for n in names) and "지오스토리" in names

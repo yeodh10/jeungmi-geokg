@@ -183,6 +183,7 @@ export function createPanel(ctx) {
     setHome(render) { homeRender = render; if (ctx.data) renderHome(); },
     renderHome,
     hasHome: () => !!homeRender,
+    hasTab: id => tabs.has(id),
     setPlaceRenderer(fn) { placeRenderer = fn; },
     get placeRenderer() { return placeRenderer; },
     collapse(on) { return setCollapsed(on === undefined ? !collapsed : on); },

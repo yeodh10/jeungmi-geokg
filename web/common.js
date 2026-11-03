@@ -18,7 +18,9 @@ const VENDOR = (() => {
 })();
 
 const BASE = "https://yeodh10.github.io/jeungmi-geokg/id/";
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// 자료에서 온 바깥 링크는 http, https만 링크로 만든다 (javascript: 같은 주소를 막는다). 아니면 빈 값
+const safeUrl = u => (/^https?:\/\/[^\s]+$/i.test(String(u ?? "").trim()) ? String(u).trim() : "");
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 // 표준 어휘(어휘 파일 밖) 속성과 값의 한국어 이름

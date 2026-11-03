@@ -108,13 +108,20 @@ function padding() {
   if (sheet.active()) {
     const H = sheet.heights();
     const bar = searchbar.getBoundingClientRect().bottom;
+    // #map-top은 고정 위치라 offsetParent가 늘 비어 있다. 보이는지는 그려진 상자가 있는지로 본다 (가로 화면은 칩을 숨긴다)
     const chips = document.getElementById("map-top");
-    const top = Math.round(chips && chips.offsetParent && chips.childElementCount ? chips.getBoundingClientRect().bottom + 8 : bar + 8);
+    const shown = chips && chips.childElementCount && chips.getClientRects().length && getComputedStyle(chips).display !== "none";
+    const top = Math.round(shown ? Math.max(bar, chips.getBoundingClientRect().bottom) + 8 : bar + 8);
     return { left: 0, right: 0, top, bottom: sheet.current() === "full" ? H.half : sheet.height() };
   }
   return { left: panel.isCollapsed() ? 0 : 404, right: 0, top: 0, bottom: 0 };
 }
 sheet.onChange(() => ctx.mapApi.setPadding(padding()));
+// 칩 줄은 기능 모듈이 나중에 채우고, 화면을 돌리면 숨거나 나온다. 그때마다 위 여백을 다시 잰다
+if (typeof ResizeObserver === "function") {
+  const top = document.getElementById("map-top");
+  if (top) new ResizeObserver(() => { if (ctx.mapApi) ctx.mapApi.setPadding(padding()); }).observe(top);
+}
 
 // ---- 지도. WebGL을 못 쓰면 안내만 띄우고 찾기, 목록, 장소 정보는 그대로 쓴다 (명세 3.11절)
 const mapEl = document.getElementById("map");
@@ -234,7 +241,7 @@ function onSelect(sel) {
   if (!r) { notFound(); return; }
   selected = { ...sel, ...r };
   if (!sel.noPush) state.set({ focus: r.path, unit: r.group ? "group" : null }, { push: true, silent: true });
-  const labelPt = r.pt && r.kind !== "station" ? { pt: r.pt, text: r.name } : null;
+  const labelPt = r.pt && r.kind !== "station" ? { pt: r.pt, text: r.name, path: r.path, group: r.group ? r.group.g : null } : null;
   if (r.paths.length) ctx.mapApi.highlight(r.paths, { style: "select", label: labelPt });
   else if (r.pt) ctx.mapApi.highlight([], { style: "select", label: labelPt, pt: r.pt });
   else ctx.mapApi.clearHighlight("select");
@@ -391,11 +398,11 @@ function searchFallback() {
   });
 }
 
-// 지도 아래 기준 표기 (출처 기준일)
+// 지도 아래 기준 표기 (출처 기준일). places.json의 basis를 쓰고, 없을 때만 sources를 받는다 (첫 화면 300KB 기준)
 async function basisControl() {
   if (!ctx.map) return;
   try {
-    const s = await ctx.source.sources();
+    const s = ctx.data && ctx.data.basis ? { basis: ctx.data.basis } : await ctx.source.sources();
     if (!s || !s.basis) return;
     ctx.map.addControl({
       onAdd() { const div = document.createElement("div"); div.className = "maplibregl-ctrl map-basis"; div.textContent = s.basis; this._el = div; return div; },
@@ -425,6 +432,8 @@ async function start() {
   searchFallback();
   basisControl();
   const s = state.get();
+  // 주소창의 tab이 없는 탭이면 지운다 (예: ?tab=<img>). 찾기 탭은 주소창에 적지 않는다
+  if (s.tab && (s.tab === "search" || !panel.hasTab || !panel.hasTab(s.tab))) { state.set({ tab: null }, { silent: true }); delete s.tab; }
   if (s.tab) panel.selectTab(s.tab);
   // 첫 화면: 주소창 위치가 없으면 PC는 범위 원 전체를 패널 오른쪽에, 휴대폰은 역 중심 배율 15
   if (ctx.map && !urlView && !s.focus) {
