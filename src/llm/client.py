@@ -15,6 +15,7 @@ from pydantic import BaseModel
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+TIMEOUT_SECONDS = 30.0  # SDK 기본값은 10분이라 멈춘 호출이 서버 작업 스레드를 오래 붙잡는다. 평가에서 질문 하나, 고시 하나가 30초를 넘긴 적이 없다
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -29,24 +30,26 @@ class MissingAPIKey(RuntimeError):
 
 def get_client() -> anthropic.Anthropic:
     load_dotenv(ROOT / ".env")
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(timeout=TIMEOUT_SECONDS)
     if client.api_key is None and client.auth_token is None and getattr(client, "credentials", None) is None:
         raise MissingAPIKey("ANTHROPIC_API_KEY가 없다")
     return client
 
 
-def parse(client, schema: type[T], system: str, user: str | list, effort: str = "high") -> T:
+def parse(client, schema: type[T], system: str, user: str | list, effort: str | None = "high", model: str = MODEL) -> T:
     """구조화 출력으로 한 번 부르고, 스키마로 검증된 결과를 돌려준다.
 
     system은 매번 같은 글이라 캐시해 둔다. user에 대화 목록(list)을 주면 그대로 messages로 쓴다.
     """
     messages = user if isinstance(user, list) else [{"role": "user", "content": user}]
+    # 대체 모델과 노력 설정은 기본 모델에만 쓴다. 입력 가드의 작은 모델은 한 번만 부른다
+    extra = {"betas": [FALLBACK_BETA], "fallbacks": "default"} if model == MODEL else {"betas": []}
+    if effort:
+        extra["output_config"] = {"effort": effort}
     response = client.beta.messages.parse(
-        model=MODEL,
+        model=model,
         max_tokens=16000,
-        betas=[FALLBACK_BETA],
-        fallbacks="default",
-        output_config={"effort": effort},
+        **extra,
         system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         messages=messages,
         output_format=schema,
