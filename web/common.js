@@ -56,11 +56,43 @@ function whenStyleReady(map, cb) {
   poll();
 }
 
+// 지도에 놓을 수 있는 [경도, 위도]인지. 범위 밖 값은 maplibre가 예외를 던져 화면 스크립트가 멈춘다
+const okLngLat = c => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]) && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
+
+// 지도에 놓을 수 있는 좌표만 모은다. GeometryCollection, 모양 없는 객체, 범위 밖 좌표는 건너뛴다
 function boundsOf(features) {
   const b = new maplibregl.LngLatBounds();
-  const walk = c => (typeof c[0] === "number" ? b.extend(c) : c.forEach(walk));
-  features.forEach(f => walk(f.geometry.coordinates));
+  const walk = c => {
+    if (!Array.isArray(c)) return;
+    if (typeof c[0] === "number") { if (okLngLat(c)) b.extend(c); }
+    else c.forEach(walk);
+  };
+  const visit = g => {
+    if (!g) return;
+    if (g.type === "GeometryCollection") (g.geometries || []).forEach(visit);
+    else walk(g.coordinates);
+  };
+  features.forEach(f => visit(f && f.geometry));
   return b;
+}
+
+// 객체들이 보이게 지도를 옮긴다. 놓을 좌표가 하나도 없으면 그대로 둔다 (빈 범위로 옮기면 예외가 난다)
+function fitTo(map, features, options) {
+  const b = boundsOf(features);
+  if (!b.isEmpty()) map.fitBounds(b, options);
+}
+
+// 주소창의 z, c를 지도의 처음 위치로 읽는다. 지도가 받을 수 없는 값이면 null
+function viewFrom(z, c) {
+  const zoom = parseFloat(z), center = String(c ?? "").split(",").map(s => s.trim()).filter(Boolean).map(Number);
+  return Number.isFinite(zoom) && zoom >= 0 && zoom <= 24 && center.length === 2 && okLngLat(center) ? { zoom, center } : null;
+}
+
+// 키로 묶는다. 프로토타입이 없는 객체라 키가 constructor나 __proto__여도 된다
+function groupBy(items, key) {
+  const out = Object.create(null);
+  for (const x of items) (out[key(x)] ||= []).push(x);
+  return out;
 }
 
 // API를 부르고 JSON을 받는다. 실패하면 화면에 그대로 보일 한국어 문장을 담은 Error를 던진다

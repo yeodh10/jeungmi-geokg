@@ -65,7 +65,7 @@ def run() -> None:
     assert {m["iri"] for m in missed} == {str(M.C), str(M.D)}
 
     props = {p.id: p for p in (make(r, "시험") for r in found)}
-    a, bb = props["rule-bim-link-A"], props["rule-bim-link-B"]
+    a, bb = next(p for p in props.values() if p.changes[0].o.value == str(M.A)), next(p for p in props.values() if p.changes[0].o.value == str(M.B))
     assert any("층 수: BIM 지상 0, 지하 3 / 그래프(대장) 지상 0, 지하 3" in e and "확인 필요" not in e for e in a.evidence), a.evidence
     assert any("위치로만 찾았다" in e for e in bb.evidence)
 

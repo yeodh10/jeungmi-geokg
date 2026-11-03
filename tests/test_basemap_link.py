@@ -22,16 +22,106 @@ def copy_without_basemap(dst: Path) -> None:
     dst.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def check_shared_polygon() -> None:
+    """한 폴리곤을 함께 쓰는 건물은 모두 지도 건물과 이어진다. 전에는 하나만 이어졌다."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    from src.model.build_objects import match_by_shape
+
+    frame = lambda rows: gpd.GeoDataFrame(rows, columns=["uri", "kind", "use", "geometry"], geometry="geometry", crs="EPSG:5186")
+    ours = frame([("a", "x", "x", box(0, 0, 10, 10)), ("b", "x", "x", box(0, 0, 10, 10)), ("c", "x", "x", box(20, 0, 30, 10)),
+                  ("d", "x", "x", box(40, 0, 50, 10)), ("e", "x", "x", box(40, 0, 50, 10))])
+    theirs = frame([("m1", "x", "x", box(0, 0, 10, 11)), ("m2", "x", "x", box(20, 0, 30, 10)), ("m3", "x", "x", box(40, 0, 50, 30)),
+                    ("m4", "x", "x", box(100, 0, 110, 10))])
+    links, review, unmatched = match_by_shape(ours, theirs, box(-1, -1, 200, 200))
+    assert sorted(zip(links["building_uri"], links["map_uri"])) == [("a", "m1"), ("b", "m1"), ("c", "m2")], links
+    assert set(links.loc[links["map_uri"] == "m1", "iou"]) == {0.909}, links
+    assert sorted(zip(review["building_uri"], review["map_uri"])) == [("d", "m3"), ("e", "m3")], review  # IoU 0.33은 목록으로 간다
+    assert list(unmatched["uri"]) == ["m4"], unmatched
+
+
+def check_underground_address() -> None:
+    """지하 주소는 같은 번호의 지상 지도 주소와 같다고 보지 않는다. 국가기본도 주소에는 지상, 지하 구분이 없다."""
+    import pandas as pd
+
+    from src.model.build_objects import map_address_key
+
+    df = pd.DataFrame({"road_code": ["1", "1"], "bldg_main_no": ["560", "560"], "bldg_sub_no": ["0", "0"], "underground": ["0", "1"]})
+    above, below = map_address_key(df)
+    assert above == "1-560-0" and below != above, (above, below)
+
+
+def check_near_same_address() -> None:
+    """규칙 5: 가장 가까운 모양의 주소가 달라도 5m 안에 주소 같은 모양이 있으면 그 모양을 쓴다."""
+    import geopandas as gpd
+    from shapely.geometry import Point, box
+
+    from src.review.basemap_proposals import near_same_address
+
+    points = gpd.GeoDataFrame({"uri": ["p", "q"], "bldg_mgt_no": ["1", "2"]}, geometry=[Point(0, 0), Point(100, 0)], crs="EPSG:5186")
+    maps = gpd.GeoDataFrame({"map_uri": ["가까운 다른 주소", "조금 먼 같은 주소", "먼 같은 주소"], "addr_key": ["다른", "같은", "같은"]},
+                            geometry=[box(1, 0, 5, 5), box(-5, 0, -3, 5), box(90, 0, 92, 5)], crs="EPSG:5186")
+    near = near_same_address(points, maps, {"1": "같은", "2": "같은"})
+    assert list(near["map_uri"]) == ["조금 먼 같은 주소"] and list(near["distance_m"]) == [3.0], near  # q는 8m라 빠진다
+
+
+def check_rules_on_data(df, proc) -> None:
+    """모양 규칙의 넓이와 층수 기준이 주소 잇기에도 걸린다. 모양 붙이기 겹침은 양쪽 모양 기준으로 잰다."""
+    import geopandas as gpd
+
+    from src.review.basemap_proposals import SHAPE_MAX_OVERLAP, SHAPE_MIN_AREA_M2, floor_gap, shape_candidates
+
+    b = gpd.read_file(proc / "objects.gpkg", layer="building").to_crs("EPSG:5186").set_index("uri")
+    maps = gpd.read_file(proc / "objects.gpkg", layer="basemap_building").to_crs("EPSG:5186").set_index("uri")
+    for r in df.itertuples():
+        assert b.at[r.gis_uri, "geometry"].area >= SHAPE_MIN_AREA_M2 and maps.at[r.basemap_uri, "geometry"].area >= SHAPE_MIN_AREA_M2, r
+        assert not floor_gap(b.at[r.building_uri, "floors_above"], maps.at[r.basemap_uri, "floors"]), r
+    polys = b[b.geom_type != "Point"].geometry.reset_index(drop=True)
+    for r in shape_candidates(proc)[0].itertuples():
+        m = maps.at[r.map_uri, "geometry"]
+        for g in polys.iloc[polys.sindex.query(m, predicate="intersects")]:
+            x = m.intersection(g).area
+            assert x / m.area <= SHAPE_MAX_OVERLAP and x / g.area <= SHAPE_MAX_OVERLAP, (r.map_uri, x, g.area)
+
+
+def check_floor_gap() -> None:
+    """층수 규칙의 경계: 3층 차이부터 부속 구조물로 본다. 값이 없거나 지하만 있는 건물은 보지 않는다."""
+    from src.review.basemap_proposals import floor_gap
+
+    assert floor_gap(5, 2) and floor_gap(15, 1) and not floor_gap(4, 2) and not floor_gap(10, 3)
+    assert not floor_gap(float("nan"), 1) and not floor_gap(5, float("nan")) and not floor_gap(0, 1)
+
+
+def check_audit(proc) -> None:
+    """지금 승인이 지금 규칙으로 다시 뽑히는지 나눠 본다. 규칙 밖 목록과 다시 뽑힌 제안을 합치면 승인 전체다. 승인 기록은 고치지 않는다."""
+    from src.review.basemap_proposals import audit, candidates, shape_candidates
+    from src.review.proposals import ProposalStore
+
+    approved = {p.id for p in ProposalStore(REAL).load() if p.status == "approved" and p.id.startswith("rule-basemap-")}
+    picked = {f"rule-basemap-link-{u.rsplit('/', 1)[-1]}" for u in candidates(proc)["gis_uri"]}
+    picked |= {f"rule-basemap-shape-{m}" for m in shape_candidates(proc)[0]["mgt"]}
+    out = audit(proc)
+    assert set(out["id"]) == approved - picked and not picked - approved, (set(out["id"]) ^ (approved - picked), picked - approved)
+    assert not out["reason"].eq("다른 규칙").any(), out  # 까닭을 하나도 대지 못한 줄이 없어야 한다
+
+
 def run() -> None:
     import geopandas as gpd
 
     from src.graph.store import load_store
     from src.graph.validate import check_proposal
-    from src.review.basemap_proposals import MAX_DISTANCE_M, candidates, make
+    from src.review.basemap_proposals import MAX_DISTANCE_M, PROC, candidates, make
     from src.review.proposals import ProposalStore, group_of
 
+    check_shared_polygon()
+    check_underground_address()
+    check_near_same_address()
+    check_floor_gap()
     df = candidates()
     assert len(df) >= 1, "후보가 없다"
+    check_rules_on_data(df, PROC)
+    check_audit(PROC)
     # 규칙: 대상은 모양 없는 점 건물, 거리 한계 안, 점 건물 하나에 제안 하나, 주소 미연결 건물에서 출발
     b = gpd.read_file(ROOT / "data" / "processed" / "objects.gpkg", layer="building").set_index("uri")
     assert (b.loc[df["building_uri"]].geometry.geom_type == "Point").all()
@@ -46,9 +136,10 @@ def run() -> None:
     for p in props:
         ok, res = check_proposal(g, p)
         assert ok, (p.id, res)
+        assert "규칙 1~5" in p.source_detail, p.source_detail  # 규칙 수와 근거 문구가 맞는다
     assert len({group_of(p)[0] for p in props}) == 1  # 검토 화면에서 한 묶음
 
-    # 승인하면 상태가 주소 연결됨이 되고 sameAs로 건물관리번호 건물을 가리킨다
+    # 승인하면 상태가 주소 연결됨이 되고 jgk:sameBuildingAs로 건물관리번호 건물을 가리킨다. owl:sameAs는 쓰지 않는다
     tmp = Path(tempfile.mkdtemp()) / "proposals.json"
     copy_without_basemap(tmp)
     try:
@@ -56,9 +147,10 @@ def run() -> None:
         store.add_new(props)
         p = store.decide(props[0].id, "approved", "시험 검토자")
         g2 = load_store(store)
-        q = f"SELECT ?s ?same WHERE {{ <{p.target}> <{JGK}status> ?s ; <http://www.w3.org/2002/07/owl#sameAs> ?same }}"
+        q = f"SELECT ?s ?same WHERE {{ <{p.target}> <{JGK}status> ?s ; <{JGK}sameBuildingAs> ?same }}"
         got = [(r["s"].value, r["same"].value) for r in g2.query(q)]
         assert got == [(JGK + "AddressLinked", df.iloc[0]["building_uri"])], got
+        assert not any(c.p.endswith("owl#sameAs") for c in p.changes), p.changes
     finally:
         shutil.rmtree(tmp.parent, ignore_errors=True)
     print(f"국가기본도 주소 연결 제안 확인 통과: {len(props)}건")
@@ -84,6 +176,7 @@ def run_shape(g, b) -> None:
     for p in props:
         ok, res = check_proposal(g, p)
         assert ok, (p.id, res)
+        assert "규칙 1~8" in p.source_detail, p.source_detail
         removed = [c for c in p.changes if c.op == "remove"]
         assert len(removed) == 1 and g.query(f"ASK {{ <{removed[0].s}> <{removed[0].p}> {removed[0].o.sparql()} }}"), p.id
     assert len({group_of(p)[0] for p in props}) == 1

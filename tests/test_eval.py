@@ -44,7 +44,56 @@ def run() -> None:
         "quote": "지어낸 문장", "target": Target(road_address="양천로 999")})]})
     g = notice_grade(made_up, body, None)
     assert g["quote_exact"] == [False] and g["grounded"] == [False], g
+    check_report()
     print("평가 채점 규칙 확인 통과")
+
+
+def check_report() -> None:
+    """report.py는 문서의 자동 표 표시 사이만 다시 쓰고, 사람이 고친 글은 그대로 둔다. 표시가 없으면 문서를 건드리지 않는다."""
+    import json
+    import tempfile
+    from pathlib import Path
+
+    import src.eval.report as report
+
+    usage = {"input_tokens": 1, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0, "output_tokens": 1}
+    nl = [{"id": "q01", "question": "옛 문구로 잰 질문", "kind": "count", "correct": False, "gold": 3, "n_rows": 1,
+           "llm_calls": 1, "seconds": 1.0, "usage": usage}]
+    nt = [{"no": "1", "title": "고시", "is_spatial": True, "changes": [{"change_type": "other"}], "quote_exact": [True],
+           "grounded": [], "has_gold": False, "seconds": 2.0, "usage": usage}]
+    saved = report.EVAL, report.OUT, report.QUESTIONS
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        (tmp / "nl_eval.json").write_text(json.dumps(nl, ensure_ascii=False), encoding="utf-8")
+        (tmp / "notice_eval.json").write_text(json.dumps(nt, ensure_ascii=False), encoding="utf-8")
+        (tmp / "q.yaml").write_text("- id: q01\n  question: 지금 문구\n", encoding="utf-8")
+        report.EVAL, report.OUT, report.QUESTIONS = tmp, tmp / "llm-eval.md", tmp / "q.yaml"
+        try:
+            report.main()  # 문서가 없으면 처음 꼴로 만든다
+            first = report.OUT.read_text(encoding="utf-8")
+            assert first.count("<!-- 자동 시작:") == 4 and "지금 문구 (문구 바꿈" in first and "옛 문구로 잰 질문" not in first, first
+            assert "운영과 같은 프롬프트" not in first and "결과 파일을 만든 때의 프롬프트" in first
+            edited = first.replace("## 채점을 고친 기록", "사람이 고친 글.\n\n## 채점을 고친 기록").replace("| 문서 | 1건", "| 문서 | 999건")
+            report.OUT.write_text(edited, encoding="utf-8")
+            report.main()
+            again = report.OUT.read_text(encoding="utf-8")
+            assert "사람이 고친 글." in again and "| 문서 | 1건" in again and "999건" not in again, again
+            report.main()
+            assert report.OUT.read_text(encoding="utf-8") == again, "다시 돌려도 같다"
+            broken = again.replace("<!-- 자동 끝: notice-table -->", "")
+            report.OUT.write_text(broken, encoding="utf-8")
+            try:
+                report.main()
+            except SystemExit as e:
+                assert e.code == 1
+            else:
+                raise AssertionError("표시가 깨진 문서는 바꾸지 않고 실패로 끝나야 한다")
+            assert report.OUT.read_text(encoding="utf-8") == broken
+        finally:
+            report.EVAL, report.OUT, report.QUESTIONS = saved
+    # 저장소의 문서에도 표시가 다 있다
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "llm-eval.md").read_text(encoding="utf-8")
+    assert sorted(m.group(2) for m in report.MARK.finditer(doc)) == ["nl-misses", "nl-table", "notice-seen", "notice-table"]
 
 
 def test_eval():

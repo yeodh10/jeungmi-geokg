@@ -17,6 +17,7 @@ BIM의 층, 공간, 부재는 BIM 그래프에 그대로 두고, 이 그래프�
 """
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
@@ -95,7 +96,8 @@ def make(row: dict, source: str) -> Proposal:
     evidence.append("BIM의 층, 공간, 부재는 BIM 그래프에 두고 이 그래프에는 건물끼리의 연결만 넣는다 (docs/bim.md)")
     key = row["iri"].rstrip("/#").rsplit("/", 1)[-1].rsplit("#", 1)[-1]
     return Proposal(
-        id=f"rule-bim-link-{key}", created_at=now(), source_kind="rule-candidate",
+        # 끝 이름은 모델마다 겹친다(model1#Building_1, model2#Building_1). IRI 전체의 해시로 id를 만든다
+        id="rule-bim-link-" + hashlib.sha256(row["iri"].encode("utf-8")).hexdigest()[:16], created_at=now(), source_kind="rule-candidate",
         source_detail=f"BIM 모델(BOT)의 건물을 그래프 건물에 잇기 (src/review/bim_proposals.py, {source})",
         action="link", target=t["uri"], target_type="Building",
         summary=f"'{name}'에 BIM 모델 건물 {row['label'] or key}을(를) 잇는다",
@@ -116,7 +118,10 @@ def main() -> None:
         print(f"[제안] {p.id}: {p.summary}")
     for m in missed:
         print(f"[못 이음] {m['iri']}: {m['why']}")
-    print(f"새 제안 {ProposalStore().add_new(props)}건 (짝 {len(found)}, 못 이음 {len(missed)})")
+    added = ProposalStore().add_new(props)
+    print(f"새 제안 {added}건 (짝 {len(found)}, 못 이음 {len(missed)})")
+    for pid in added.differ:
+        print(f"[건너뜀] {pid}: 같은 id의 제안이 이미 있는데 내용이 다르다")
 
 
 if __name__ == "__main__":

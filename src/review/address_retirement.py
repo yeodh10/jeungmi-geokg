@@ -17,7 +17,7 @@ from pathlib import Path
 import openpyxl
 
 from src.graph.store import load_store
-from src.llm.notice import JGK, Resolver, current_values, location_of, read_notice, to_term
+from src.llm.notice import DCTERMS, JGK, Resolver, current_values, location_of, read_notice, to_term, used_datasets
 from src.review.proposals import Change, Proposal, ProposalStore, Term, now
 
 XSD_DATE = "http://www.w3.org/2001/XMLSchema#date"
@@ -48,10 +48,25 @@ def retire_changes(store, uri: str, day: str) -> list[Change]:
                  Change(op="add", s=uri, p=JGK + "retiredOn", o=Term(kind="literal", value=day, datatype=XSD_DATE))]
 
 
+def based_on(store, building: str, entrances: list[str]) -> list[str]:
+    """표 제안의 근거 자료. 고시 제안(src.llm.notice.used_datasets)과 같은 방식으로, 고시공고 자료와 대상을 찾는 데 쓴 자료를 적는다.
+
+    건물은 도로명주소와 지번(내비게이션용DB)으로 찾으므로 지번으로 찾을 때의 자료에 건물 자신의 출처가 들어간다.
+    함께 폐지하는 출입구의 출처도 적는다. 보류 자료에서 온 출입구가 있으면 공개 사이트(src/graph/publish.py)에서 빠진다.
+    """
+    used = set(used_datasets(store, building, "지번"))
+    for e in entrances:
+        used |= {o.value.rsplit("#", 1)[-1] for o in current_values(store, e, DCTERMS + "source")}
+    return sorted(used)
+
+
 def make(rows: list[dict], meta: dict, tag: str, store, resolver: Resolver) -> tuple[list[Proposal], list[dict]]:
     props, report = [], []
+    notice = resolver.notice_uri(meta.get("번호", ""))
+    notice_key = notice.rsplit("/", 1)[-1] if notice else None  # 시군구코드-연도-번호. 고시 파일 머리의 번호로 코드가 정한다
+    home = resolver.notice_area(meta.get("번호", ""))  # 표의 주소는 시군구를 적지 않아서 고시를 낸 시군구로 본다
     for r in rows:
-        by_road, by_jibun = set(resolver.by_road(r["도로명주소"])), set(resolver.by_jibun(r["비고"]))
+        by_road, by_jibun = set(resolver.by_road(r["도로명주소"], home)), set(resolver.by_jibun(r["비고"], home))
         item = {**r, "도로명주소로 찾은 건물": len(by_road), "지번으로 찾은 건물": len(by_jibun), "제안": []}
         day = to_iso(r["폐지일"]) or meta.get("날짜")
         if not by_road and not by_jibun:
@@ -74,7 +89,8 @@ def make(rows: list[dict], meta: dict, tag: str, store, resolver: Resolver) -> t
                               f"폐지조서 {r['연번']}번: {r['행정동']}, {r['도로명주소']}, {r['폐지일']}, {r['폐지사유']}, {r['비고']}",
                               f"도로명주소와 지번이 같은 건물 {len(by_road)}개를 가리킨다",
                               f"출처: {meta.get('출처', '')}"],
-                    changes=changes, location=location_of(store, b)))
+                    changes=changes, location=location_of(store, b), notice_key=notice_key,
+                    based_on=based_on(store, b, entrances)))
                 item["제안"].append(pid)
             item["결과"] = f"폐지 제안 {len(by_road)}건"
         report.append(item)
@@ -93,6 +109,8 @@ def main() -> None:
     for item in report:
         print(f"{item['연번']:>2} {item['도로명주소']:<16} {item['결과']}")
     print(f"제안 {len(props)}건, 새로 추가 {added}건")
+    for pid in added.differ:
+        print(f"건너뜀 {pid}: 같은 id의 제안이 이미 있는데 내용이 다르다")
 
 
 if __name__ == "__main__":

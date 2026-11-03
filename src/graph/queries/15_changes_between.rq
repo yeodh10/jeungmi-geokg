@@ -1,11 +1,13 @@
-# 두 시각 사이에 승인된 변경과 그 변경이 넣고 뺀 트리플 (시점별 판 비교). {{SINCE}}, {{UNTIL}}은 xsd:dateTime
+# 두 시각 사이의 변경과 그 변경이 넣고 뺀 트리플 (시점별 판 비교). {{SINCE}}, {{UNTIL}}은 xsd:dateTime
+# 승인과 승인을 거둔 정정(action이 withdraw) 둘 다 나온다. 제안의 대상은 제안을 대상에 잇는 사건에서 읽는다
 PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?decidedAt ?proposal ?action ?target ?op ?s ?p ?o WHERE {
-  ?proposal a jgk:ChangeProposal ; jgk:decidedAt ?decidedAt ; jgk:proposalAction ?action ; jgk:affects ?target ; jgk:hasChange ?c .
-  ?c jgk:changeOp ?op ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
+SELECT DISTINCT ?order ?decidedAt ?proposal ?action ?target ?op ?s ?p ?o WHERE {
+  ?c jgk:changeOf ?proposal ; jgk:decidedAt ?decidedAt ; jgk:proposalAction ?action ; jgk:changeOrder ?order ;
+     jgk:changeOp ?op ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
   FILTER (?decidedAt > "{{SINCE}}"^^xsd:dateTime && ?decidedAt <= "{{UNTIL}}"^^xsd:dateTime)
-} ORDER BY ?decidedAt ?proposal ?op
+  FILTER (?p != prov:wasInfluencedBy)
+  ?link jgk:changeOf ?proposal ; rdf:predicate prov:wasInfluencedBy ; rdf:subject ?target .
+} ORDER BY ?order

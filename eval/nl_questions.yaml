@@ -6,6 +6,7 @@
 #   values   정답은 값(이름 등) 집합. 정답 값이 모델 결과에 모두 나오고, 결과 행이 정답의 3배를 넘지 않으면 맞다
 #   boolean  ASK. 참거짓이 같으면 맞다
 # 시스템 프롬프트에 예시로 넣는 쿼리(src/graph/queries)와 거의 같은 질문은 넣지 않았다.
+# q06, q18은 민원행정기관 자료의 기관 이름 대신 내비게이션용DB의 도로명주소로 묻는다. 정답 값은 옛 문구와 같다 (docs/llm-eval.md).
 
 - id: q01
   question: 증미역 역사 건물의 도로명주소는?
@@ -34,10 +35,10 @@
     SELECT DISTINCT ?f WHERE { ?f a jgk:PublicFacility ; geo:hasDefaultGeometry/geo:asWKT ?w .
       FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001:200}})) }
 - id: q06
-  question: 강서소방서가 들어 있는 건물은 지상 몇 층이야?
+  question: 서울특별시 강서구 양천로 550 건물은 지상 몇 층이야?
   kind: values
   gold: |
-    SELECT ?n WHERE { ?f a jgk:PublicFacility ; rdfs:label "강서소방서"@ko ; jgk:housedIn ?b . ?b jgk:floorsAbove ?n }
+    SELECT ?n WHERE { ?b a jgk:Building ; jgk:roadAddress "서울특별시 강서구 양천로 550" ; jgk:floorsAbove ?n }
 - id: q07
   question: 지상 20층 이상인 건물은 몇 개야?
   kind: count
@@ -94,11 +95,11 @@
   gold: |
     SELECT ?name WHERE { ?f a jgk:PublicFacility ; jgk:facilityType ?t ; rdfs:label ?name . FILTER(STRSTARTS(?t, "경찰서/")) }
 - id: q18
-  question: 등촌119안전센터에서 300m 안에 있는 학교 이름은?
+  question: 서울특별시 강서구 양천로 550 건물에서 300m 안에 있는 학교 이름은?
   kind: values
   gold: |
     SELECT ?name WHERE { ?f a jgk:PublicFacility ; jgk:facilityType ?t ; rdfs:label ?name ; geo:hasDefaultGeometry/geo:asWKT ?w .
-      FILTER(STRSTARTS(?t, "학교/")) FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/public-facility/6113432:300}})) }
+      FILTER(STRSTARTS(?t, "학교/")) FILTER(geof:sfIntersects(?w, {{NEAR:https://yeodh10.github.io/jeungmi-geokg/id/building/1150010200106300002026625:300}})) }
 - id: q19
   question: 이름에 '아파트'가 들어간 건물은 몇 개야?
   kind: count

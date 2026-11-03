@@ -153,13 +153,18 @@ def add_maps(g: Graph, proc: Path) -> None:
         path = proc / f"building_{name}.csv"
         if not path.exists():
             continue
-        for r in pd.read_csv(path, dtype=str, keep_default_na=False).itertuples():
+        rows = pd.read_csv(path, dtype=str, keep_default_na=False)
+        for r in rows.itertuples():
             g.add((URIRef(r.building_uri), prop, URIRef(r.map_uri)))
-            if name == "basemap":  # 견준 결과는 지도 쪽 객체에 적는다 (공개 보류가 같이 걸린다)
-                m = URIRef(r.map_uri)
-                g.add((m, JGK.pnuAgrees, Literal(r.pnu_same == "True")))
-                if r.address_same in ("True", "False"):
-                    g.add((m, JGK.addressAgrees, Literal(r.address_same == "True")))
+        if name != "basemap":
+            continue
+        # 견준 결과는 지도 쪽 객체에 적는다 (공개 보류가 같이 걸린다). 폴리곤을 함께 쓰는 건물은 주소가 서로 다르므로 하나라도 같으면 같다고 적는다
+        for map_uri, same in rows.groupby("map_uri"):
+            m = URIRef(map_uri)
+            g.add((m, JGK.pnuAgrees, Literal(bool(same["pnu_same"].eq("True").any()))))
+            compared = same["address_same"].isin(["True", "False"])
+            if compared.any():
+                g.add((m, JGK.addressAgrees, Literal(bool(same["address_same"].eq("True").any()))))
 
 
 def add_sensors(g: Graph, proc: Path) -> None:

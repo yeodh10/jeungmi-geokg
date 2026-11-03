@@ -4,9 +4,11 @@
       python -m src.eval.notice_eval --regrade      (모델을 다시 부르지 않고 저장된 추출 결과를 다시 채점)
 입력: data/raw/notices/eval/{mgtNo}.txt (python -m src.eval.collect_notices로 받는다), eval/notice_gold.yaml
 출력: data/processed/eval/notice_eval.json
-제안 파일은 건드리지 않는다. 운영과 같은 프롬프트(src.llm.notice.SYSTEM)와 같은 출력 형식으로 추출만 한다.
+제안 파일은 건드리지 않는다. 운영 코드의 프롬프트 함수(src.llm.notice의 SYSTEM, build_prompt)와 같은 출력 형식으로 추출만 한다.
+입력 가드, 원문 대조, 객체 찾기는 거치지 않는다. 저장된 결과는 잰 때의 프롬프트로 얻은 것이라, 프롬프트를 바꾸면 다시 재야 한다.
 
-원문만으로 재는 것 (모든 문서). 원문은 모델에 넣은 것 그대로(제목과 본문)다:
+원문만으로 재는 것 (모든 문서). 원문은 모델에 넣은 것 그대로(제목과 본문)다.
+운영의 원문 대조(src.llm.notice.check_grounded)와 같은 함수로 판정한다:
   quote_exact   뽑은 근거 문장(quote)이 원문에 그대로 있는가 (띄어쓰기는 무시)
   grounded      뽑은 도로명주소, 지번이 원문에 있는가 (지어낸 주소가 없는가)
 정답으로 재는 것 (eval/notice_gold.yaml에 있는 문서):
@@ -18,7 +20,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -27,7 +28,8 @@ import yaml
 
 from src.eval.nl_eval import USAGE_KEYS, Recording
 from src.llm.client import get_client, parse
-from src.llm.notice import SYSTEM, NoticeExtraction, read_notice
+from src.llm.notice import SYSTEM, NoticeExtraction, build_prompt, in_source, read_notice, source_text
+from src.llm.notice import norm as squash
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / "data" / "raw" / "notices" / "eval"
@@ -35,15 +37,11 @@ GOLD = ROOT / "eval" / "notice_gold.yaml"
 OUT = ROOT / "data" / "processed" / "eval" / "notice_eval.json"
 
 
-def squash(s: str | None) -> str:
-    return re.sub(r"\s+", "", s or "")
-
-
 def grade(ext: NoticeExtraction, body: str, gold: dict | None, title: str = "") -> dict:
-    doc = squash(title) + squash(body)
-    quotes = [squash(c.quote) in doc for c in ext.changes]
+    doc = source_text(title, body)
+    quotes = [in_source(c.quote, doc) for c in ext.changes]
     addrs = [a for c in ext.changes for a in (c.target.road_address, c.target.jibun_address) if a]
-    out = {"quote_exact": quotes, "grounded": [squash(a) in doc for a in addrs]}
+    out = {"quote_exact": quotes, "grounded": [in_source(a, doc) for a in addrs]}
     if gold is None:
         return out
     if gold.get("is_spatial") is not None:
@@ -86,7 +84,7 @@ def main() -> None:
         before = len(rec.calls)
         t0 = time.perf_counter()
         try:
-            ext = parse(rec, NoticeExtraction, SYSTEM, f"고시공고 제목: {meta.get('제목', '')}\n\n{body}")
+            ext = parse(rec, NoticeExtraction, SYSTEM, build_prompt(meta.get("제목", ""), body))
             row = {"is_spatial": ext.is_spatial, "changes": [c.model_dump() for c in ext.changes],
                    **grade(ext, body, gold.get(path.stem), meta.get("제목", ""))}
         except Exception as e:  # 거절이나 형식 오류도 기록한다

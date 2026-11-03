@@ -2,7 +2,8 @@
 data/raw/*
 !data/raw/.gitkeep
 
-# 이용 조건 확인이 끝나기 전까지 가공 데이터도 올리지 않는다 (docs/decisions.md 참고)
+# 가공 데이터도 올리지 않는다. 수치지형도와 국가기본도는 공간정보관리법의 국외 반출 제한 때문에 공개 저장소에 올리지 않고,
+# 전자지도 2종은 공개 보류를 유지한다 (docs/decisions.md 참고)
 data/processed/*
 !data/processed/.gitkeep
 

@@ -73,14 +73,16 @@ jgk:mapUseCode a owl:DatatypeProperty ; rdfs:label "국가기본도 건물 용�
     rdfs:comment "코드 값의 뜻은 코드 정의서를 확인하지 못해 값 그대로 둔다."@ko ; rdfs:range xsd:string .
 jgk:mapFloors a owl:DatatypeProperty ; rdfs:label "지도의 층수"@ko ; rdfs:range xsd:integer .
 jgk:basemapFeature a owl:ObjectProperty ; rdfs:label "국가기본도의 같은 건물"@ko ;
-    rdfs:comment "모양이 서로 가장 많이 겹치고 IoU가 0.5 이상인 짝. 겹친 정도는 지도 쪽 jgk:matchIoU에 적는다."@ko ;
+    rdfs:comment "모양이 서로 가장 많이 겹치고 IoU가 0.5 이상인 짝. 건물관리번호 여럿이 한 폴리곤을 함께 쓰면 그 건물 모두가 같은 지도 건물을 가리킨다. 겹친 정도는 지도 쪽 jgk:matchIoU에 적는다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:BaseMapFeature .
 jgk:digitalMapFeature a owl:ObjectProperty ; rdfs:label "수치지형도의 같은 건물"@ko ;
     rdfs:comment "jgk:basemapFeature와 같은 규칙으로 수치지형도 건물에 잇는다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:DigitalMapFeature .
 jgk:matchIoU a owl:DatatypeProperty ; rdfs:label "모양 겹침 정도(IoU)"@ko ; rdfs:range xsd:decimal .
-jgk:pnuAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 PNU가 같다"@ko ; rdfs:range xsd:boolean .
-jgk:addressAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 도로명주소가 같다"@ko ; rdfs:range xsd:boolean .
+jgk:pnuAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 PNU가 같다"@ko ; rdfs:range xsd:boolean ;
+    rdfs:comment "이은 건물이 여럿이면 하나라도 같을 때 참이다."@ko .
+jgk:addressAgrees a owl:DatatypeProperty ; rdfs:label "이은 건물과 도로명주소가 같다"@ko ; rdfs:range xsd:boolean ;
+    rdfs:comment "이은 건물이 여럿이면 하나라도 같을 때 참이다. 국가기본도 주소에는 지상, 지하 구분이 없어 지하 주소 건물은 견주지 않는다."@ko .
 
 jgk:Building jgk:basemapClass jgk:basemap-B .
 jgk:Road jgk:basemapClass jgk:basemap-A .
@@ -110,6 +112,9 @@ jgk:inLegalDong a owl:ObjectProperty ; rdfs:label "법정동에 속한다"@ko ;
 jgk:inBasicZone a owl:ObjectProperty ; rdfs:label "기초구역에 속한다"@ko ;
     rdfs:comment "건물 주소의 우편번호로 정한 소속이다."@ko ;
     rdfs:domain jgk:Building ; rdfs:range jgk:BasicZone .
+jgk:sameBuildingAs a owl:ObjectProperty ; rdfs:label "같은 실물 건물"@ko ;
+    rdfs:comment "주소 미연결 건물이 건물관리번호 건물과 같은 실물 건물이라는 연결. 두 객체는 자료가 달라 모양, 용도, 이름, 층수가 서로 다를 수 있다. owl:sameAs로 잇고 추론하면 두 객체의 값과 번호가 한 객체에 섞이므로 쓰지 않는다. 2026-11-02 앞에 승인한 제안은 owl:sameAs로 남아 있다."@ko ;
+    rdfs:domain jgk:Building ; rdfs:range jgk:Building .
 jgk:within a owl:ObjectProperty ; rdfs:label "행정동에 속한다"@ko ;
     rdfs:comment "원천 데이터의 행정동코드로 정한 소속이다. 모양끼리의 포함 관계는 geof:sfWithin으로 따로 계산한다."@ko ;
     rdfs:domain geo:Feature ; rdfs:range jgk:AdminDong .
@@ -161,7 +166,7 @@ jgk:households a owl:DatatypeProperty ; rdfs:label "세대수"@ko ; rdfs:range x
 jgk:mainBuildingCount a owl:DatatypeProperty ; rdfs:label "주건축물수"@ko ; rdfs:range xsd:integer .
 jgk:complexMainUse a owl:DatatypeProperty ; rdfs:label "단지 주용도"@ko ; rdfs:range xsd:string .
 
-# 변경 제안 (사람이 승인한 것만 그래프에 들어온다)
+# 변경 제안 (승인된 것만 그래프에 들어온다)
 
 jgk:Notice a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "고시공고"@ko ;
     rdfs:comment "구청 고시 한 건. URI는 고시 번호(시군구코드-연도-번호)를 그대로 쓴다. 구역, 사업에는 전국 공통 번호가 없어 고시를 객체로 두고 대상을 잇는다."@ko .
@@ -174,18 +179,25 @@ jgk:completedBy a owl:ObjectProperty ; rdfs:label "준공, 공사완료 고시"@
 
 jgk:ChangeProposal a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "변경 제안"@ko .
 jgk:affects a owl:ObjectProperty ; rdfs:label "바꾸는 대상"@ko ; rdfs:domain jgk:ChangeProposal .
-jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko .
+jgk:proposalAction a owl:DatatypeProperty ; rdfs:label "제안 종류(create, update, retire, link)"@ko ;
+    rdfs:comment "변경 기록(rdf:Statement)에는 승인을 거둘 때 생긴 사건을 뜻하는 withdraw도 쓴다."@ko .
 jgk:sourceKind a owl:DatatypeProperty ; rdfs:label "제안 출처(rule-candidate, data-diff, llm-notice, notice-table)"@ko .
-jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "승인한 사람"@ko .
-jgk:decidedAt a owl:DatatypeProperty ; rdfs:label "승인 시각"@ko ; rdfs:range xsd:dateTime .
+jgk:decidedBy a owl:DatatypeProperty ; rdfs:label "결정한 검토자"@ko ;
+    rdfs:comment "승인이나 정정을 한 검토자 이름. 사람이거나, 사람이 맡긴 자동 검토자다(기록에 'Claude (사용자 위임)'처럼 그대로 남는다). 변경 기록에는 정정 사건의 검토자도 적는다."@ko .
+jgk:decidedAt a owl:DatatypeProperty ; rdfs:label "결정 시각"@ko ; rdfs:range xsd:dateTime ;
+    rdfs:comment "승인 시각. 변경 기록에는 정정 사건의 시각도 적는다."@ko .
 jgk:hasChange a owl:ObjectProperty ; rdfs:label "바꾼 트리플"@ko ; rdfs:domain jgk:ChangeProposal ; rdfs:range rdf:Statement ;
     rdfs:comment "승인된 제안이 넣거나 뺀 트리플 하나. rdf:subject, rdf:predicate, rdf:object와 jgk:changeOp로 적는다. 이 기록으로 승인 전 시점의 그래프를 되살린다."@ko .
 jgk:changeOp a owl:DatatypeProperty ; rdfs:label "넣기(add) 또는 빼기(remove)"@ko ; rdfs:range xsd:string .
+jgk:changeOf a owl:ObjectProperty ; rdfs:label "이 변경을 낸 제안"@ko ; rdfs:domain rdf:Statement ; rdfs:range jgk:ChangeProposal ;
+    rdfs:comment "제안 노드가 승인을 거둘 때 빠져도 변경 기록은 이 관계로 제안을 가리킨다."@ko .
+jgk:changeOrder a owl:DatatypeProperty ; rdfs:label "변경 재생 순서"@ko ; rdfs:domain rdf:Statement ; rdfs:range xsd:integer ;
+    rdfs:comment "결정의 일련번호 * 1,000,000 + 제안 안의 차례. 시각 T의 값은 트리플마다 이 번호가 가장 큰 사건으로 정한다."@ko .
 
 # BIM 모델과 잇기 (docs/bim.md)
 
 jgk:bimBuilding a owl:ObjectProperty ; rdfs:label "BIM 모델 건물"@ko ; rdfs:domain jgk:Building ;
-    rdfs:comment "같은 실물 건물의 BIM 모델 건물(IFC를 W3C BOT로 바꾼 bot:Building). BIM의 층, 공간, 부재는 BIM 그래프에 두고 여기에는 이 연결만 둔다. 제안을 거쳐 사람이 승인한다(src/review/bim_proposals.py)."@ko .
+    rdfs:comment "같은 실물 건물의 BIM 모델 건물(IFC를 W3C BOT로 바꾼 bot:Building). BIM의 층, 공간, 부재는 BIM 그래프에 두고 여기에는 이 연결만 둔다. 제안을 거쳐 승인한 연결만 넣는다(src/review/bim_proposals.py)."@ko .
 
 # 센서와 관측 (W3C, OGC 공동 표준 SOSA/SSN)
 
@@ -248,8 +260,8 @@ jgk:dataset-ngii-basemap a jgk:Dataset ;
     rdfs:label "국토지리정보원 국가기본도 (국토정보플랫폼 내려받기, 2026-10-30, 증미역 반경 1.25km 영역)"@ko ;
     dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-ngii-digital-map a jgk:Dataset ;
-    dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
-    rdfs:label "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 2025년 제작)"@ko ;
+    dcterms:title "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 37608085, 2025년 제작)"@ko ;
+    rdfs:label "국토지리정보원 수치지형도 Ver2.0 1:5,000 (도엽 37608075, 37608085, 2025년 제작)"@ko ;
     dcterms:source <https://map.ngii.go.kr> .
 jgk:dataset-agency-code a jgk:Dataset ;
     dcterms:title "행정안전부 행정표준코드 기관코드"@ko ;
@@ -264,3 +276,9 @@ jgk:dataset-sdot a jgk:Dataset ;
     rdfs:label "서울시 스마트서울 도시데이터 센서(S-DoT) 환경정보 (설치 위치 2026-03-11, 관측 2026-10-12~18)"@ko ;
     dcterms:license "공공누리 제1유형 (출처표시)"@ko ;
     dcterms:source <https://data.seoul.go.kr/dataList/OA-15969/S/1/datasetView.do> .
+jgk:dataset-gangseo-notice a jgk:Dataset ;
+    dcterms:title "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;
+    rdfs:label "서울특별시 강서구 고시공고 (강서구청 누리집 고시공고 게시판)"@ko ;
+    rdfs:comment "고시공고에서 뽑은 변경 제안(src/llm/notice.py)과 첨부 표로 만든 제안(src/review/address_retirement.py)의 근거다. 고시 하나하나의 주소는 고시 객체의 dcterms:source에 적는다."@ko ;
+    dcterms:license "저작권법 제7조 제2호: 국가나 지방자치단체의 고시, 공고, 훈령은 이 법의 보호를 받지 못한다"@ko ;
+    dcterms:source <https://www.gangseo.seoul.kr/gs040301> .

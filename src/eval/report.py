@@ -1,18 +1,25 @@
-"""평가 결과(data/processed/eval/*.json)를 docs/llm-eval.md로 정리한다.
+"""평가 결과(data/processed/eval/*.json)로 docs/llm-eval.md의 자동 표를 다시 쓴다.
 
 실행: python -m src.eval.report
+문서에서 바꾸는 곳은 '<!-- 자동 시작: 이름 ... -->'과 '<!-- 자동 끝: 이름 -->' 사이뿐이다. 그 밖의 글은 사람이 고친 그대로 둔다.
+문서가 없으면 처음 꼴(표시 포함)로 새로 만든다. 다시 쓸 표의 표시가 문서에 없으면 문서를 건드리지 않고 실패로 끝낸다.
 """
 from __future__ import annotations
 
 import json
+import re
+import sys
 from collections import Counter
 from pathlib import Path
 
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "data" / "processed" / "eval"
 OUT = ROOT / "docs" / "llm-eval.md"
+QUESTIONS = ROOT / "eval" / "nl_questions.yaml"
 KIND_KO = {"count": "개수", "entities": "객체 목록", "values": "값", "boolean": "있다 없다"}
+MARK = re.compile(r"(<!-- 자동 시작: ([\w-]+)[^\n]*-->\n)(.*?)(<!-- 자동 끝: \2 -->)", re.S)
 
 
 def pct(a: int, b: int) -> str:
@@ -29,35 +36,42 @@ def token_line(t: dict, calls: int) -> str:
             f"{t['cache_creation_input_tokens']:,}), 출력 {t['output_tokens']:,} 토큰")
 
 
-def nl_section(rows: list[dict]) -> list[str]:
+def current_questions() -> dict[str, str]:
+    """지금 문제 문구. 잰 뒤 문구를 바꾼 문제는 표에 지금 문구를 쓰고 바뀌었다고 적는다 (옛 문구를 문서에 되살리지 않는다)."""
+    if not QUESTIONS.exists():
+        return {}
+    return {q["id"]: q["question"] for q in yaml.safe_load(QUESTIONS.read_text(encoding="utf-8")) or []}
+
+
+def nl_blocks(rows: list[dict]) -> dict[str, list[str]]:
     n = len(rows)
     strict = sum(r["correct"] for r in rows)
     # 정답 포함: 값 문제는 정답 값이 모두 결과에 있으면(행이 많아도) 맞은 것으로 본다
     contains = sum(r["correct"] or (r["kind"] == "values" and r.get("recall") == 1.0) for r in rows)
     retried = sum(r["llm_calls"] > 1 for r in rows)
-    out = ["## 1. 자연어 질의 (질문 -> SPARQL)", "",
-           "질문마다 사람이 정답 SPARQL을 쓰고 지금 그래프에 돌려 정답을 정했다. 모델이 쓴 SPARQL을 실행한 결과가 정답과 같은지 본다(실행 정확도).",
-           "문제와 정답 쿼리는 [eval/nl_questions.yaml](../eval/nl_questions.yaml)에 있다.", "",
-           "| 항목 | 값 |", "|---|---|",
-           f"| 엄격한 정답 | {pct(strict, n)} |",
-           f"| 정답을 포함 (값 문제에서 행이 많아도 정답이 다 들어 있음) | {pct(contains, n)} |",
-           f"| 오류를 보고 다시 쓴 질문 | {retried} |",
-           f"| 걸린 시간 (질문 하나) | 평균 {sum(r['seconds'] for r in rows) / n:.1f}초, 가장 긴 것 {max(r['seconds'] for r in rows):.1f}초 |",
-           f"| 토큰 | {token_line(tokens(rows), sum(r['llm_calls'] for r in rows))} |", "",
-           "| 문제 | 종류 | 결과 | 호출 | 초 |", "|---|---|---|---|---|"]
+    now = current_questions()
+    table = ["| 항목 | 값 |", "|---|---|",
+             f"| 엄격한 정답 | {pct(strict, n)} |",
+             f"| 정답을 포함 (값 문제에서 행이 많아도 정답이 다 들어 있음) | {pct(contains, n)} |",
+             f"| 오류를 보고 다시 쓴 질문 | {retried} |",
+             f"| 걸린 시간 (질문 하나) | 평균 {sum(r['seconds'] for r in rows) / n:.1f}초, 가장 긴 것 {max(r['seconds'] for r in rows):.1f}초 |",
+             f"| 토큰 | {token_line(tokens(rows), sum(r['llm_calls'] for r in rows))} |", "",
+             "| 문제 | 종류 | 결과 | 호출 | 초 |", "|---|---|---|---|---|"]
     for r in rows:
         mark = "맞음" if r["correct"] else ("정답 포함" if r["kind"] == "values" and r.get("recall") == 1.0 else "틀림")
-        out.append(f"| {r['id']} {r['question']} | {KIND_KO[r['kind']]} | {mark} | {r['llm_calls']} | {r['seconds']} |")
-    misses = [r for r in rows if not r["correct"]]
-    if misses:
-        out += ["", "틀린 문제:"]
-        for r in misses:
+        question = now.get(r["id"], r["question"])
+        if question != r["question"]:
+            question += " (문구 바꿈, 표 아래 참고)"
+        table.append(f"| {r['id']} {question} | {KIND_KO[r['kind']]} | {mark} | {r['llm_calls']} | {r['seconds']} |")
+    misses = []
+    for r in rows:
+        if not r["correct"]:
             why = r.get("error") or f"결과 {r.get('n_rows')}행, 정답 {r['gold']}"
-            out.append(f"- {r['id']}: {why}")
-    return out
+            misses.append(f"- {r['id']}: {why}")
+    return {"nl-table": table, "nl-misses": ["틀린 문제:"] + misses if misses else ["틀린 문제: 없음"]}
 
 
-def notice_section(rows: list[dict], before: list[dict] | None = None) -> list[str]:
+def notice_blocks(rows: list[dict], before: list[dict] | None = None) -> dict[str, list[str]]:
     ok = [r for r in rows if "error" not in r]
     quotes = [q for r in ok for q in r["quote_exact"]]
     grounded = [g for r in ok for g in r["grounded"]]
@@ -66,65 +80,74 @@ def notice_section(rows: list[dict], before: list[dict] | None = None) -> list[s
     targets = [t for r in gold for t in r.get("targets_found", [])]
     types = [r["change_types_ok"] for r in gold if "change_types_ok" in r]
     dates = [r["date_ok"] for r in gold if "date_ok" in r]
-    out = ["## 2. 고시공고 추출 (글 -> 바뀌는 내용)", "",
-           "강서구청 누리집의 실제 고시(제목에 '고시'가 든 글)를 운영과 같은 프롬프트로 넣었다. 원문은 커밋하지 않고 번호로만 적는다",
-           "(`python -m src.eval.collect_notices`로 다시 받는다). 정답은 [eval/notice_gold.yaml](../eval/notice_gold.yaml)에 사람이 달았다.", "",
-           "| 항목 | 값 |", "|---|---|",
-           f"| 문서 | {len(rows)}건 (정답을 단 문서 {len(gold)}건, 오류 {len(rows) - len(ok)}건) |",
-           f"| 근거 문장이 원문 그대로 | {pct(sum(quotes), len(quotes))} |",
-           f"| 뽑은 주소, 지번이 원문에 있음 (지어내지 않음) | {pct(sum(grounded), len(grounded))} |",
-           f"| 공간 문서 판단 | {pct(sum(spatial), len(spatial))} |",
-           f"| 정답 대상(지번, 주소, 이름)을 뽑음 | {pct(sum(targets), len(targets))} |",
-           f"| 변경 종류가 정답이 허용하는 범위 | {pct(sum(types), len(types))} |",
-           f"| 효력 날짜 | {pct(sum(dates), len(dates))} |",
-           f"| 걸린 시간 (문서 하나) | 평균 {sum(r['seconds'] for r in rows) / max(1, len(rows)):.1f}초 |",
-           f"| 토큰 | {token_line(tokens(rows), len(rows))} |", ""]
+    table = ["| 항목 | 값 |", "|---|---|",
+             f"| 문서 | {len(rows)}건 (정답을 단 문서 {len(gold)}건, 오류 {len(rows) - len(ok)}건) |",
+             f"| 근거 문장이 원문 그대로 | {pct(sum(quotes), len(quotes))} |",
+             f"| 뽑은 주소, 지번이 원문에 있음 (지어내지 않음) | {pct(sum(grounded), len(grounded))} |",
+             f"| 공간 문서 판단 | {pct(sum(spatial), len(spatial))} |",
+             f"| 정답 대상(지번, 주소, 이름)을 뽑음 | {pct(sum(targets), len(targets))} |",
+             f"| 변경 종류가 정답이 허용하는 범위 | {pct(sum(types), len(types))} |",
+             f"| 효력 날짜 | {pct(sum(dates), len(dates))} |",
+             f"| 걸린 시간 (문서 하나) | 평균 {sum(r['seconds'] for r in rows) / max(1, len(rows)):.1f}초 |",
+             f"| 토큰 | {token_line(tokens(rows), len(rows))} |"]
     bad = [r for r in gold if not all([r.get("is_spatial_ok", True), all(r.get("targets_found", [])),
                                        r.get("change_types_ok", True), r.get("date_ok", True)])]
     if bad:
-        out.append("정답과 다른 문서:")
+        table += ["", "정답과 다른 문서:"]
         for r in bad:
             parts = [k for k in ("is_spatial_ok", "change_types_ok", "date_ok") if r.get(k) is False]
             if r.get("targets_found") and not all(r["targets_found"]):
                 parts.append("targets")
-            out.append(f"- {r['no']} {r['title']}: {', '.join(parts)}")
-        out.append("")
+            table.append(f"- {r['no']} {r['title']}: {', '.join(parts)}")
     kinds = Counter(c["change_type"] for r in ok for c in r["changes"])
     n_changes = sum(kinds.values())
-    out += ["운영에서 본 것:", "",
+    seen = ["운영에서 본 것:", "",
             f"- 문서 {len(ok)}건 중 {sum(r['is_spatial'] for r in ok)}건을 공간 문서로 보고 {sum(bool(r['changes']) for r in ok)}건에서 변경 {n_changes}개를 뽑았다.",
             "- 변경 종류: " + ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + ".",
-            f"- other는 {kinds.get('other', 0)}개({kinds.get('other', 0) / max(1, n_changes):.0%})다.", ""]
+            f"- other는 {kinds.get('other', 0)}개({kinds.get('other', 0) / max(1, n_changes):.0%})다."]
     if before:
         old = Counter(c["change_type"] for r in before if "error" not in r for c in r["changes"])
         n_old = sum(old.values())
-        names = sorted(set(old) | set(kinds), key=lambda k: -(kinds.get(k, 0) + old.get(k, 0)))
-        out += ["변경 종류를 넓히기 전과 뒤 (2026-10-30, 같은 95건):", "",
-                "| 종류 | 전 | 뒤 |", "|---|---|---|"]
-        out += [f"| {k} | {old.get(k, 0)} | {kinds.get(k, 0)} |" for k in names]
-        out += [f"| 합계 (other 비율) | {n_old} ({old.get('other', 0) / max(1, n_old):.0%}) | {n_changes} ({kinds.get('other', 0) / max(1, n_changes):.0%}) |", "",
-                "넓히기 전에는 정비사업 인가, 구역 지정, 계획 결정에 맞는 칸이 없어 대부분 other였다. zone_designated, zone_released, plan_approved, project_completed를 더했고,",
-                "이 네 종류는 고시를 객체(notice/{시군구코드}-{연도}-{번호})로 만들어 대상 필지나 건물에서 잇는 제안이 된다(범위 안 대상일 때).", ""]
+        names = sorted(set(old) | set(kinds), key=lambda k: (-(kinds.get(k, 0) + old.get(k, 0)), k))  # 같은 수는 이름 차례로
+        seen += ["", "변경 종류를 넓히기 전과 뒤 (2026-10-30, 같은 95건):", "",
+                 "| 종류 | 전 | 뒤 |", "|---|---|---|"]
+        seen += [f"| {k} | {old.get(k, 0)} | {kinds.get(k, 0)} |" for k in names]
+        seen += [f"| 합계 (other 비율) | {n_old} ({old.get('other', 0) / max(1, n_old):.0%}) | {n_changes} ({kinds.get('other', 0) / max(1, n_changes):.0%}) |", "",
+                 "넓히기 전에는 정비사업 인가, 구역 지정, 계획 결정에 맞는 칸이 없어 대부분 other였다. zone_designated, zone_released, plan_approved, project_completed를 더했고,",
+                 "이 네 종류는 고시를 객체(notice/{시군구코드}-{연도}-{번호})로 만들어 대상 필지나 건물에서 잇는 제안이 된다(범위 안 대상일 때)."]
     wrong_quotes = [r["no"] for r in ok if not all(r["quote_exact"])]
     ungrounded = [r["no"] for r in ok if not all(r["grounded"])]
     if wrong_quotes or ungrounded:
-        out.append(f"원문과 다른 근거 문장이 있는 문서: {', '.join(wrong_quotes) or '없음'}. 원문에 없는 주소가 있는 문서: {', '.join(ungrounded) or '없음'}.")
-    return out
+        seen += ["", f"원문과 다른 근거 문장이 있는 문서: {', '.join(wrong_quotes) or '없음'}. 원문에 없는 주소가 있는 문서: {', '.join(ungrounded) or '없음'}."]
+    return {"notice-table": table, "notice-seen": seen}
 
 
-def main() -> None:
+def marked(name: str, lines: list[str]) -> list[str]:
+    return [f"<!-- 자동 시작: {name} (src/eval/report.py가 이 표시 사이만 다시 쓴다) -->", "", *lines, "", f"<!-- 자동 끝: {name} -->"]
+
+
+def first_doc(blocks: dict[str, list[str]]) -> str:
+    """문서가 없을 때 만드는 처음 꼴. 자동 표 말고는 사람이 고쳐 쓰는 글이다."""
     lines = ["# LLM 평가", "",
              "이 프로젝트에서 LLM이 맡은 일 두 가지(자연어 질문을 SPARQL로 바꾸기, 고시공고에서 바뀌는 내용 뽑기)를 실제 모델로 잰 결과다.",
              "모델은 src/llm/client.py의 설정(claude-opus-5-5, 구조화 출력, 시스템 프롬프트 캐시) 그대로다. 다시 재려면:", "",
              "```bash", ".venv/Scripts/python -m src.eval.nl_eval", ".venv/Scripts/python -m src.eval.collect_notices",
              ".venv/Scripts/python -m src.eval.notice_eval", ".venv/Scripts/python -m src.eval.report", "```", ""]
-    nl, nt = EVAL / "nl_eval.json", EVAL / "notice_eval.json"
-    if nl.exists():
-        lines += nl_section(json.loads(nl.read_text(encoding="utf-8"))) + [""]
-    if nt.exists():
-        bf = EVAL / "notice_eval_before.json"
-        lines += notice_section(json.loads(nt.read_text(encoding="utf-8")),
-                                json.loads(bf.read_text(encoding="utf-8")) if bf.exists() else None) + [""]
+    if "nl-table" in blocks:
+        lines += ["## 1. 자연어 질의 (질문 -> SPARQL)", "",
+                  "질문마다 사람이 정답 SPARQL을 쓰고 지금 그래프에 돌려 정답을 정했다. 모델이 쓴 SPARQL을 실행한 결과가 정답과 같은지 본다(실행 정확도).",
+                  "문제와 정답 쿼리는 [eval/nl_questions.yaml](../eval/nl_questions.yaml)에 있다.", "",
+                  *marked("nl-table", blocks["nl-table"]), "",
+                  "표에서 '문구 바꿈'은 잰 뒤 eval/nl_questions.yaml의 문구를 바꾼 문제다. 그 결과는 옛 문구로 잰 것이다.", "",
+                  *marked("nl-misses", blocks["nl-misses"]), ""]
+    if "notice-table" in blocks:
+        lines += ["## 2. 고시공고 추출 (글 -> 바뀌는 내용)", "",
+                  "강서구청 누리집의 실제 고시(제목에 '고시'가 든 글)를 운영 코드의 프롬프트 함수(src.llm.notice의 SYSTEM, build_prompt)로 넣는다.",
+                  "아래 숫자는 결과 파일을 만든 때의 프롬프트로 잰 값이라, 그 뒤 프롬프트가 바뀌었으면 지금 운영과 같은 조건이 아니다.",
+                  "평가는 입력 가드, 원문 대조, 객체 찾기를 거치지 않고 추출만 잰다.",
+                  "원문은 커밋하지 않고 번호로만 적는다 (`python -m src.eval.collect_notices`로 다시 받는다). 정답은 [eval/notice_gold.yaml](../eval/notice_gold.yaml)에 사람이 달았다.", "",
+                  *marked("notice-table", blocks["notice-table"]), "",
+                  *marked("notice-seen", blocks["notice-seen"]), ""]
     lines += ["## 채점을 고친 기록", "",
               "결과를 처음 채점했을 때 틀린 것 5건을 하나씩 보니 모두 채점 쪽 문제여서 고쳤다. 모델을 다시 부르지 않고 저장된 결과를 다시 채점했다.",
               "",
@@ -138,8 +161,43 @@ def main() -> None:
               "- 고시공고 정답도 한 사람이 달았고 23건뿐이다. 정비사업 인가처럼 공간 객체가 '바뀌는' 문서인지 애매한 것은 공간 판단을 재지 않았다(null). 정답 문서가 적어 100%라는 값을 넓게 믿으면 안 된다.",
               "- 고시는 본문만 넣는다. 폐지조서 같은 첨부(엑셀, PDF)는 이 평가에 없고, 첨부표는 코드가 읽는다(src/review/address_retirement.py).",
               "- 비용은 토큰 수로만 적는다. 단가는 Anthropic 요금표를 따른다.", ""]
-    OUT.write_text("\n".join(lines), encoding="utf-8")
-    print(f"-> {OUT}")
+    return "\n".join(lines)
+
+
+def fill(doc: str, blocks: dict[str, list[str]]) -> str:
+    """표시 사이만 새 내용으로 바꾼다. 다시 쓸 표의 표시가 없거나 두 번 있으면 ValueError (문서는 그대로 둔다)."""
+    found = Counter(m.group(2) for m in MARK.finditer(doc))
+    problems = [f"{name}: 표시 {found[name]}쌍" for name in blocks if found[name] != 1]
+    if problems:
+        raise ValueError("자동 표 표시가 맞지 않아 문서를 바꾸지 않았다 (" + ", ".join(problems) + ")")
+
+    def one(m: re.Match) -> str:
+        if m.group(2) not in blocks:
+            return m.group()
+        return m.group(1) + "\n" + "\n".join(blocks[m.group(2)]) + "\n\n" + m.group(4)
+    return MARK.sub(one, doc)
+
+
+def main() -> None:
+    blocks = {}
+    nl, nt = EVAL / "nl_eval.json", EVAL / "notice_eval.json"
+    if nl.exists():
+        blocks |= nl_blocks(json.loads(nl.read_text(encoding="utf-8")))
+    if nt.exists():
+        bf = EVAL / "notice_eval_before.json"
+        blocks |= notice_blocks(json.loads(nt.read_text(encoding="utf-8")),
+                                json.loads(bf.read_text(encoding="utf-8")) if bf.exists() else None)
+    if not OUT.exists():
+        OUT.write_text(first_doc(blocks), encoding="utf-8")
+        print(f"새 문서 -> {OUT}")
+        return
+    try:
+        text = fill(OUT.read_text(encoding="utf-8"), blocks)
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
+    OUT.write_text(text, encoding="utf-8")
+    print(f"자동 표 {len(blocks)}개를 다시 씀 -> {OUT}")
 
 
 if __name__ == "__main__":

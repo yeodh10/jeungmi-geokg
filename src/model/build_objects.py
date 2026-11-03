@@ -5,7 +5,7 @@
 출력: data/processed/objects.gpkg (building, entrance 레이어, EPSG:4326)
       data/processed/parcel.csv, admin_dong.csv, building_entrance.csv
       data/processed/road.csv, legal_dong, basic_zone, road_segment 레이어, entrance_road.csv (전자지도가 있을 때)
-      data/processed/review_gis_id_conflict.csv (사람이 볼 목록), objects_report.json
+      data/processed/review_gis_id_conflict.csv, review_register_duplicate.csv, review_gis_tiny.csv (사람이 볼 목록), objects_report.json
 규칙: docs/uri-policy.md
 """
 from __future__ import annotations
@@ -34,12 +34,15 @@ SUB_ENTRANCE_TYPE = {"01": "공용", "02": "차량용", "03": "보행자용"}
 # 내비게이션용DB 지번 산여부 -> PNU 대지구분
 MOUNTAIN_TO_LAND = {"0": "1", "1": "2"}
 ADDRESS_KEY = ["road_code", "underground", "bldg_main_no", "bldg_sub_no"]
+UNDERGROUND_KEY = "-지하"  # 지도 주소와 견주는 키에서 지하 주소에 붙이는 표시
 # 도로명주소 전자지도 도로위계구분 (ROA_CLS_SE). 서울 도로구간 6.7만 개의 도로명 끝말과 맞춰 보고 정했다 (docs/data-sources.md)
 ROAD_CLASS = {"1": "고속도로", "2": "대로", "3": "로", "4": "길"}
 # 국가기본도 건물과 우리 건물을 잇는 기준: 서로 가장 많이 겹치는 짝이고 IoU(겹친 넓이 / 합친 넓이)가 이 값 이상
 BASEMAP_IOU_LINK = 0.5
 # 이보다 낮지만 이 값 이상 겹치면 사람이 볼 목록에 남긴다
 BASEMAP_IOU_REVIEW = 0.2
+# GIS건물통합정보 모양이 이보다 작으면 실제 외곽이 아니라 자리표시로 본다 (0.08㎡ 마름모, docs/decisions.md)
+GIS_TINY_M2 = 1
 # 출입구를 도로 구간에 잇는 거리 한계 (같은 도로명의 가장 가까운 구간까지, EPSG:5186 미터). 넘으면 사람이 볼 목록에 남긴다
 FACE_ROAD_MAX_M = 60
 
@@ -64,6 +67,15 @@ def to_int(v) -> int | None:
         return int(float(s))
     except ValueError:
         return None
+
+
+def floor_counts(above, below) -> tuple[int | None, int | None]:
+    """지상층수와 지하층수. 둘 다 0이면 없는 값이다. 대장 속성이 없는 행은 빈칸 대신 0을 적어 두기 때문이다.
+
+    지하만 있는 건물(지하철 역사, 지하 주차장)의 지상 0은 실제 값이라 그대로 둔다.
+    """
+    a, b = to_int(above), to_int(below)
+    return (None, None) if not a and not b else (a, b)
 
 
 def to_date(v) -> str | None:
@@ -117,7 +129,7 @@ def match_agency(name: str, sido: str, sigungu: str, ag: pd.DataFrame) -> tuple[
 
     1. 이름이 같은 기관 (시도 이름이 전체기관명에 들어 있어야 한다)
     2. "OO동주민센터"는 시군구 아래의 "OO동"
-    3. 기관코드 이름이 우리 이름의 끝부분과 같은 기관 (예: 서울강서염창지구대 -> 염창지구대)
+    3. 기관코드 이름이 우리 이름의 끝부분과 같은 기관 (예: 시도와 구 이름을 앞에 붙인 지구대 이름)
     """
     name = re.sub(r"\s+", "", name)
     in_sido = ag[ag["전체기관명"].str.contains(sido[:2])]
@@ -134,7 +146,7 @@ def match_agency(name: str, sido: str, sigungu: str, ag: pd.DataFrame) -> tuple[
 
 
 def parse_road_address(addr: str) -> tuple[str, str, str]:
-    """'서울특별시 강서구 양천로 646-28' -> (지하여부, 본번, 부번)"""
+    """'서울특별시 강서구 양천로 지하 560' -> (지하여부, 본번, 부번)"""
     under = "1" if " 지하 " in f" {addr} " else "0"
     main, _, sub = addr.split()[-1].partition("-")
     return under, main, sub or "0"
@@ -158,29 +170,33 @@ def match_by_shape(ours, theirs, cover) -> tuple[pd.DataFrame, pd.DataFrame, pd.
     """우리 건물(ours)과 지도 건물(theirs)을 모양으로 맞춘다. 둘 다 uri, kind, use, geometry 열을 가진 미터 좌표계 GeoDataFrame.
 
     - cover(받은 범위) 안에 있는 건물끼리만 견준다. 범위 밖은 비교하지 않는다(자료를 더 받으면 넓어진다).
+    - 건물관리번호 여럿이 한 폴리곤을 함께 쓴다. 건물이 아니라 폴리곤끼리 맞춘 뒤, 그 폴리곤을 쓰는 건물 모두에 결과를 나눠 준다.
     - 서로 가장 많이 겹치는 짝이고 IoU가 BASEMAP_IOU_LINK 이상이면 잇는다. 그보다 낮지만 BASEMAP_IOU_REVIEW 이상이면 사람이 볼 목록에 남긴다.
     - 짝이 없는 건물은 양쪽 모두 목록으로 남긴다.
     돌려주는 것: (잇는 짝, 사람이 볼 짝, 짝 없는 건물)
     """
     ours = ours[ours.within(cover)].reset_index(drop=True)
     theirs = theirs[theirs.within(cover)].reset_index(drop=True)
-    pieces = gpd.overlay(ours[["uri", "geometry"]].rename(columns={"uri": "building_uri"}),
-                         theirs[["uri", "geometry"]].rename(columns={"uri": "map_uri"}),
+    ours = ours.assign(poly=pd.factorize(shapely.to_wkb(shapely.normalize(ours.geometry.values)))[0])
+    polys = ours.drop_duplicates("poly")
+    pieces = gpd.overlay(polys[["poly", "geometry"]], theirs[["uri", "geometry"]].rename(columns={"uri": "map_uri"}),
                          how="intersection", keep_geom_type=True)
-    area_of = lambda df: dict(zip(df["uri"], df.area))
-    a_ours, a_theirs = area_of(ours), area_of(theirs)
+    a_ours, a_theirs = dict(zip(polys["poly"], polys.area)), dict(zip(theirs["uri"], theirs.area))
     pieces["inter"] = pieces.area
-    pieces = pieces.groupby(["building_uri", "map_uri"], as_index=False)["inter"].sum()
-    pieces["iou"] = pieces["inter"] / (pieces["building_uri"].map(a_ours) + pieces["map_uri"].map(a_theirs) - pieces["inter"])
-    by_iou = pieces.sort_values("iou", ascending=False)
-    best_ours = by_iou.drop_duplicates("building_uri").set_index("building_uri")["map_uri"]
-    best_theirs = by_iou.drop_duplicates("map_uri").set_index("map_uri")["building_uri"]
-    mutual = by_iou[by_iou["building_uri"].map(best_ours).eq(by_iou["map_uri"])
-                    & by_iou["map_uri"].map(best_theirs).eq(by_iou["building_uri"])]
-    links = mutual[mutual["iou"] >= BASEMAP_IOU_LINK][["building_uri", "map_uri", "iou"]].round({"iou": 3})
-    review = by_iou[(by_iou["iou"] >= BASEMAP_IOU_REVIEW) & ~by_iou["building_uri"].isin(links["building_uri"])
+    pieces = pieces.groupby(["poly", "map_uri"], as_index=False)["inter"].sum()
+    pieces["iou"] = pieces["inter"] / (pieces["poly"].map(a_ours) + pieces["map_uri"].map(a_theirs) - pieces["inter"])
+    by_iou = pieces.sort_values(["iou", "map_uri"], ascending=[False, True])
+    best_ours = by_iou.drop_duplicates("poly").set_index("poly")["map_uri"]
+    best_theirs = by_iou.drop_duplicates("map_uri").set_index("map_uri")["poly"]
+    mutual = by_iou[by_iou["poly"].map(best_ours).eq(by_iou["map_uri"])
+                    & by_iou["map_uri"].map(best_theirs).eq(by_iou["poly"])]
+    links = mutual[mutual["iou"] >= BASEMAP_IOU_LINK][["poly", "map_uri", "iou"]].round({"iou": 3})
+    review = by_iou[(by_iou["iou"] >= BASEMAP_IOU_REVIEW) & ~by_iou["poly"].isin(links["poly"])
                     & ~by_iou["map_uri"].isin(links["map_uri"])]
-    review = review.drop_duplicates("building_uri")[["building_uri", "map_uri", "iou"]].round({"iou": 3})
+    review = review.drop_duplicates("poly")[["poly", "map_uri", "iou"]].round({"iou": 3})
+    buildings_of = ours[["poly", "uri"]].rename(columns={"uri": "building_uri"})
+    links = links.merge(buildings_of, on="poly")[["building_uri", "map_uri", "iou"]]
+    review = review.merge(buildings_of, on="poly")[["building_uri", "map_uri", "iou"]]
     left_ours = ~ours["uri"].isin(set(links["building_uri"]) | set(review["building_uri"]))
     left_theirs = ~theirs["uri"].isin(set(links["map_uri"]) | set(review["map_uri"]))
     unmatched = pd.concat([ours.loc[left_ours, ["uri", "kind", "use"]].assign(side="graph"),
@@ -190,11 +206,21 @@ def match_by_shape(ours, theirs, cover) -> tuple[pd.DataFrame, pd.DataFrame, pd.
 
 def match_report(n_map: int, ours_in: int, theirs_in: int, links, review, unmatched) -> dict:
     return {"map_buildings": n_map, "compared_in_cover": {"graph": ours_in, "map": theirs_in},
-            "linked": len(links), "for_review": len(review),
+            "linked": len(links), "linked_map_buildings": int(links["map_uri"].nunique()), "for_review": len(review),
             "only_in_graph": int((unmatched["side"] == "graph").sum()),
             "only_in_map": int((unmatched["side"] == "map").sum()),
             "only_in_map_by_kind": unmatched.loc[unmatched["side"] == "map", "kind"].value_counts().to_dict(),
             "iou_median": round(float(links["iou"].median()), 3) if len(links) else None}
+
+
+def map_address_key(df) -> pd.Series:
+    """내비게이션용DB 주소를 지도 주소와 견줄 키로. 지하 주소에는 표시를 붙인다.
+
+    국가기본도 주소에는 지상, 지하 구분이 없어 도로명번호, 본번, 부번만 있다. 지하 주소를 그대로 견주면
+    같은 번호의 지상 건물과 같다고 나오므로, 표시를 붙여 지도 주소와 같아지지 않게 한다.
+    """
+    key = df["road_code"] + "-" + df["bldg_main_no"] + "-" + df["bldg_sub_no"]
+    return key.where(df["underground"] != "1", key + UNDERGROUND_KEY)
 
 
 def our_polygons(buildings, metric: str):
@@ -232,6 +258,7 @@ def make_basemap_objects(area_gpkg: Path, buildings, centers, metric: str, stora
       GIS건물통합정보 A21도 같은 꼴(17자리)이지만 값이 하나도 같지 않아(새로 붙은 번호) 짝을 맞추는 데 쓰지 않는다.
     - 비교 범위는 내려받은 영역(1:5,000 도엽 색인을 그 영역으로 자른 모양)이다.
     - 이은 짝마다 PNU와 도로명주소(시군구코드 + 도로명번호 + 본번 + 부번)가 우리 쪽과 같은지 적는다.
+      우리 쪽이 지하 주소면 견주지 않는다(국가기본도에 지상, 지하 구분이 없다).
     """
     have = set(pyogrio.list_layers(area_gpkg)[:, 0])
     if "ngii_basemap_building" not in have:
@@ -248,14 +275,19 @@ def make_basemap_objects(area_gpkg: Path, buildings, centers, metric: str, stora
     sig = nb["pnu_no"].str[:5]
     nb["addr_key"] = (sig + nb["rncode_dc"].fillna("") + "-" + nb["bldmn_no"].astype("Int64").astype(str)
                       + "-" + nb["bldsl_no"].astype("Int64").astype(str)).where(nb["rncode_dc"].notna())
-    navi_key = centers.assign(addr_key=centers["road_code"] + "-" + centers["bldg_main_no"] + "-" + centers["bldg_sub_no"])
-    key_of_building = dict(zip(navi_key["bldg_mgt_no"].map(uri.building), navi_key["addr_key"]))
+    key_of_building = dict(zip(centers["bldg_mgt_no"].map(uri.building), map_address_key(centers)))
     pnu_of_building = dict(zip(buildings["uri"], buildings["pnu"]))
     by_uri = nb.set_index("uri")
+
+    def address_same(b: str, m: str) -> bool | None:
+        ours_key, map_key = key_of_building.get(b), by_uri.at[m, "addr_key"]
+        if ours_key is None or ours_key.endswith(UNDERGROUND_KEY) or pd.isna(map_key):
+            return None
+        return ours_key == map_key
+
     links = links.assign(
         pnu_same=[pnu_of_building.get(b) == by_uri.at[m, "pnu_no"] for b, m in zip(links["building_uri"], links["map_uri"])],
-        address_same=[None if b not in key_of_building or pd.isna(by_uri.at[m, "addr_key"])
-                      else key_of_building[b] == by_uri.at[m, "addr_key"] for b, m in zip(links["building_uri"], links["map_uri"])])
+        address_same=[address_same(b, m) for b, m in zip(links["building_uri"], links["map_uri"])])
 
     iou_of = dict(zip(links["map_uri"], links["iou"]))
     layer = gpd.GeoDataFrame({
@@ -268,6 +300,18 @@ def make_basemap_objects(area_gpkg: Path, buildings, centers, metric: str, stora
     report["address_same"] = int((links["address_same"] == True).sum())  # noqa: E712 (None과 구분)
     report["address_different"] = int((links["address_same"] == False).sum())  # noqa: E712
     return {"layer": layer, "links": links, "review": review, "unmatched": unmatched, "report": report}
+
+
+def split_register(reg: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """총괄표제부를 필지마다 한 행으로 고른다. 돌려주는 것: (쓰는 행, 사람이 볼 행).
+
+    한 필지에 일반대장과 집합대장이 함께 있으면 서로 다른 건물의 행이다. 필지에는 값을 하나씩만 둘 수 있으므로
+    세대수가 있는 집합대장을, 같은 구분끼리면 연면적이 큰 행을 쓰고 나머지는 지우지 않고 검토 목록으로 뺀다.
+    """
+    ordered = reg.assign(_general=reg["대장구분코드명"].ne("집합"), _area=pd.to_numeric(reg["연면적"], errors="coerce").fillna(0))
+    ordered = ordered.sort_values(["_general", "_area"], ascending=[True, False], kind="stable").drop(columns=["_general", "_area"])
+    used = ordered.drop_duplicates("pnu")
+    return used, reg[~reg.index.isin(used.index)]
 
 
 def make_emap_objects(area_gpkg: Path, centers, buildings, entrances, parcels, metric: str, storage: str) -> dict:
@@ -407,17 +451,17 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
                 label=text(c["sigungu_bldg_name"]) or gis_label(g),
                 use_name=text(g["A9"]), structure_name=text(g["A11"]),
                 approval_date=to_date(g["A13"]),
-                floors_above=to_int(g["A26"]), floors_below=to_int(g["A27"]),
                 pnu=text(g["A2"]), attr_source="gis", geometry=g.geometry,
             )
+            row["floors_above"], row["floors_below"] = floor_counts(g["A26"], g["A27"])
         else:
             # 폴리곤이 없으면 대장 속성도 없다. 내비게이션용DB 값으로 대신한다 (docs/decisions.md)
             row.update(
                 label=text(c["sigungu_bldg_name"]),
                 use_name=text(c["bldg_use"]), structure_name=None, approval_date=None,
-                floors_above=to_int(c["floors_above"]), floors_below=to_int(c["floors_below"]),
                 pnu=rep_pnu.get(mgt), attr_source="navi", geometry=c.geometry,
             )
+            row["floors_above"], row["floors_below"] = floor_counts(c["floors_above"], c["floors_below"])
         rows.append(row)
 
     # 3. 주소가 연결되지 않은 건물: building-gis/{A1}
@@ -425,12 +469,12 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     for a1, g in gis_by_id.iterrows():
         if a1 in linked:
             continue
+        above, below = floor_counts(g["A26"], g["A27"])
         rows.append({
             "uri": uri.building_gis(a1), "kind": "building-gis", "status": "AddressUnlinked",
             "bldg_mgt_no": None, "gis_building_id": a1, "road_address": None, "adm_dong_code": None,
             "label": gis_label(g), "use_name": text(g["A9"]), "structure_name": text(g["A11"]),
-            "approval_date": to_date(g["A13"]),
-            "floors_above": to_int(g["A26"]), "floors_below": to_int(g["A27"]),
+            "approval_date": to_date(g["A13"]), "floors_above": above, "floors_below": below,
             "pnu": text(g["A2"]), "attr_source": "gis", "geometry": g.geometry,
         })
     buildings = gpd.GeoDataFrame(rows, geometry="geometry", crs=storage)
@@ -462,8 +506,8 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     reg = pd.DataFrame(register.drop(columns="geometry"))
     reg["pnu"] = (reg["법정동코드"] + reg["대지구분코드명"].map({"대지": "1", "산": "2"})
                   + reg["주지번"].str.zfill(4) + reg["부지번"].str.zfill(4))
-    reg_dup = int(reg["pnu"].duplicated().sum())
-    reg = reg.drop_duplicates("pnu").set_index("pnu")
+    reg_used, reg_review = split_register(reg)
+    reg = reg_used.set_index("pnu")
     pnus = sorted(set(buildings["pnu"].dropna()) | set(reg.index.dropna()))
     # 필지 번호를 어느 자료에서 얻었는지 (GIS A2, 내비 대표지번, 총괄표제부)
     pnu_sources = buildings.dropna(subset=["pnu"]).groupby("pnu")["attr_source"].agg(set).to_dict()
@@ -543,6 +587,13 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     dongs.to_csv(proc / "admin_dong.csv", index=False, encoding="utf-8")
     links.to_csv(proc / "building_entrance.csv", index=False, encoding="utf-8")
     conflicts.to_csv(proc / "review_gis_id_conflict.csv", index=False, encoding="utf-8")
+    reg_review[["pnu", "대지위치", "대장구분코드명", "건축물대장일련번호", "대지면적", "연면적", "주용도코드명", "세대수", "주건축물수"]].to_csv(
+        proc / "review_register_duplicate.csv", index=False, encoding="utf-8")
+    tiny = buildings[buildings.geom_type.isin(["Polygon", "MultiPolygon"])].to_crs(metric)
+    tiny = tiny[tiny.area < GIS_TINY_M2]
+    pd.DataFrame({"uri": tiny["uri"], "label": tiny["label"], "polygon_m2": tiny.area.round(3),
+                  "register_building_area_m2": tiny["gis_building_id"].map(pd.to_numeric(gis_by_id["A12"], errors="coerce"))}).to_csv(
+        proc / "review_gis_tiny.csv", index=False, encoding="utf-8")
     for name in ("road", "entrance_road", "building_zone", "parcel_legal_dong", "review_entrance_road"):
         emap[name].to_csv(proc / f"{name}.csv", index=False, encoding="utf-8")
     for name in ("road_segment", "legal_dong", "basic_zone"):
@@ -570,13 +621,16 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
             "gis_exact_duplicates_merged": merged,
             "gis_id_conflicts_for_review": len(conflicts),
             "without_pnu": int(buildings["pnu"].isna().sum()),
+            "floors_unknown": int(buildings["floors_above"].isna().sum()),
+            "gis_tiny_polygons_for_review": len(tiny),
         },
         "entrance": {"main": int((entrances["kind"] == "main").sum()),
                      "sub": int((entrances["kind"] == "sub").sum()),
                      "building_links": len(links)},
         "parcel": {"total": len(parcels),
-                   "with_complex_info": int(parcels["site_area"].notna().sum()),
-                   "register_duplicate_pnu_rows": reg_dup},
+                   "with_complex_info": int(parcels["sources"].str.contains("register").sum()),
+                   "with_site_area": int(parcels["site_area"].notna().sum()),
+                   "register_duplicate_pnu_rows": len(reg_review)},
         "admin_dong": len(dongs),
         "road": {"total": len(emap["road"]), "segments": len(emap["road_segment"]),
                  "entrances_facing_road": len(emap["entrance_road"]),

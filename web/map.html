@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>지도 | 증미역 공간 지식 그래프</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" integrity="sha384-GIdEBaqGN9mNkDkMkzMHW8EKUqtpPIe/sLj1X7DIrnc9uPtLROJgmuDlh+3rBw0j" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="/static/style.css">
 <script src="/static/common.js"></script>
 <style>
@@ -157,7 +157,7 @@
           <label class="layer" title="도로명주소 전자지도의 도로구간. 출입구는 같은 도로명의 가장 가까운 구간에 이어져 있다"><input type="checkbox" data-l="road"><i class="sw" style="background:var(--road);height:3px"></i>도로 구간<span class="n" id="n-road"></span></label>
           <h4>견주어 볼 지도</h4>
           <label class="layer" title="국토지리정보원 국가기본도의 건물 외곽 (증미역 둘레 약 600m만 받음). 우리 건물과 모양이 1:1로 겹치면 서로 이어져 있다"><input type="checkbox" data-l="basemap"><i class="sw area" style="border-color:var(--basemap)"></i>국가기본도 건물<span class="n" id="n-basemap"></span></label>
-          <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000, 도엽 37608075)의 건물 외곽"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
+          <label class="layer" title="국토지리정보원 수치지형도 Ver2.0(1:5,000)의 건물 외곽"><input type="checkbox" data-l="digitalmap"><i class="sw area" style="border-color:var(--digitalmap)"></i>수치지형도 건물<span class="n" id="n-digitalmap"></span></label>
           <label class="layer" title="도로명주소 전자지도의 법정동 경계"><input type="checkbox" data-l="legaldong"><i class="sw area" style="border-color:var(--legaldong)"></i>법정동 경계<span class="n" id="n-legaldong"></span></label>
           <h4>바탕</h4>
           <label class="layer" title="config/area.yaml의 중심과 반지름으로 그린 원"><input type="checkbox" data-l="area"><i class="sw area"></i>범위 1km</label>
@@ -183,7 +183,7 @@ const KEY_ORDER = ["roadAddress", "useName", "structureName", "floorsAbove", "fl
   "sensorSerial", "sensorModel", "installAddress", "installArea", "addressBuildingDistance", "hasSimpleResult", "resultTime"];
 const LINKS = ["within", "inLegalDong", "inBasicZone", "locatedOn", "addressRoad", "housedIn", "hasEntrance", "facesRoad",
   "segmentOf", "basemapFeature", "digitalMapFeature", "zoneDesignatedBy", "zoneReleasedBy", "planApprovedBy", "completedBy",
-  "addressBuilding", "observes", "madeBySensor", "observedProperty", "sameAs", "wasInfluencedBy"];
+  "addressBuilding", "observes", "madeBySensor", "observedProperty", "sameAs", "sameBuildingAs", "wasInfluencedBy"];
 // 변경 제안 노드를 열 때 더 보이는 속성과, 어휘 이름표가 길어서 줄여 쓰는 이름
 const PROPOSAL_KEYS = ["description", "proposalAction", "sourceKind", "created", "decidedBy", "decidedAt"];
 const KEY_LABEL = { proposalAction: "제안 종류", sourceKind: "제안 출처" };
@@ -220,10 +220,7 @@ let st = new Set(qs.has("st") ? list(qs.get("st")).filter(s => STATUSES.some(x =
 const DEFAULT_OFF = "entrance,legaldong,basemap,digitalmap";  // 처음에 꺼 둘 레이어
 const off = new Set(qs.has("off") ? list(qs.get("off")).filter(k => k in LAYER_IDS) : DEFAULT_OFF.split(","));
 let dongSel = qs.get("dong") || "";
-const zc = (() => {
-  const z = parseFloat(qs.get("z")), c = list(qs.get("c")).map(Number);
-  return isFinite(z) && c.length === 2 && c.every(isFinite) ? { zoom: z, center: c } : null;
-})();
+const zc = viewFrom(qs.get("z"), qs.get("c"));
 const focus0 = qs.get("focus");
 let initialFit = !zc && !focus0;  // 범위 원을 받으면 그 bbox로 처음 화면을 맞출지
 
@@ -343,7 +340,7 @@ function loadKind(k) {
       data[k] = fc;
       if (map.getSource(k)) map.getSource(k).setData(fc);
       else { map.addSource(k, { type: "geojson", data: fc }); layerSpecs(k).forEach(addLayerAt); }
-      $("n-" + k).textContent = fc.features.length.toLocaleString() + "개";
+      $("n-" + k).textContent = fc.features.length.toLocaleString() + "개" + (fc.skipped ? `, 모양을 못 읽은 ${fc.skipped.toLocaleString()}개 뺌` : "");
       applyVis(k);
       if (k === "building") { renderStatus(); renderDongs(); applyDong(); }
       item.state = "ok";
@@ -440,7 +437,7 @@ $("only-retired").onclick = () => {
   setStatuses(["폐지"]);
   const fs = data.building.features.filter(f => f.properties.status === "폐지");
   if (off.has("building")) { off.delete("building"); document.querySelector('[data-l="building"]').checked = true; applyVis("building"); }
-  if (fs.length) map.fitBounds(boundsOf(fs), { padding: 60, maxZoom: 18, duration: 500 });
+  fitTo(map, fs, { padding: 60, maxZoom: 18, duration: 500 });
 };
 $("all-status").onclick = () => setStatuses(STATUSES.map(x => x.name));
 
@@ -478,7 +475,7 @@ function selectDong(name, fit = true) {
   if ([...$("dong").options].some(o => o.value === dongSel)) $("dong").value = dongSel;
   applyDong(); saveQuery();
   const fs = dongSel ? dongFeatures(dongSel) : [];
-  if (fit && fs.length) { initialFit = false; map.fitBounds(boundsOf(fs), { padding: 40, maxZoom: 17, duration: 500 }); }
+  if (fit && fs.length) { initialFit = false; fitTo(map, fs, { padding: 40, maxZoom: 17, duration: 500 }); }
 }
 $("dong").onchange = e => selectDong(e.target.value);
 
@@ -518,10 +515,11 @@ function bindInfo() {
       const r = await fetchJSON(`/api/editions/as-of?uri=${encodeURIComponent(current)}&at=${encodeURIComponent(at)}`);
       const nm = v => (r.names[v] && r.names[v].label) || ext(v) || (String(v).startsWith("http") ? localName(v) : v);
       const cell = vs => vs.length ? vs.map(v => esc(nm(v))).join("<br>") : '<span class="muted">없음</span>';
+      // 모양의 값은 속성 이름이 'hasGeometry asWKT'처럼 공백으로 이어져 온다
       out.innerHTML = r.diff.length
         ? `<table class="kv asof-t"><tr><th>속성</th><th>승인 전</th><th>지금</th></tr>${r.diff.map(d =>
-            `<tr><td class="k">${esc(nm(d.p))}</td><td>${cell(d.before)}</td><td>${cell(d.after)}</td></tr>`).join("")}</table>
-           <div class="small muted">승인 기록(jgk:hasChange)을 거꾸로 되돌려 ${esc(new Date(r.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }))} 시점의 값을 그래프에서 되살렸습니다.</div>`
+            `<tr><td class="k">${esc(d.p.split(" ").map(nm).join(" "))}</td><td>${cell(d.before)}</td><td>${cell(d.after)}</td></tr>`).join("")}</table>
+           <div class="small muted">승인과 정정의 사건 기록(jgk:changeOf)으로 ${esc(new Date(r.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }))} 시점의 값을 트리플마다 찾아 되살렸습니다.</div>`
         : '<div class="small muted">그 시점과 지금 값이 같습니다.</div>';
     } catch (e) { out.innerHTML = `<div class="banner no">${esc(e.message)}</div>`; }
   });
@@ -572,8 +570,7 @@ async function show(uri, opts = {}) {
   panel = "feature";
 
   const names = f.names || {};
-  const by = {};
-  for (const t of f.triples) (by[localName(t.p)] ||= []).push(t);
+  const by = groupBy(f.triples, t => localName(t.p));
   const types = (by.type || []).map(t => t.o);
   const isProposal = types.some(t => t.endsWith("#ChangeProposal")) || uri.startsWith(BASE + "proposal/");
   const isDong = types.some(t => t.endsWith("#AdminDong"));
@@ -635,7 +632,7 @@ async function show(uri, opts = {}) {
   const sel = opts.group || (feat ? [feat] : []);
   map.getSource("sel").setData({ type: "FeatureCollection", features: sel });
   if (isDong) selectDong(me.label, !opts.quiet);
-  else if (sel.length && !opts.quiet) { initialFit = false; map.fitBounds(boundsOf(sel), { padding: 120, maxZoom: 17, duration: 500 }); }
+  else if (sel.length && !opts.quiet) { initialFit = false; fitTo(map, sel, { padding: 120, maxZoom: 17, duration: 500 }); }
 }
 
 addEventListener("popstate", () => {
@@ -726,7 +723,7 @@ function renderAnswer(a, refit) {
   ++showSeq;  // 늦게 온 객체 응답이 답을 덮지 않게 한다
   panel = "answer";
   const fc = a.geojson || emptyFC();
-  if (refit && fc.features.length) map.fitBounds(boundsOf(fc.features), { padding: 80, maxZoom: 17, duration: 500 });
+  if (refit && fc.features.length) fitTo(map, fc.features, { padding: 80, maxZoom: 17, duration: 500 });
   const vars = a.vars || [], rows = a.rows || [];
   const geo = a.geometry_vars || vars.filter(v => rows.some(r => GEOM_RE.test(String(r[vars.indexOf(v)] ?? ""))));
   const cols = vars.filter(v => !geo.includes(v));
@@ -743,7 +740,7 @@ function renderAnswer(a, refit) {
     const shown = rows.slice(0, 50);
     const count = a.truncated || rows.length > 50
       ? `결과 ${rows.length.toLocaleString()}행${a.truncated ? "(더 있지만 잘림)" : ""} 중 ${shown.length}행 표시` : `결과 ${rows.length}행`;
-    body = `<div class="small muted">${count}${fc.features.length ? `, 지도에 보라색 테두리로 ${fc.features.length.toLocaleString()}개 표시` : ""}</div>
+    body = `<div class="small muted">${count}${fc.features.length ? `, 지도에 보라색 테두리로 ${fc.features.length.toLocaleString()}개 표시` : ""}${a.cut_cells ? `, 너무 길어 잘린 칸 ${a.cut_cells.toLocaleString()}개` : ""}</div>
       <div class="tablewrap"><table class="kv"><thead><tr>${cols.map(v => `<th>${esc(v)}</th>`).join("")}</tr></thead>
       <tbody>${shown.map(r => `<tr>${cols.map(v => `<td>${cell(r[vars.indexOf(v)])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }

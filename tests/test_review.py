@@ -27,7 +27,7 @@ def run() -> None:
 
     review_app.proposals = ProposalStore(tmp)
     review_app.state["store"] = None
-    c = TestClient(review_app.app)
+    c = TestClient(review_app.app, base_url="http://localhost")  # 서버가 받는 이름이다
 
     assert c.get("/").status_code == 200
     pending = c.get("/api/proposals?status=pending").json()

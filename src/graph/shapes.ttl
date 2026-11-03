@@ -6,9 +6,11 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 
 # 증미역 공간 지식 그래프 데이터 규칙 (SHACL)
 # 원천 그래프 전체와, 승인 전 변경 제안을 이 규칙으로 검사한다 (src/graph/validate.py).
+# 값 하나로 볼 수 없는 규칙(종류 빼기 금지, 모양 출처 빼기 금지, WKT 값 검사)은 validate.py의 change_problems에 있다.
 
 # 모든 공간 객체: 상태는 정확히 하나, 정해진 값 중 하나
 jgks:Feature a sh:NodeShape ;
@@ -17,7 +19,9 @@ jgks:Feature a sh:NodeShape ;
                   sh:in ( jgk:Active jgk:AddressUnlinked jgk:AddressLinked jgk:Retired ) ;
                   sh:message "상태는 정확히 하나이고 사용, 주소 미연결, 주소 연결됨, 폐지 중 하나여야 한다"@ko ] ;
     sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:class jgk:Dataset ;
-                  sh:message "출처(원천 데이터)가 하나 이상 있어야 한다"@ko ] .
+                  sh:message "출처(원천 데이터)가 하나 이상 있어야 한다"@ko ] ;
+    sh:property [ sh:path jgk:retiredOn ; sh:maxCount 1 ; sh:datatype xsd:date ;
+                  sh:message "폐지 확인일은 날짜(xsd:date) 하나여야 한다"@ko ] .
 
 # 폐지된 객체에는 폐지 확인일이 있어야 한다
 jgks:Retired a sh:NodeShape ;
@@ -36,7 +40,9 @@ jgks:HasGeometry a sh:NodeShape ;
 jgks:Geometry a sh:NodeShape ;
     sh:targetClass geo:Geometry ;
     sh:property [ sh:path geo:asWKT ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype geo:wktLiteral ;
-                  sh:message "모양에는 WKT가 정확히 하나 있어야 한다"@ko ] .
+                  sh:message "모양에는 WKT가 정확히 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:source ; sh:class jgk:Dataset ;
+                  sh:message "모양의 출처는 어휘에 있는 자료여야 한다"@ko ] .
 
 # 건물: 건물관리번호(25자리) 또는 GIS건물통합식별번호(28자리) 중 정확히 하나로 식별
 jgks:Building a sh:NodeShape ;
@@ -59,7 +65,11 @@ jgks:Building a sh:NodeShape ;
     sh:property [ sh:path jgk:floorsBelow ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
     sh:property [ sh:path jgk:approvalDate ; sh:maxCount 1 ; sh:datatype xsd:date ] ;
     sh:property [ sh:path jgk:useName ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
-    sh:property [ sh:path jgk:roadAddress ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+    sh:property [ sh:path jgk:roadAddress ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path jgk:basemapFeature ; sh:nodeKind sh:IRI ; sh:class jgk:BaseMapFeature ;
+                  sh:message "국가기본도 연결은 그래프에 있는 국가기본도 객체를 가리키는 IRI여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:digitalMapFeature ; sh:nodeKind sh:IRI ; sh:class jgk:DigitalMapFeature ;
+                  sh:message "수치지형도 연결은 그래프에 있는 수치지형도 객체를 가리키는 IRI여야 한다"@ko ] .
 
 # 주소 미연결 건물은 건물관리번호가 없어야 하고, 주소 연결 건물은 행정동에 속해야 한다
 jgks:BuildingStatus a sh:NodeShape ;
@@ -71,7 +81,48 @@ SELECT $this WHERE { $this jgk:status jgk:AddressUnlinked ; jgk:buildingMgtNo ?n
     sh:sparql [ a sh:SPARQLConstraint ;
         sh:message "건물관리번호가 있는 건물이 행정동에 속하지 않는다"@ko ;
         sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
-SELECT $this WHERE { $this jgk:buildingMgtNo ?n . FILTER NOT EXISTS { $this jgk:within ?d } }""" ] .
+SELECT $this WHERE { $this jgk:buildingMgtNo ?n . FILTER NOT EXISTS { $this jgk:within ?d } }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "상태가 주소 연결됨인데 이어진 건물이 없다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this WHERE { $this jgk:status jgk:AddressLinked . FILTER NOT EXISTS { $this owl:sameAs|jgk:sameBuildingAs ?x } }""" ] .
+
+# 같은 건물 잇기(owl:sameAs, jgk:sameBuildingAs): 우리 객체끼리 이을 때만 본다. 위키데이터로 잇는 owl:sameAs는 여기 들지 않는다
+jgks:SameBuilding a sh:NodeShape ;
+    sh:targetSubjectsOf owl:sameAs, jgk:sameBuildingAs ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "같은 건물로 잇는 대상이 그래프에 없거나 건물이 아니다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this ?value WHERE { $this owl:sameAs|jgk:sameBuildingAs ?value .
+  FILTER (STRSTARTS(STR(?value), "https://yeodh10.github.io/jeungmi-geokg/id/"))
+  FILTER NOT EXISTS { ?value a jgk:Building } }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "자기 자신을 같은 건물로 이을 수 없다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this ?value WHERE { $this owl:sameAs|jgk:sameBuildingAs ?value . FILTER (?value = $this) }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "같은 건물 잇기는 사슬이나 고리가 될 수 없다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this ?value WHERE { $this owl:sameAs|jgk:sameBuildingAs ?value .
+  ?value owl:sameAs|jgk:sameBuildingAs ?next .
+  FILTER (STRSTARTS(STR(?next), "https://yeodh10.github.io/jeungmi-geokg/id/")) FILTER (?value != $this) }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "한 대상에는 건물 하나만 이을 수 있다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this ?value WHERE { $this owl:sameAs|jgk:sameBuildingAs ?value . ?other owl:sameAs|jgk:sameBuildingAs ?value .
+  FILTER (STRSTARTS(STR(?value), "https://yeodh10.github.io/jeungmi-geokg/id/")) FILTER (?other != $this) }""" ] ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+        sh:message "한 건물은 대상 하나에만 이을 수 있다"@ko ;
+        sh:select """PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT $this ?value WHERE { $this owl:sameAs|jgk:sameBuildingAs ?value . $this owl:sameAs|jgk:sameBuildingAs ?other .
+  FILTER (STRSTARTS(STR(?value), "https://yeodh10.github.io/jeungmi-geokg/id/"))
+  FILTER (STRSTARTS(STR(?other), "https://yeodh10.github.io/jeungmi-geokg/id/")) FILTER (?other != ?value) }""" ] .
 
 jgks:Parcel a sh:NodeShape ;
     sh:targetClass jgk:Parcel ;
@@ -105,6 +156,22 @@ jgks:Station a sh:NodeShape ;
 jgks:AdminDong a sh:NodeShape ;
     sh:targetClass jgk:AdminDong ;
     sh:property [ sh:path jgk:admDongCode ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{10}$" ] .
+
+# 고시: 표제, 고시일, 출처, 구역 종류는 하나씩. 같은 번호의 다른 글이 값을 덧붙이지 못하게 한다
+jgks:Notice a sh:NodeShape ;
+    sh:targetClass jgk:Notice ;
+    sh:property [ sh:path rdfs:label ; sh:maxCount 1 ; sh:message "고시 표제는 하나여야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:issued ; sh:maxCount 1 ; sh:message "고시일은 하나여야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:source ; sh:maxCount 1 ; sh:message "고시 출처는 하나여야 한다"@ko ] ;
+    sh:property [ sh:path jgk:zoneKind ; sh:maxCount 1 ; sh:message "고시의 구역 종류는 하나여야 한다"@ko ] .
+
+# 변경 제안: 어디서 온 제안인지와 무엇을 바꾸는지가 있어야 한다
+jgks:ChangeProposal a sh:NodeShape ;
+    sh:targetClass jgk:ChangeProposal ;
+    sh:property [ sh:path jgk:sourceKind ; sh:minCount 1 ; sh:maxCount 1 ;
+                  sh:in ( "rule-candidate" "data-diff" "llm-notice" "notice-table" ) ;
+                  sh:message "제안 출처는 정해진 값 중 하나로 정확히 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path jgk:affects ; sh:minCount 1 ; sh:message "제안에는 바꾸는 대상이 있어야 한다"@ko ] .
 
 # 센서와 관측 (SOSA): 관측은 센서 하나, 항목 하나, 값 하나, 시각 하나
 jgks:Sensor a sh:NodeShape ;

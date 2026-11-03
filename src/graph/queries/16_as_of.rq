@@ -1,20 +1,25 @@
-# 한 객체의 시각 {{AT}} 값: 지금 값에서 그 뒤에 승인된 변경을 거꾸로 되돌린다 (시점별 판). 기본은 증미역 역사 건물
+# 한 객체의 시각 {{AT}} 값 (시점별 판). 기본은 증미역 역사 건물
+# 트리플마다 그 시각 이전의 마지막 사건으로 정한다. 사건은 그래프가 실제로 바뀐 변경만 남으므로 넣기와 빼기가 번갈아 나온다
+# 주어를 가지마다 직접 적는다. 바깥 VALUES로 주면 UNION 안으로 전달되지 않아 모든 트리플을 훑는다
 PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX prov: <http://www.w3.org/ns/prov#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-SELECT ?p ?o WHERE {
-  VALUES ?s { <{{URI}}> }
+SELECT DISTINCT ?p ?o WHERE {
   {
-    ?s ?p ?o .
-    FILTER NOT EXISTS { ?c jgk:changeOp "add" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
-                        ?pr jgk:hasChange ?c ; jgk:decidedAt ?t . FILTER (?t > "{{AT}}"^^xsd:dateTime) }
-    FILTER NOT EXISTS { ?o jgk:decidedAt ?t2 . FILTER (?t2 > "{{AT}}"^^xsd:dateTime) }
+    # 사건이 없는 트리플: 지금 값 그대로
+    <{{URI}}> ?p ?o .
+    FILTER NOT EXISTS { ?e rdf:subject <{{URI}}> ; rdf:predicate ?p ; rdf:object ?o ; jgk:changeOrder ?any }
   } UNION {
-    ?c jgk:changeOp "remove" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
-    ?pr jgk:hasChange ?c ; jgk:decidedAt ?t . FILTER (?t > "{{AT}}"^^xsd:dateTime)
-    FILTER NOT EXISTS { ?c2 jgk:changeOp "add" ; rdf:subject ?s ; rdf:predicate ?p ; rdf:object ?o .
-                        ?pr2 jgk:hasChange ?c2 ; jgk:decidedAt ?t3 . FILTER (?t3 > "{{AT}}"^^xsd:dateTime) }
+    # 그 시각 이전의 마지막 사건이 넣기
+    ?c rdf:subject <{{URI}}> ; jgk:changeOp "add" ; rdf:predicate ?p ; rdf:object ?o ; jgk:decidedAt ?t ; jgk:changeOrder ?n .
+    FILTER (?t <= "{{AT}}"^^xsd:dateTime)
+    FILTER NOT EXISTS { ?c2 rdf:subject <{{URI}}> ; rdf:predicate ?p ; rdf:object ?o ; jgk:decidedAt ?t2 ; jgk:changeOrder ?n2 .
+                        FILTER (?t2 <= "{{AT}}"^^xsd:dateTime && ?n2 > ?n) }
+  } UNION {
+    # 그 시각 이전에 사건이 없고 첫 사건이 빼기: 원래 있던 값
+    ?c rdf:subject <{{URI}}> ; jgk:changeOp "remove" ; rdf:predicate ?p ; rdf:object ?o ; jgk:changeOrder ?n .
+    FILTER NOT EXISTS { ?c2 rdf:subject <{{URI}}> ; rdf:predicate ?p ; rdf:object ?o ; jgk:changeOrder ?n2 . FILTER (?n2 < ?n) }
+    FILTER NOT EXISTS { ?c3 rdf:subject <{{URI}}> ; rdf:predicate ?p ; rdf:object ?o ; jgk:decidedAt ?t3 .
+                        FILTER (?t3 <= "{{AT}}"^^xsd:dateTime) }
   }
 }

@@ -55,12 +55,96 @@ def make_next_snapshot(dst: Path) -> dict:
             "create": f"https://yeodh10.github.io/jeungmi-geokg/id/building/{FAKE_MGT}", "map_updates": map_updates}
 
 
+def check_against_current() -> None:
+    """승인으로 바뀐 객체에 대한 갱신 제안: 빼는 값을 지금 그래프에서 뽑아야 승인할 수 있다.
+
+    재현: 원천끼리 비교하면 지금 그래프에 없는 옛 점을 빼고 새 점을 넣어, 모양에 WKT가 둘이 되고 영구히 승인할 수 없었다.
+    """
+    import pyoxigraph as ox
+    from rdflib import Graph
+
+    from src.graph.store import apply_problems
+    from src.review.diff_proposals import diff
+
+    jgk, geo = "https://yeodh10.github.io/jeungmi-geokg/def#", "http://www.opengis.net/ont/geosparql#"
+    root = "https://yeodh10.github.io/jeungmi-geokg/id/building"
+    old_point, new_point, polygon = "POINT (126.86 37.55)", "POINT (126.86 37.56)", "POLYGON ((126.86 37.55, 126.87 37.55, 126.87 37.56, 126.86 37.55))"
+
+    def source(point: str, with_gis: bool, floors: int = 3, name: str = "가") -> str:
+        text = f"""@prefix jgk: <{jgk}> . @prefix geo: <{geo}> . @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<{root}/1> a jgk:Building, geo:Feature ; jgk:status jgk:Active ; jgk:floorsAbove {floors} ; rdfs:label "{name}"@ko ;
+    dcterms:source jgk:dataset-a ; geo:hasGeometry <{root}/1/geometry> .
+<{root}/1/geometry> a geo:Geometry ; geo:asWKT "{point}"^^geo:wktLiteral .
+"""
+        if with_gis:
+            text += f"""<{root}/2> a jgk:Building, geo:Feature ; jgk:status jgk:AddressUnlinked ; dcterms:source jgk:dataset-a .
+<{root}/3> a jgk:Building, geo:Feature ; jgk:status jgk:Active ; dcterms:source jgk:dataset-a .
+"""
+        return text
+
+    old = Graph().parse(data=source(old_point, True), format="turtle")
+    new = Graph().parse(data=source(new_point, False, floors=4, name="나"), format="turtle")
+    # 지금 그래프: 원천에 승인 두 건이 얹혔다 (건물 1에 폴리곤, 건물 2는 주소 연결), 건물 3은 이미 폐지
+    current = ox.Store()
+    current.load(input=source(polygon, True).encode("utf-8"), format=ox.RdfFormat.TURTLE)
+    current.update(f"""DELETE DATA {{ <{root}/2> <{jgk}status> <{jgk}AddressUnlinked> . <{root}/3> <{jgk}status> <{jgk}Active> }} ;
+INSERT DATA {{ <{root}/2> <{jgk}status> <{jgk}AddressLinked> . <{root}/3> <{jgk}status> <{jgk}Retired> }}""")
+
+    props = {(p.action, p.target): p for p in diff(old, new, "t", "시험", current=current)}
+    assert set(props) == {("update", f"{root}/1"), ("retire", f"{root}/2")}, sorted(props)  # 이미 폐지된 건물 3은 다시 제안하지 않는다
+    upd = props[("update", f"{root}/1")]
+    wkt_changes = {(c.op, c.o.value) for c in upd.changes if c.p == geo + "asWKT"}
+    assert wkt_changes == {("remove", polygon), ("add", new_point)}, wkt_changes
+    assert upd.flags == ["승인된 값을 덮어쓴다"] and any("승인" in e for e in upd.evidence), upd
+    assert not apply_problems(current, upd), apply_problems(current, upd)
+    ret = props[("retire", f"{root}/2")]
+    assert [(c.op, c.o.value) for c in ret.changes if c.p == jgk + "status"] == [("remove", jgk + "AddressLinked"), ("add", jgk + "Retired")], ret.changes
+    assert not apply_problems(current, ret), apply_problems(current, ret)
+
+    # 자료의 값이 지금 값과 같으면 승인된 값을 건드리지 않고, 모두 같으면 제안을 만들지 않는다
+    same = ox.Store()
+    same.load(input=source(new_point, True, floors=4, name="나").encode("utf-8"), format=ox.RdfFormat.TURTLE)
+    assert not [p for p in diff(old, new, "t", "시험", current=same) if p.target == f"{root}/1"]
+
+    # 지금 그래프를 주지 않으면 자료끼리 견준다 (이전과 같다)
+    plain = next(p for p in diff(old, new, "t", "시험") if p.target == f"{root}/1")
+    assert ("remove", old_point) in {(c.op, c.o.value) for c in plain.changes} and plain.flags == []
+
+
+def check_same_building() -> None:
+    """주소 연결 제안은 jgk:sameBuildingAs로 잇고, 옛 승인이 owl:sameAs로 이은 건물은 다시 잇지 않는다."""
+    import pyoxigraph as ox
+    from rdflib import Graph
+
+    from src.review.diff_proposals import diff
+
+    jgk, geo = "https://yeodh10.github.io/jeungmi-geokg/def#", "http://www.opengis.net/ont/geosparql#"
+    root = "https://yeodh10.github.io/jeungmi-geokg/id"
+    gis, mgt = f"{root}/building-gis/1", f"{root}/building/2"
+    head = f"""@prefix jgk: <{jgk}> . @prefix geo: <{geo}> . @prefix dcterms: <http://purl.org/dc/terms/> .
+"""
+    old = Graph().parse(data=head + f"""<{gis}> a jgk:Building, geo:Feature ; jgk:status jgk:AddressUnlinked ; jgk:gisBuildingId "1" ; dcterms:source jgk:dataset-a .""", format="turtle")
+    new = Graph().parse(data=head + f"""<{mgt}> a jgk:Building, geo:Feature ; jgk:status jgk:Active ; dcterms:source jgk:dataset-a ; geo:hasGeometry <{mgt}/geometry> .
+<{mgt}/geometry> a geo:Geometry ; jgk:sourceGisBuildingId "1" ; geo:asWKT "POINT (126.86 37.55)"^^geo:wktLiteral .""", format="turtle")
+    link = next(p for p in diff(old, new, "t", "시험") if p.action == "link")
+    assert [c.p for c in link.changes if c.o.value == mgt] == [jgk + "sameBuildingAs"], link.changes
+
+    linked = ox.Store()  # 옛 승인: 상태는 이미 주소 연결됨이고 owl:sameAs로 이어져 있다
+    linked.load(input=(head + f"""@prefix owl: <http://www.w3.org/2002/07/owl#> .
+<{gis}> a jgk:Building, geo:Feature ; jgk:status jgk:AddressLinked ; owl:sameAs <{mgt}> ; dcterms:source jgk:dataset-a .""").encode("utf-8"),
+                format=ox.RdfFormat.TURTLE)
+    assert not [p for p in diff(old, new, "t", "시험", current=linked) if p.action == "link"]
+
+
 def run() -> None:
     from src.graph import build_graph
     from src.graph.store import load_store
     from src.review.diff_proposals import diff
     from src.review.proposals import ProposalStore
 
+    check_against_current()
+    check_same_building()
     tmp = Path(tempfile.mkdtemp())
     new_dir = tmp / "next"
     new_dir.mkdir()
@@ -93,7 +177,8 @@ def run() -> None:
     floors = ask(f"SELECT ?f WHERE {{ <{expect['update']}> jgk:floorsAbove ?f }}")
     assert len(floors) == 1, floors  # 이전 값은 빠지고 새 값만 남는다
     assert ask(f"SELECT ?s WHERE {{ <{expect['link']}> jgk:status ?s }}") == [[str(build_graph.JGK.AddressLinked)]]
-    assert ask(f"SELECT ?o WHERE {{ <{expect['link']}> owl:sameAs ?o }}") == [[expect["create"]]]
+    assert ask(f"SELECT ?o WHERE {{ <{expect['link']}> jgk:sameBuildingAs ?o }}") == [[expect["create"]]]
+    assert not ask(f"SELECT ?o WHERE {{ <{expect['link']}> owl:sameAs ?o }}")
     assert bool(g.query(f"ASK {{ <{expect['create']}> a <https://yeodh10.github.io/jeungmi-geokg/def#Building> }}"))
     print("자동 갱신 확인 통과:", {a: u.rsplit("/", 1)[-1] for a, u in expect.items()})
     shutil.rmtree(tmp, ignore_errors=True)

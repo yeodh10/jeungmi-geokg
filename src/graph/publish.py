@@ -10,8 +10,10 @@
   def/index.html, def/ontology.ttl  어휘
   assets/  화면 모양(web/style.css를 그대로 씀)과 스크립트, search.json(전체 찾기용 목록)
 
-공개 보류 출처(config/area.yaml의 publish.hold_sources)에서 온 객체는 페이지를 만들지 않고,
-다른 페이지에서도 그 객체로 가는 연결을 뺀다.
+공개 여부는 '출처를 모르면 공개하지 않는다'로 정한다 (public_nodes).
+공개 보류 출처(config/area.yaml의 publish.hold_sources)에서 왔거나 출처를 모르는 노드는 페이지를 만들지 않고,
+다른 페이지에서도 그 노드로 가는 연결을 뺀다. 다 만든 뒤 자체 검사(site_problems)를 돌려, 보류 자료의 이름이나 지도 번호가
+나가면 만든 결과를 지우고 실패한다.
 """
 from __future__ import annotations
 
@@ -28,6 +30,7 @@ from shapely.geometry import mapping
 
 from src.graph.store import ALIGNMENT, ONTOLOGY, load_store
 from src.model.uri import BASE
+from src.review.proposals import ProposalStore
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "data" / "processed" / "site"
@@ -42,6 +45,11 @@ RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 DCT_SOURCE = "http://purl.org/dc/terms/source"
 GEO = "http://www.opengis.net/ont/geosparql#"
 SOSA = "http://www.w3.org/ns/sosa/"
+# 공개하면 안 되는 지도 번호: 국가기본도 객체ID(BLD로 시작하는 17자리), 국토부 UFID(17자리), 수치지형도 UFID(34자리)
+MAP_NUMBER = re.compile(r"(?<![0-9A-Za-z])(?:BLD[0-9A-Z]{14}|B0010000[0-9A-Z]{9}|[0-9A-Z]{34})(?![0-9A-Za-z])")
+OUR_PATH = re.compile(re.escape(SITE_PATH) + r"/id/[a-z-]+/[^\s\"'<>&]+")
+HOLD_NOTE = ("민원행정기관 전자지도와 도로명주소 전자지도는 공개하지 않기로 정했고, 국가기본도와 수치지형도는 기본측량성과라 해외 서버에 올리지 않습니다. "
+             "이 네 자료에서 온 객체와 모양은 이 사이트에 없습니다.")
 UNIT_KO = {"DEG_C": "℃", "PERCENT": "%", "DeciB": "dB", "LUX": "lux", "UNITLESS": ""}
 EXT_LABEL = {
     RDF_TYPE: "종류", RDFS_LABEL: "이름", DCT_SOURCE: "출처", RDFS_COMMENT: "설명",
@@ -76,7 +84,8 @@ PRINCIPLES = [
     ("객체 원자화", "건물, 출입구, 필지, 도로, 행정구역, 공공시설을 각각 하나의 객체로 쪼개고 모양(Geometry)은 따로 둡니다."),
     ("영구 식별자", "새 번호를 만들지 않고 건물관리번호, PNU, 도로명코드 같은 공식 번호를 그대로 URI에 씁니다. 객체가 없어져도 URI는 남습니다."),
     ("자동 갱신", "새 자료가 오면 그래프를 덮어쓰지 않고 객체마다 견줘 신규, 변경, 폐지 제안을 만듭니다."),
-    ("AI 제안 후 사람 승인", "고시공고는 LLM이 바뀌는 내용만 뽑고, 사람이 승인한 변경만 그래프에 들어가며 누가 언제 승인했는지 남습니다."),
+    ("AI 제안 후 사람 승인", "고시공고는 LLM이 바뀌는 내용만 뽑고, 검토자가 승인한 변경만 그래프에 들어가며 누가 언제 승인했는지 남습니다. "
+                       "지금까지의 결정은 사람이 맡긴 검토자 Claude가 했고, 기록의 검토자 이름에 그대로 남아 있습니다."),
 ]
 ICON = {
     "globe": '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
@@ -118,6 +127,55 @@ def hold_sources() -> set[str]:
 
 def kind_of(uri: str) -> str:
     return uri[len(BASE) + 1:].split("/")[0]
+
+
+def public_nodes(triples: dict, hold: set[str], given: dict[str, set[str]] | None = None) -> set[str]:
+    """공개해도 되는 우리 URI. 출처가 있고 그 출처가 모두 공개 자료인 노드만 들어간다. 출처를 모르면 공개하지 않는다.
+
+    모양 노드와 제안의 변경 기록은 자기 출처가 없으면 부모(객체, 제안)의 출처를 따른다.
+    부모를 공개할 수 없으면 자기 출처가 무엇이든 공개하지 않는다.
+    제안에는 출처 트리플이 없어 근거 자료를 쓴다 (given: 제안 URI -> 출처 URI).
+    """
+    given = given or {}
+    open_sets = {s for s, plist in triples.items() if any(p.value == RDF_TYPE and o.value == JGK + "Dataset" for p, o in plist)} - hold
+
+    def parent(s: str) -> str | None:
+        if s.endswith("/geometry"):
+            return s.removesuffix("/geometry")
+        return s.rsplit("/change/", 1)[0] if "/change/" in s else None
+
+    def sources(s: str) -> set[str]:
+        found = {o.value for p, o in triples.get(s, []) if p.value == DCT_SOURCE} | given.get(s, set())
+        up = parent(s)
+        return sources(up) if not found and up else found
+
+    def known(s: str, src: str) -> bool:  # 고시는 자료 이름 대신 구청 게시물 주소를 출처로 적는다
+        return src in open_sets or (kind_of(s) == "notice" and src.startswith("https://"))
+
+    def allowed(s: str) -> bool:
+        found, up = sources(s), parent(s)
+        return bool(found) and all(known(s, x) for x in found) and (up is None or allowed(up))
+
+    return {s for s in triples if s.startswith(BASE + "/") and allowed(s)}
+
+
+def site_problems(out: Path, hold: set[str], held: set[str]) -> list[str]:
+    """만든 사이트에 공개하면 안 되는 것이 있으면 그 목록. 어휘(def/)는 자료 이름을 정의하는 곳이라 이름 검사에서 뺀다."""
+    names = [h.rsplit("#", 1)[-1] for h in hold]
+    found = [f"페이지가 만들어진 보류 노드: {s}" for s in sorted(held) if (out / s[len(SITE) + 1:]).exists()]
+    for f in sorted(out.rglob("*")):
+        if not f.is_file():
+            continue
+        where = f.relative_to(out).as_posix()
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if not where.startswith("def/"):
+            found += [f"{where}: 보류 자료 이름 {n}" for n in names if n in text]
+        found += [f"{where}: 지도 번호 {m}" for m in sorted(set(MAP_NUMBER.findall(text)))]
+        for path in sorted(set(OUR_PATH.findall(text))):
+            u = BASE + path[len(SITE_PATH) + 3:].removesuffix("/index.ttl").removesuffix("/index.html").rstrip("/")
+            if u in held:
+                found.append(f"{where}: 보류 노드 연결 {u}")
+    return found
 
 
 def page(title: str, body: str, *, nav: str | None = None, head: str = "", desc: str = "", wide: bool = False) -> str:
@@ -166,7 +224,8 @@ def align_section() -> str:
              "http://www.w3.org/2004/02/skos/core#closeMatch": "가까운 개념", "http://www.w3.org/2002/07/owl#sameAs": "같은 실물"}
     short = lambda u: (u.replace(JGK, "jgk:").replace("https://schema.org/", "schema:").replace("http://www.wikidata.org/entity/", "wd:")
                        .replace("http://inspire.ec.europa.eu/featureconcept/", "inspire:").replace("https://w3id.org/bot#", "bot:")
-                       .replace("http://www.w3.org/2004/02/skos/core#", "skos:").replace(BASE + "/", "id:"))
+                       .replace("http://www.w3.org/2004/02/skos/core#", "skos:").replace("http://www.w3.org/2000/01/rdf-schema#", "rdfs:")
+                       .replace(BASE + "/", "id:"))
     rows = sorted((str(s), str(p), str(o)) for s, p, o in g if str(p) in kinds)
     trs = "".join(f'<tr><td class="mono">{e(short(s))}</td><td>{kinds[p]}</td><td class="mono"><a href="{e(o)}" rel="noopener">{e(short(o))}</a></td></tr>' for s, p, o in rows)
     return (f'<section class="card sec"><h2>바깥 표준 어휘와 잇기 <span class="muted">{len(rows)}</span></h2>'
@@ -179,7 +238,9 @@ def main() -> None:
     hold = hold_sources()
     # 승인 제안은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹는다. 모르면 공개하지 않는다.
     # 국가기본도로 만든 제안은 그 결론(잇기, 모양)까지 공개 사이트에서 빠진다.
-    store = load_store(keep=lambda p: bool(p.based_on) and not {JGK + d for d in p.based_on} & hold)
+    usable = lambda p: bool(p.based_on) and not {JGK + d for d in p.based_on} & hold
+    store = load_store(keep=usable)
+    given = {p.uri: {JGK + d for d in p.based_on} for p in ProposalStore().load() if usable(p)}
 
     triples = defaultdict(list)
     for s, p, o, _ in store.quads_for_pattern(None, None, None, None):
@@ -199,9 +260,9 @@ def main() -> None:
             if p.value == JGK + "hasEntrance" and s in addrs:
                 addrs.setdefault(o.value, addrs[s] + " 출입구")
     obs_summary = observation_summary(triples)
-    held = {s for s, plist in triples.items() if any(p.value == DCT_SOURCE and o.value in hold for p, o in plist)}
-    held |= {f"{s}/geometry" for s in held}
-    public = lambda s: s.startswith(BASE + "/") and s not in held and not s.endswith("/geometry")
+    pub = public_nodes(triples, hold, given)
+    held = {s for s in triples if s.startswith(BASE + "/")} - pub
+    shown = lambda u: not u.startswith(BASE + "/") or u in pub  # 우리 URI는 공개 목록에 있어야 보인다. 그래프에 없는 URI도 보이지 않는다
     pname = lambda p: labels.get(p) or EXT_LABEL.get(p) or p.rsplit("#", 1)[-1]
 
     def name_of(u: str) -> str:
@@ -221,7 +282,7 @@ def main() -> None:
         return EXT_LABEL.get(u) or u.rsplit("#", 1)[-1]
 
     def link(u: str) -> str:
-        if u in held:
+        if not shown(u):
             return '<span class="muted">(공개 보류 중인 객체)</span>'
         href = u.replace(SITE, SITE_PATH) + ("/" if u.startswith(BASE) else "") if u.startswith(SITE) else u
         return f'<a href="{e(href)}">{e(name_of(u))}</a>'
@@ -255,11 +316,11 @@ def main() -> None:
     for s, plist in triples.items():
         # 모양 노드(…/geometry)도 이미 공개한 URI라 페이지를 계속 만든다. 목록과 찾기에는 넣지 않는다
         is_geom = s.endswith("/geometry")
-        if not s.startswith(BASE + "/") or s in held:
+        if s not in pub:
             continue
         d = OUT / s[len(SITE) + 1:]
         d.mkdir(parents=True, exist_ok=True)
-        keep = [(p, o) for p, o in plist if o.value not in held]
+        keep = [(p, o) for p, o in plist if shown(o.value)]
         (d / "index.ttl").write_text("".join(f"<{s}> {term_nt(p)} {term_nt(o)} .\n" for p, o in keep), encoding="utf-8")
         kind = kind_of(s)
         kind_ko, rule = KINDS.get(kind, (kind, ""))
@@ -284,7 +345,7 @@ def main() -> None:
         out_links = "".join(f'<tr><td class="k">{e(pname(p))}</td><td class="links">{" ".join(link(o.value) for o in by_p[p])}</td></tr>' for p in rels)
         back = defaultdict(list)
         for p, src in inbound.get(s, []):
-            if src not in held:
+            if src in pub:
                 back[p].append(src)
         back_rows = "".join(
             f'<tr><td class="k">{e(pname(p))}</td><td class="links">{" ".join(link(x) for x in sorted(srcs, key=name_of)[:40])}'
@@ -308,7 +369,7 @@ def main() -> None:
         # 모양: 지도에 그릴 GeoJSON (좌표는 소수 6자리)
         geom_json = ""
         gnode = s if is_geom else f"{s}/geometry"
-        if gnode not in held:
+        if gnode in pub:
             wkt = next((o.value for p, o in triples.get(gnode, []) if p.value == GEO + "asWKT"), None)
             if wkt:
                 g = shapely.set_precision(shapely.from_wkt(wkt), 1e-6)
@@ -390,7 +451,7 @@ def main() -> None:
     <div id="sm-hits"></div>
     <h2 class="sm-sub">레이어</h2>{layer_rows}
     <h2 class="sm-sub">건물 상태</h2><div class="sm-legend" id="sm-legend"></div>
-    <p class="small muted sm-note">민원행정기관, 도로명주소 전자지도, 국가기본도, 수치지형도에서 온 객체와 모양은 이용 조건을 확인하는 중이라 넣지 않았습니다.
+    <p class="small muted sm-note">{e(HOLD_NOTE)}
     도로 구간, 법정동 경계, 국가기본도 건물까지 보이는 지도 화면은 <a href="{REPO}#실행">저장소에서 서버를 켜면</a> 열립니다.</p>
     <div id="sm-info"></div>
   </aside>
@@ -440,7 +501,7 @@ def main() -> None:
     station = f"{BASE}/station/1150010200106660040000001"
     examples = [(station, "증미역"), (f"{BASE}/building/1150010200106660040000001", "증미역 역사 건물"),
                 (f"{BASE}/legal-dong/1150010200", "등촌동 (법정동)"), (f"{BASE}/road/115003115008", "양천로 (도로)")]
-    ex = "".join(f'<a class="chip type" href="{e(u.replace(SITE, SITE_PATH))}/">{e(t)}</a>' for u, t in examples if public(u))
+    ex = "".join(f'<a class="chip type" href="{e(u.replace(SITE, SITE_PATH))}/">{e(t)}</a>' for u, t in examples if u in pub)
     body = f"""<section class="hero"><div class="hero-text">
   <p class="eyebrow">서울 9호선 증미역 반경 1km, GeoSPARQL 1.1</p>
   <h1>공식 번호로 엮은<br>증미역 공간 지식 그래프</h1>
@@ -476,11 +537,15 @@ def main() -> None:
 <section><h2 class="sec-title">국가기본도 대전환 4원칙과 이 그래프</h2><div class="pgrid">{principles}</div></section>
 <section class="card sec two"><div><h2>그래프 쓰기</h2><p class="small">페이지마다 같은 주소에 Turtle 파일(<code>index.ttl</code>)이 있어 기계가 그대로 읽을 수 있습니다.
 어휘는 <a href="{SITE_PATH}/def/">jgk</a>이고, 원본에서 그래프를 다시 만드는 코드는 <a href="{REPO}">GitHub 저장소</a>에 있습니다.</p></div>
-<div><h2>공개 범위</h2><p class="small">민원행정기관 전자지도, 도로명주소 전자지도, 국가기본도, 수치지형도에서 온 객체와 모양은 이용 조건을 확인하는 중이라 이 사이트에 넣지 않았습니다.</p></div></section>"""
+<div><h2>공개 범위</h2><p class="small">{e(HOLD_NOTE)} 출처를 알 수 없는 노드도 넣지 않고, 승인한 변경은 근거 자료가 적혀 있고 모두 공개 자료일 때만 얹습니다.</p></div></section>"""
     (OUT / "index.html").write_text(page("처음", body, nav="", desc="증미역 반경 1km 공간 지식 그래프의 URI 사이트"), encoding="utf-8")
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
     report = {"pages": n, "held": len([h for h in held if not h.endswith('/geometry')]), "by_kind": counts}
     (OUT / "publish_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    problems = site_problems(OUT, hold, held)
+    if problems:
+        shutil.rmtree(OUT)  # 잘못 만든 결과가 그대로 올라가지 않게 지운다
+        raise RuntimeError(f"공개하면 안 되는 값이 {len(problems)}곳에 있어 사이트를 지웠다: " + "; ".join(problems[:10]))
     print(json.dumps(report, ensure_ascii=False))
 
 
