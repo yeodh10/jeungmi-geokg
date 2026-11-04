@@ -22,6 +22,7 @@ const P = {
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   system: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
+  orbit: '<path d="M4.5 10A8 8 0 0 1 18 6.3"/><path d="M18 2.5v4h-4"/><path d="M19.5 14A8 8 0 0 1 6 17.7"/><path d="M6 21.5v-4h4"/><path d="M12 9l3 1.6v3L12 15.2l-3-1.6v-3z"/>',
   external: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   pin: '<path d="M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2"/>',
 };
@@ -29,9 +30,9 @@ const P = {
 export const icon = (name, size = 20) =>
   `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${P[name] || P.info}</svg>`;
 
-// 도구 줄 묶음 순서. 위 줄: 지도 보기, 재기, 링크. 아래 줄: 확대와 축소, 역과 내 위치
+// 도구 줄 묶음 순서. 위 줄: 지도 보기, 재기, 링크. 아래 줄: 입체 보기, 확대와 축소, 역과 내 위치
 const TOP = ["view", "measure", "link", "other"];
-const BOTTOM = ["zoom", "place"];
+const BOTTOM = ["d3", "zoom", "place"];
 
 export function createUI() {
   const toastEl = document.getElementById("toast");

@@ -5,7 +5,7 @@
 
 const cfg = window.APP_CONFIG || { mode: "public", root: "", app: ".", build: "", source: "./source-static.js", extra: [] };
 const V = "?v=" + encodeURIComponent(cfg.build || "");
-const FEATURES = ["search", "chips", "card", "popup", "nearby", "here", "ask", "datatab", "tour", "themes", "measure", "conditions"];
+const FEATURES = ["search", "chips", "card", "popup", "nearby", "here", "ask", "datatab", "tour", "themes", "measure", "conditions", "motion"];
 const SITE = "https://yeodh10.github.io/jeungmi-geokg";
 const KIND = { building: "건물", "building-gis": "건물", station: "역", road: "길", "admin-dong": "행정동", "legal-dong": "법정동",
   "basic-zone": "우편구역", sensor: "센서", parcel: "필지", entrance: "입구", business: "상호", group: "단지",

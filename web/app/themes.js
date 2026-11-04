@@ -119,6 +119,7 @@ export async function init(ctx) {
   };
   function setThreeD(on, { view = null, write = true, announce = true } = {}) {
     threeD = !!on;
+    if (!threeD) setSpin(false, { announce: false });
     if (threeD && !map.getLayer("bldg-3d")) {
       map.addLayer({ id: "bldg-3d", type: "fill-extrusion", source: "bldg", minzoom: 14,
         paint: { "fill-extrusion-color": key ? themeSpec(key).color : mapApi.defaultBuildingColor(),
@@ -128,22 +129,63 @@ export async function init(ctx) {
     }
     if (!threeD && map.getLayer("bldg-3d")) map.removeLayer("bldg-3d");
     allowTurn(threeD);
-    north.hidden = !threeD;
+    north.hidden = spin.hidden = !threeD;
+    d3btn.setAttribute("aria-pressed", String(threeD));
     const pitch = view ? view[0] : 55, bearing = view ? view[1] : -20;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    map.easeTo({ pitch: threeD ? pitch : 0, bearing: threeD ? bearing : 0, duration: reduce ? 0 : 500 });
+    // 주소창에서 되살릴 때(write=false)는 움직이지 않고 바로 놓는다. 처음 불러올 때의 여백 맞추기가 이 움직임을 끊어 기울기가 낮게 남았다
+    map.easeTo({ pitch: threeD ? pitch : 0, bearing: threeD ? bearing : 0, duration: reduce || !write ? 0 : 800,
+      easing: t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2) });
     btn.classList.toggle("on", !!key || threeD);
     if (write) state.set({ d3: threeD ? `${Math.round(pitch)},${Math.round(bearing)}` : null }, { silent: true });
     renderPop();
-    if (announce) ui.live(threeD ? "입체 보기를 켰습니다. 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌면 지도를 돌리거나 기울일 수 있습니다" : "입체 보기를 껐습니다");
+    if (announce) ui.live(threeD ? "입체 보기를 켰습니다. Q와 E 키로 왼쪽 오른쪽으로 돌리고, 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌면 돌리거나 기울일 수 있습니다" : "입체 보기를 껐습니다");
   }
   // 입체 보기의 시점을 주소창에 적어, 링크로 같은 시점을 나눌 수 있게 한다
   map.on("moveend", () => { if (threeD) state.set({ d3: `${Math.round(map.getPitch())},${Math.round(map.getBearing())}` }, { silent: true }); });
   // 북쪽으로: 입체 보기에서만 보인다. 아이콘은 지도의 방위각만큼 돌아 북쪽을 가리킨다
   const north = ui.toolButton({ id: "tool-north", icon: "compass", label: "북쪽을 위로", group: "view", order: 1,
-    onClick: () => map.easeTo({ bearing: 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 }) });
+    onClick: () => { setSpin(false, { announce: false }); map.easeTo({ bearing: 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 }); } });
   north.hidden = true;
   map.on("rotate", () => { const svg = north.querySelector("svg"); if (svg) svg.style.transform = `rotate(${-map.getBearing()}deg)`; });
+  // 아래 도구 줄의 3D 단추: 지도 보기 창을 열지 않고 바로 입체 보기를 켜고 끈다
+  const d3btn = ui.toolButton({ id: "tool-3d", icon: "cube", label: "입체 보기", group: "d3", order: 0, onClick: () => setThreeD(!threeD) });
+  d3btn.innerHTML = '<span class="tool-txt" aria-hidden="true">3D</span>';
+  d3btn.setAttribute("aria-pressed", "false");
+
+  // 한 바퀴 돌아보기: 입체 보기에서만 보인다. 지도 가운데를 축으로 천천히 계속 돈다.
+  // 단추를 다시 누르거나, 지도를 만지거나(누르기, 휠, 키), 북쪽 단추를 누르거나, 입체 보기를 끄면 멈춘다.
+  // 찾기로 다른 곳에 옮겨 가는 것처럼 앱이 지도를 움직이면 멈추지 않고, 그 움직임이 끝난 뒤 새 가운데를 축으로 다시 돈다.
+  // 90도씩 이어 돌려서 moveend가 한 바퀴에 네 번만 난다(주소창 시점 적기가 프레임마다 돌지 않게)
+  const SPIN_QUARTER_MS = 9000;  // 한 바퀴 36초
+  let spinning = false;
+  const spin = ui.toolButton({ id: "tool-spin", icon: "orbit", label: "한 바퀴 돌아보기", group: "view", order: 2,
+    onClick: () => setSpin(!spinning) });
+  spin.hidden = true;
+  spin.setAttribute("aria-pressed", "false");
+  function spinStep() {
+    if (!spinning) return;
+    // 평평하게 눕힌 채면 도는 것이 보이지 않으니 기울여서 돈다 (입체를 켜는 움직임이 끝나기 전에 눌러도 같다)
+    const pitch = map.getPitch() < 30 ? 55 : map.getPitch();
+    // essential: 사용자가 직접 켠 움직임이다. 빼면 '동작 줄이기' 설정에서 시간이 0이 되어 moveend가 끝없이 이어진다
+    map.easeTo({ bearing: map.getBearing() + 90, pitch, duration: SPIN_QUARTER_MS, easing: t => t, essential: true });
+  }
+  function setSpin(on, { announce = true } = {}) {
+    on = !!on && threeD;
+    if (on === spinning) return;
+    spinning = on;
+    spin.setAttribute("aria-pressed", String(on));
+    spin.setAttribute("aria-label", on ? "돌아보기 멈추기" : "한 바퀴 돌아보기");
+    spin.title = spin.getAttribute("aria-label");
+    if (on) spinStep();
+    else map.stop();
+    if (announce) ui.live(on ? "지도 가운데를 축으로 천천히 돕니다. 단추를 다시 누르거나 지도를 만지면 멈춥니다" : "돌아보기를 멈췄습니다");
+  }
+  // moveend는 다른 움직임이 시작되며 앞 움직임을 끊을 때도 그 easeTo 안에서 바로 난다. 거기서 곧장 돌기 시작하면 그 움직임과 엉키므로
+  // 한 프레임 미루고, 그때 다른 움직임(여백 맞추기, 찾은 곳으로 옮기기)이 돌고 있으면 그것이 끝난 뒤의 moveend를 기다린다
+  map.on("moveend", () => { if (spinning) requestAnimationFrame(() => { if (spinning && !map.isMoving()) spinStep(); }); });
+  for (const t of ["pointerdown", "wheel", "keydown"]) map.getContainer().addEventListener(t, () => { if (spinning) setSpin(false); }, { capture: true, passive: true });
+  bus.on("motion:start", () => { if (spinning) setSpin(false); });   // 키로 옮기거나 돌리기 시작하면 (motion.js)
 
   // ---- 도구 단추와 고르는 창
   const btn = ui.toolButton({ id: "tool-view", icon: "layers", label: "지도 보기", group: "view", order: 0, onClick: () => openPop(pop.hidden) });
@@ -184,7 +226,7 @@ export async function init(ctx) {
       <div class="pop-legend">${spec ? legendRows(spec) + (spec.note ? `<p class="small muted">${esc(spec.note)}</p>` : "") : baseLegend()}</div>
       <label class="pick pick-3d"><input type="checkbox" id="theme-3d"${threeD ? " checked" : ""}>입체 보기 (LoD1 높이)</label>
       ${threeD ? `<p class="small muted">높이는 건축물대장 높이(GIS건물통합정보)이고, 없으면 지상 층수 × ${FLOOR_H}m로 추정합니다. 측량한 높이는 아닙니다. 점으로만 표시된 건물과 높이, 층수가 모두 없는 건물은 입체로 세우지 않습니다.</p>
-        <p class="small muted">돌리기와 기울이기: 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌기(휴대폰은 두 손가락). 오른쪽 위 나침반 버튼을 누르면 북쪽이 위로 돌아옵니다.</p>` : ""}
+        <p class="small muted">돌리기와 기울이기: Q와 E 키, 또는 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌기(휴대폰은 두 손가락). 옮기기는 W, A, S, D나 방향키입니다. 오른쪽 위 나침반 버튼을 누르면 북쪽이 위로 돌아옵니다. 그 아래 돌아보기 버튼을 누르면 지도 가운데를 축으로 천천히 돌고, 지도를 만지면 멈춥니다.</p>` : ""}
       <fieldset class="pick-set bright-set"><legend>화면 모드</legend>
         <div class="seg">${[["system", "시스템"], ["light", "밝게"], ["dark", "어둡게"]].map(([v, l]) => `<label class="pick"><input type="radio" name="theme-pick2" value="${v}"${themeChoice() === v ? " checked" : ""}>${l}</label>`).join("")}</div>
         <label for="map-bright" class="small">지도 밝기 <b>${brightness}%</b></label>

@@ -171,3 +171,4 @@ body.panel-collapsed #map-top { left: 404px; }
 .hover-tip { pointer-events: none; }
 
 .tool[hidden] { display: none; }   /* .tool의 inline-flex가 hidden을 이기지 않게 */
+.tool-txt { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
