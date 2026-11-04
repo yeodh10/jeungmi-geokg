@@ -147,7 +147,11 @@ def check_rules_on_data(tmp: Path) -> None:
                             for c in changes if (c["op"] if isinstance(c, dict) else c.op) == "add"))
 
     rows = json.loads(REAL.read_text(encoding="utf-8")) if REAL.exists() else []
-    approved = {r["id"]: link_of(r["changes"]) for r in rows if r["id"].startswith(RULES) and r["status"] == "approved"}
+    # 2026-11-03에 정정 스크립트로 먼저 만든 컴퓨터는 옮기기 제안 번호가 'fix-same-building-rule-basemap-link-{GIS 번호}'다.
+    # 모듈(same_building_migration)은 'fix-same-building-{GIS 번호}'로 만들므로, 같은 꼴로 맞춰 견준다
+    old_fix = "fix-same-building-rule-basemap-link-"
+    approved = {r["id"].replace(old_fix, "fix-same-building-"): link_of(r["changes"])
+                for r in rows if r["id"].startswith(RULES) and r["status"] == "approved"}
     os.environ["JGK_PROPOSALS"] = str(tmp)
     store = ProposalStore(tmp)
     ph = placeholder_proposals.candidates()

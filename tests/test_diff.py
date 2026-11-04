@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 import geopandas as gpd
+import pyogrio
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +25,9 @@ FAKE_MGT = "1150010200199990000000001"  # 시험용 건물관리번호 (실제 �
 def make_next_snapshot(dst: Path) -> dict:
     for f in FILES:
         shutil.copy(PROC / f, dst / f)
-    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in ["building", "entrance", "station", "public_facility"] + EMAP_LAYERS}
+    have = set(pyogrio.list_layers(PROC / "objects.gpkg")[:, 0])  # 연속지적도 원본이 없는 컴퓨터에는 parcel_shape가 없다
+    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in ["building", "entrance", "station", "public_facility"] + EMAP_LAYERS
+              if n in have}
     b = layers["building"]
     busy = set(layers["station"]["building_uri"]) | set(pd.read_csv(PROC / "facility_building.csv")["building_uri"])
     addressed = b[(b["kind"] == "building") & ~b["uri"].isin(busy)]
