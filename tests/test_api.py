@@ -10,6 +10,7 @@ import hashlib
 import itertools
 import json
 import logging
+import os
 import re
 import shutil
 import socket
@@ -191,16 +192,17 @@ def check_concurrency(tmp: Path, review_app) -> str:
 
 
 def check_approval_and_layers(c, tmp: Path, review_app) -> None:
-    """검토자 이름이 SPARQL로 실행되지 않고, 폐지 승인 뒤 레이어에 바로 폐지로 나온다."""
+    """검토자 이름이 SPARQL로 실행되지 않고, 폐지 승인 뒤 로컬 지도 카드에 바로 폐지로 나오며 층의 ETag가 바뀐다."""
     from src.review.proposals import ProposalStore
 
     p = next(p for p in ProposalStore(tmp).load() if p.id.startswith("table-") and p.status == "pending")
-    first = c.get("/api/layers/building")
+    path = p.target.split("/id/", 1)[1]
+    first = c.get("/api/layers/road")
     etag = first.headers["etag"]
-    assert first.headers["cache-control"] == "no-cache" and etag.startswith('W/"building-'), first.headers
-    assert c.get("/api/layers/building", headers={"If-None-Match": etag}).status_code == 304
-    before = {f["properties"]["uri"]: f["properties"]["status"] for f in first.json()["features"]}
-    assert before[p.target] != "폐지", before[p.target]
+    assert first.headers["cache-control"] == "no-cache" and etag.startswith('W/"road-'), first.headers
+    assert c.get("/api/layers/road", headers={"If-None-Match": etag}).status_code == 304
+    before = strict(c.get("/api/card", params={"path": path}))
+    assert before["status"] != "폐지", before.get("status")
 
     size = len(review_app.store())
     sneaky = 'x" } ; DROP ALL ; INSERT DATA { <a:s> <a:p> "y'
@@ -212,17 +214,17 @@ def check_approval_and_layers(c, tmp: Path, review_app) -> None:
     assert who == [sneaky], who
     assert not list(g.query("SELECT ?o WHERE { <a:s> ?p ?o }"))
 
-    after = c.get("/api/layers/building", headers={"If-None-Match": etag})
+    after = c.get("/api/layers/road", headers={"If-None-Match": etag})
     assert after.status_code == 200 and after.headers["etag"] != etag, after.headers
-    now = {f["properties"]["uri"]: f["properties"]["status"] for f in after.json()["features"]}
-    assert now[p.target] == "폐지", now[p.target]
+    now = strict(c.get("/api/card", params={"path": path}))
+    assert now["status"] == "폐지", now.get("status")
 
     # 서버를 다시 켜면 판 번호가 0부터 다시 세어져도, 다시 켜기 전 ETag로는 304가 나오지 않는다
     saved = dict(review_app.state)
     review_app.state.update(boot="restarted", version=int(etag.rstrip('"').rsplit("-", 1)[1]))
     review_app.layer_cache.clear()
     try:
-        again = c.get("/api/layers/building", headers={"If-None-Match": etag})
+        again = c.get("/api/layers/road", headers={"If-None-Match": etag})
         assert again.status_code == 200 and again.headers["etag"] != etag, again.headers
     finally:
         review_app.state.update(saved)
@@ -247,14 +249,18 @@ def check_map_api(c, review_app) -> None:
     assert circle.contains(Point(lon, lat)) and a["features"][0]["properties"]["label"] == "증미역 반경 1km"
 
     # 공개 여부: 공개 보류 출처(전자지도)의 공공시설은 공개 페이지가 없고, 역은 있다
-    fac = c.get("/api/layers/facility").json()["features"]
-    held = [f for f in fac if not c.get("/api/feature", params={"uri": f["properties"]["uri"]}).json()["public"]]
+    fac = [f"{BASE}/{f['p']}" for f in c.get("/api/places").json()["facilities"]]
+    held = [u for u in fac if not c.get("/api/feature", params={"uri": u}).json()["public"]]
     assert held, "공개 보류 공공시설이 없다"
-    assert c.get("/api/feature", params={"uri": held[0]["properties"]["uri"] + "/geometry"}).json()["public"] is False
+    assert c.get("/api/feature", params={"uri": held[0] + "/geometry"}).json()["public"] is False
     st = c.get("/api/feature", params={"uri": STATION}).json()
     assert st["public"] is True and st["geometry"]["type"] == "Point" and st["history"] == []
 
-    # 레이어: 한 객체가 한 번만 나오고 수는 원래 쿼리와 같다. kind, dong, 출입구 주소가 들어 있다
+    # 레이어: 로컬 앱의 보류 자료 층 네 가지만 있다. 옛 지도 화면만 쓰던 층은 없다
+    assert set(review_app.LAYER_QUERY) == {"road", "legaldong", "basemap", "digitalmap"}, review_app.LAYER_QUERY
+    for old in ("building", "entrance", "facility", "station", "sensor"):
+        assert c.get(f"/api/layers/{old}").status_code == 404, old
+    # 한 객체가 한 번만 나오고 수는 원래 쿼리와 같다. kind, dong이 들어 있다
     g = review_app.store()
     for kind, cls in review_app.LAYER_QUERY.items():
         want = next(iter(g.query(f"""PREFIX geo: <http://www.opengis.net/ont/geosparql#>
@@ -266,12 +272,9 @@ SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a {cls} ; geo:hasDefaultGeometry/g
         assert all(f["properties"]["kind"] == kind and "dong" in f["properties"] for f in feats)
         coords = json.dumps([f["geometry"]["coordinates"] for f in feats[:50]])
         assert max(len(t.split(".")[1]) for t in coords.replace("[", " ").replace("]", " ").replace(",", " ").split() if "." in t) <= 6
-    ent = c.get("/api/layers/entrance").json()["features"]
-    assert sum(1 for f in ent if f["properties"]["addr"]) > len(ent) * 0.9
-    bld = c.get("/api/layers/building").json()["features"]
-    in_dong = next(iter(g.query(f"""PREFIX jgk: <{JGK}>
-SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:Building ; jgk:within ?d . ?d a jgk:AdminDong }}""")))["n"].value
-    assert sum(1 for f in bld if f["properties"]["dong"]) == int(in_dong) > 0, in_dong
+    seg_in_dong = next(iter(g.query(f"""PREFIX jgk: <{JGK}>
+SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:RoadSegment ; jgk:within ?d . ?d a jgk:AdminDong }}""")))["n"].value
+    assert sum(1 for f in c.get("/api/layers/road").json()["features"] if f["properties"]["dong"]) == int(seg_in_dong), seg_in_dong
 
     # 도로명주소 전자지도: 공개 보류를 유지하므로 도로 구간은 통째로, 법정동은 모양만 공개하지 않는다
     seg = c.get("/api/layers/road").json()["features"]
@@ -295,7 +298,7 @@ SELECT (COUNT(DISTINCT ?f) AS ?n) WHERE {{ ?f a jgk:Building ; jgk:within ?d . ?
       ?r <http://www.w3.org/2000/01/rdf-schema#label> ?n }}"""
     assert [x["n"].value for x in g.query(q)] == ["양천로"]
 
-    r = c.get("/api/layers/building", headers={"Accept-Encoding": "gzip"})
+    r = c.get("/api/layers/basemap", headers={"Accept-Encoding": "gzip"})
     assert r.headers.get("content-encoding") == "gzip", r.headers
     assert c.get("/api/layers/nothing").status_code == 404
 
@@ -517,10 +520,10 @@ def check_bad_geometry(c, tmp, review_app) -> None:
             "line-nan": "LINESTRING (126.86 37.55, NaN NaN, 126.87 37.56)",
             "z-ok": "POINT Z (126.861 37.551 12.5)"}  # 그래프 밖에서 들어온 높이 값은 버리고 2차원으로 그린다
     drawn = {"good", "z-ok"}
-    uri = lambda name: f"{BASE}/building/wkt-{name}"
+    uri = lambda name: f"{BASE}/basemap/wkt-{name}"
     rows = [f'<{JGK}Active> <{RDFS}label> "사용"@ko .']
     for name, wkt in wkts.items():
-        rows += [f"<{uri(name)}> a <{JGK}Building> ; <{JGK}status> <{JGK}Active> ; <{GEO}hasDefaultGeometry> <{uri(name)}/geometry> ; "
+        rows += [f"<{uri(name)}> a <{JGK}BaseMapFeature> ; <{JGK}status> <{JGK}Active> ; <{GEO}hasDefaultGeometry> <{uri(name)}/geometry> ; "
                  f"<{GEO}hasGeometry> <{uri(name)}/geometry> .",
                  f'<{uri(name)}/geometry> <{GEO}asWKT> "{wkt}"^^<{GEO}wktLiteral> .']
     g = ox.Store()
@@ -534,7 +537,7 @@ def check_bad_geometry(c, tmp, review_app) -> None:
     review_app.state.update(store=g, version=keep["version"] + 1000)
     review_app.layer_cache.clear()
     try:
-        r = c.get("/api/layers/building")
+        r = c.get("/api/layers/basemap")
         assert r.status_code == 200, r.text[:200]
         body = strict(r)
         assert sorted(f["properties"]["uri"] for f in body["features"]) == sorted(uri(n) for n in drawn), body
@@ -855,7 +858,7 @@ def check_one_build_and_body_limit(c, tmp, review_app) -> None:
     review_app.layer_cache.clear()
     review_app.layer_body = counted
     codes = []
-    ts = [threading.Thread(target=lambda: codes.append(TestClient(review_app.app, base_url=LOCAL).get("/api/layers/station").status_code))
+    ts = [threading.Thread(target=lambda: codes.append(TestClient(review_app.app, base_url=LOCAL).get("/api/layers/legaldong").status_code))
           for _ in range(8)]
     try:
         for t in ts:
@@ -864,7 +867,7 @@ def check_one_build_and_body_limit(c, tmp, review_app) -> None:
             t.join()
     finally:
         review_app.layer_body = real
-    assert codes == [200] * 8 and builds == ["station"], (codes, builds)
+    assert codes == [200] * 8 and builds == ["legaldong"], (codes, builds)
 
     big = {"question": "가" * (2 * 1024 * 1024 // 3)}
     r = c.post("/api/ask", json=big)
@@ -1059,7 +1062,7 @@ def check_any_wkt(c, tmp, review_app) -> None:
         r = loose.post(f"/api/proposals/{p.id}/decision", json=OK)
         assert r.status_code == 409 and "WKT" in r.json()["detail"], (v, r.status_code, r.text[:200])
     assert review_app.state["version"] == version and all(ps.get(p.id).status == "pending" for p in made)
-    assert c.get("/api/layers/building").status_code == 200
+    assert c.get("/api/layers/road").status_code == 200
 
 
 HOLD = """import sys, time
@@ -1217,7 +1220,7 @@ def check_broken_file(c, tmp, review_app) -> None:
              ("GET", "/api/proposals/x/validate", None), ("GET", "/api/proposals/x/context", None),
              ("POST", "/api/proposals/x/decision", OK), ("POST", "/api/proposals/x/correction", {"to": "pending", "reviewer": "검토자", "reason": "시험"}),
              ("GET", "/api/groups/check?group=x", None), ("POST", "/api/groups/decision", {**OK, "group": "x"}),
-             ("GET", "/api/layers/building", None)]
+             ("GET", "/api/layers/road", None)]
     try:
         # 재현(재공격 보고 6): 목록이지만 기록이 하나도 읽히지 않는 파일은 승인 0건인 그래프가 200으로 떴다
         for content in (b"{", b"", b"null", b"123", b'"[]"', b"{}", b'{"a": 1}', b"\xff\xfe[", b"[{", b"[1, 2, null]", b'[{"id": "x"}]'):
@@ -1259,6 +1262,26 @@ def check_local_app(c, tmp, review_app) -> None:
     finally:
         review_app.has_llm_key = keep
     assert set(caps.json()["layers"]) == {"facility", "road", "legaldong", "basemap", "digitalmap"}
+    # 키 확인은 .env를 서버 환경에 올리지 않고, 환경에 있는 이름(빈 값 포함)이 .env보다 앞선다 (WP6 검토 5)
+    saved_env = {k: os.environ.get(k) for k in review_app.LLM_KEY_NAMES}
+    try:
+        for k in review_app.LLM_KEY_NAMES:
+            os.environ[k] = ""
+        names_before = set(os.environ)
+        assert review_app.has_llm_key() is False and set(os.environ) == names_before
+        os.environ["ANTHROPIC_API_KEY"] = "test-only"
+        assert review_app.has_llm_key() is True
+        for k in review_app.LLM_KEY_NAMES:
+            os.environ.pop(k)
+        names_before = set(os.environ)
+        review_app.has_llm_key()
+        assert set(os.environ) == names_before, "키 확인이 .env 값을 서버 환경에 올렸다"
+    finally:
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
     # 자료: 공개판과 같은 모양이고, 전체 뷰라 공공시설이 더해진다
     places = strict(c.get("/api/places"))
@@ -1291,8 +1314,30 @@ def check_local_app(c, tmp, review_app) -> None:
     for path in sample:
         card = strict(c.get("/api/card", params={"path": path}))
         assert card["public"] is ((f"{BASE}/{path}") in pub.triples and f"{BASE}/{path}" not in pub.held), path
-    for bad, code in (("../etc", 400), ("building/<x>", 400), ("building/0000", 404), ("proposal/x", 404)):
-        assert c.get("/api/card", params={"path": bad}).status_code == code, bad
+    for bad, code in (("../etc", 400), ("building/<x>", 400), ("building/0000", 404), ("proposal/x", 404),
+                      ("building/x\n", 400), ("building/x\r", 400), ("building/x\n/", 400)):
+        assert c.get("/api/card", params={"path": bad}).status_code == code, repr(bad)
+    # 검토 화면 링크(/map?focus={전체 URI})의 대상: 제안 대상, 둘레 지도 객체, 승인 뒤 대상. places.json에 없는 보류 자료도
+    # 카드가 있어야 하고(pt나 이름), 화면(app.js openFocus)은 로컬 모드에서 유형을 가리지 않고 카드를 받아 연다
+    by_kind = {}
+    for t in sorted({p.target for p in review_app.proposals.load() if p.target.startswith(BASE + "/")}):
+        by_kind.setdefault(t[len(BASE) + 1:].split("/", 1)[0], t)
+    for kind in ("road", "basemap", "digitalmap"):
+        u = c.get(f"/api/layers/{kind}").json()["features"][0]["properties"]["uri"]
+        by_kind.setdefault(u[len(BASE) + 1:].split("/", 1)[0], u)
+    assert {"basemap", "digital-map", "road-segment"} <= set(by_kind), sorted(by_kind)
+    for kind, t in by_kind.items():
+        if kind in ("proposal", "notice"):
+            continue
+        card = c.get("/api/card", params={"path": t[len(BASE) + 1:]})
+        if kind in ("basemap", "digital-map", "road-segment"):
+            assert card.status_code == 200, (t, card.status_code)
+        if card.status_code == 200:
+            assert card.json().get("pt") or card.json().get("name"), (kind, t)
+        else:
+            assert card.status_code == 404, (t, card.status_code)
+    app_js = (ROOT / "web" / "app" / "app.js").read_text(encoding="utf-8")
+    assert 'const cardFirst = path => placeCardKinds.test(path) || cfg.mode === "local";' in app_js and "if (cardFirst(path))" in app_js
     q = strict(c.get("/api/questions"))
     assert q["items"] and "전체 그래프" in q["note"], q["note"]
 

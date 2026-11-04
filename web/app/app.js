@@ -282,7 +282,10 @@ function notFound() {
   else panel.remove("place");
 }
 
-// 주소창의 focus를 연다. places.json에 없는 유형(입구, 상호)은 카드를 받아 본다. 없거나 공개하지 않는 장소는 같은 말로 알린다
+// 주소창의 focus를 연다. places.json에 없는 유형(입구, 상호)은 카드를 받아 본다. 없거나 공개하지 않는 장소는 같은 말로 알린다.
+// 로컬 서버는 그래프의 모든 객체에 카드가 있다. 검토 화면의 '지도에서 보기'가 국가기본도, 수치지형도 건물, 도로 구간처럼
+// places.json에 없는 보류 자료로도 오므로, 로컬 모드에서는 유형을 가리지 않고 카드를 받아 본다 (공개 모드는 그대로)
+const cardFirst = path => placeCardKinds.test(path) || cfg.mode === "local";
 async function openFocus(focus, unit, { fit }) {
   const path = normPath(focus);
   const d = ctx.data;
@@ -302,7 +305,7 @@ async function openFocus(focus, unit, { fit }) {
     bus.emit("select", { path, group: g ? g.g : undefined, from: "link", fit, noPush: true });
     return;
   }
-  if (placeCardKinds.test(path)) {
+  if (cardFirst(path)) {
     try {
       const card = await ctx.source.card(path);
       if (card && (card.pt || card.name)) { bus.emit("select", { path, card, from: "link", fit, noPush: true }); return; }

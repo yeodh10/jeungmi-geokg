@@ -946,6 +946,7 @@ def edition_as_of(uri: str, at: str):
     모양의 값은 속성 이름이 '…#hasGeometry …#asWKT'처럼 공백으로 이어져 온다.
     """
     from src.graph.editions import as_of, diff_states, moment
+    check_uri(uri)   # /api/feature와 같은 검사: http(s) 주소만 받는다 (javascript:, urn: 등은 400)
     try:
         iri(uri)
         when = moment(at)
@@ -970,20 +971,17 @@ def edition_changes(since: str = "1900-01-01", until: str = "2999-12-31"):
     return {"since": since, "until": until, "changes": rows, "names": names(uris)}
 
 
-LAYER_QUERY = {
-    "building": "jgk:Building", "entrance": "jgk:BuildingEntrance",
-    "facility": "jgk:PublicFacility", "station": "jgk:Station", "sensor": "jgk:Sensor",
-    "road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong", "basemap": "jgk:BaseMapFeature",
-    "digitalmap": "jgk:DigitalMapFeature",
-}
-LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "baddr", "bkind", "fa", "h")
+# 로컬 지도 앱의 보류 자료 층(web/local/layers-local.js)만 그린다. 건물, 출입구, 역, 센서, 공공시설은 앱 자료(/api/places 등)로 온다.
+# 옛 지도 화면만 쓰던 층(건물, 출입구, 역, 센서, 공공시설)은 그 화면과 함께 뺐다 (명세 10절 WP6 완료 기준 6)
+LAYER_QUERY = {"road": "jgk:RoadSegment", "legaldong": "jgk:LegalDong", "basemap": "jgk:BaseMapFeature",
+               "digitalmap": "jgk:DigitalMapFeature"}
+LAYER_FIELDS = ("label", "status", "use", "addr", "type", "dong", "bkind")
 layer_cache: dict = {}  # (레이어, 그래프 판 번호) -> 응답 본문(bytes)
 layer_locks = {kind: threading.Lock() for kind in LAYER_QUERY}  # 같은 레이어를 동시에 달라고 해도 한 번만 만든다
 
 
 def layer_body(kind: str) -> bytes:
-    # 한 객체가 행정동, 출입구를 가진 건물 등으로 여러 줄이 되지 않게 객체마다 묶는다
-    entrance = "OPTIONAL { ?b jgk:hasEntrance ?f ; jgk:roadAddress ?baddr0 }" if kind == "entrance" else ""
+    # 한 객체가 행정동 등으로 여러 줄이 되지 않게 객체마다 묶는다
     q = f"""PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -993,8 +991,6 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
   OPTIONAL {{ ?f rdfs:label ?label0 }} OPTIONAL {{ ?f jgk:useName ?use0 }}
   OPTIONAL {{ ?f jgk:roadAddress ?addr0 }} OPTIONAL {{ ?f jgk:entranceType ?type0 }} OPTIONAL {{ ?f jgk:mapKind ?bkind0 }}
   OPTIONAL {{ ?f jgk:within ?d . ?d a jgk:AdminDong ; rdfs:label ?dong0 }}
-  OPTIONAL {{ ?f jgk:floorsAbove ?fa0 }} OPTIONAL {{ ?f jgk:heightM ?h0 }}
-  {entrance}
 }} GROUP BY ?f"""
     feats, skipped = [], 0
     for s in store().query(q):
@@ -1004,14 +1000,10 @@ SELECT ?f (SAMPLE(?wkt0) AS ?wkt) {" ".join(f"(SAMPLE(?{k}0) AS ?{k})" for k in 
             log.warning("모양을 읽지 못해 레이어에서 건너뛴다: %s", term(s["f"]))
             continue
         props = {k: term(s[k]) for k in LAYER_FIELDS}
-        baddr = props.pop("baddr")
-        props["type"] = props["type"] or props.pop("bkind")  # 수치지형도 건물은 종류(아파트, 무벽건물 등)
-        props.pop("bkind", None)
-        props["addr"] = props["addr"] or baddr  # 출입구는 그 출입구를 가진 건물의 도로명주소
+        props["type"] = props["type"] or props["bkind"]  # 수치지형도 건물은 종류(아파트, 무벽건물 등)
         feats.append({"type": "Feature", "geometry": geometry,
                       "properties": {k: props[k] for k in ("label", "status", "use", "addr", "type")}
-                      | {"uri": term(s["f"]), "kind": kind, "dong": props["dong"]}
-                      | {k: float(props[k]) for k in ("fa", "h") if props.get(k)}})   # 입체 보기 높이 (지상 층수, 대장 높이 m)
+                      | {"uri": term(s["f"]), "kind": kind, "dong": props["dong"]}})
     return json.dumps({"type": "FeatureCollection", "features": feats, "skipped": skipped},
                       ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
@@ -1194,16 +1186,23 @@ SELECT ?b ?wkt ?label ?status WHERE {{
 # ---- 지도 앱의 자료 입구 (명세 5.3절, web/local/source-api.js가 받는다) ------------------------------------------------
 # 공개 사이트의 정적 파일과 같은 모양이다. 다른 점: 전체 뷰로 만들어 공공시설(places의 facilities)과 보류 자료가 들어 있고,
 # 카드의 public은 공개 사이트에 그 장소의 페이지가 있는지를 적는다 (false면 화면이 공개 페이지 링크를 숨긴다).
-APP_PATH = re.compile(r"^[a-z-]+/[0-9A-Za-z_.-]+$")
+APP_PATH = re.compile(r"[a-z-]+/[0-9A-Za-z_.-]+")   # fullmatch로 쓴다 ('$'는 끝 줄바꿈 앞에서도 맞는다)
 app_cache: dict = {}   # 그래프 판 번호 -> {"view", "places", ...}. 판이 바뀌면 다시 만든다
 app_lock = threading.RLock()
 
 
+LLM_KEY_NAMES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
 def has_llm_key() -> bool:
-    """자유 질문에 쓸 키가 있는지만 본다. 값은 어디에도 내보내지 않는다."""
-    from dotenv import load_dotenv
-    load_dotenv(ROOT / ".env")
-    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    """자유 질문에 쓸 키가 있는지만 본다. 값은 어디에도 내보내지 않는다.
+
+    .env는 읽기만 하고 서버 환경에 올리지 않는다 (load_dotenv는 다른 서비스 키까지 모두 올린다). 키를 실제로 쓰는 것은
+    질문을 보낼 때의 src.llm.client.get_client 하나다."""
+    from dotenv import dotenv_values
+    found = dotenv_values(ROOT / ".env") if not all(k in os.environ for k in LLM_KEY_NAMES) else {}
+    # 환경에 이미 있는 이름은 .env보다 앞선다 (load_dotenv의 기본과 같다. 빈 값으로 두면 키 없음으로 본다)
+    return any(os.environ[k] if k in os.environ else found.get(k) for k in LLM_KEY_NAMES)
 
 
 def public_uris(view) -> set[str]:
@@ -1328,7 +1327,7 @@ def app_question_list(request: Request):
 def app_card(path: str):
     """장소 하나의 카드 (card.json 모양). 모양 노드, 변경 기록, 제안, 고시는 카드가 없다 (제안은 검토 화면에서 본다)."""
     path = path.strip("/")
-    if not APP_PATH.match(path):
+    if not APP_PATH.fullmatch(path):
         raise HTTPException(400, "장소 경로가 맞지 않습니다")
     d = app_data()
     uri = f"{BASE}/{path}"

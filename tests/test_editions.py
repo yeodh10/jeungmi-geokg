@@ -641,7 +641,8 @@ def run() -> None:
     r = c.get("/api/editions/as-of", params={"uri": retire.target, "at": "2026-10-30T09:59:59+09:00"}).json()
     row = next(d for d in r["diff"] if d["p"] == status)
     assert row["after"] == [JGK + "Retired"] and JGK + "Retired" not in row["before"], row
-    assert c.get("/api/editions/as-of", params={"uri": "not a uri", "at": "2026-10-30"}).status_code == 400
+    for bad in ("not a uri", "javascript:alert(1)", "urn:x", "mailto:a@b", "file:///etc/passwd", retire.target + "\n"):
+        assert c.get("/api/editions/as-of", params={"uri": bad, "at": "2026-10-30"}).status_code == 400, bad
     ch = c.get("/api/editions/changes", params={"since": "2026-10-30T10:30:00+09:00"}).json()
     assert {x["proposal"] for x in ch["changes"]} == {link.uri}, ch
     shutil.rmtree(tmp, ignore_errors=True)

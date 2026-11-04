@@ -177,8 +177,10 @@ export function init(ctx) {
     }, true);
   }
 
-  // 주소창으로 공공시설이 열리면 공공시설 층도 켠다 (어디 있는지 보이게)
+  // 주소창이나 검토 화면 링크로 보류 자료 객체가 열리면 그 층도 켠다 (어디 있는지, 모양이 어떤지 보이게)
+  const LAYER_OF = { "public-facility": "facility", "road-segment": "road", "basemap": "basemap", "digital-map": "digitalmap" };
   bus.on("select", sel => {
-    if (sel && /^public-facility\//.test(sel.path || "") && !on.has("facility")) toggle("facility", true).then(render);
+    const k = LAYER_OF[String((sel && sel.path) || "").split("/")[0]];
+    if (k && !on.has(k)) toggle(k, true).then(render);
   });
 }

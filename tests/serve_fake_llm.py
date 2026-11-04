@@ -1,12 +1,13 @@
 """가짜 모델로 로컬 서버를 띄운다. 자유 질문 화면(web/local/ask-local.js)을 실제 API 호출 없이 확인할 때 쓴다 (명세 10절 WP6).
 
-실행: python -m tests.serve_fake_llm [--port 8000]
+실행: python -m tests.serve_fake_llm [--port 8000] [--proposals 파일]
   http://localhost:8000/map 의 묻기 탭 위 칸에서 질문하면 미리 정한 쿼리가 이 컴퓨터의 그래프에서 돈다.
 
-바꾸는 것은 src.query.nl.parse 하나다. 서버 코드에는 가짜 모드를 넣지 않는다.
+바꾸는 것은 src.query.nl의 parse와 get_client 둘이다. 서버 코드에는 가짜 모드를 넣지 않는다.
 - ANTHROPIC_BASE_URL을 http://127.0.0.1:9 로 둔다. 가짜를 빠뜨린 호출이 있어도 아무 데도 닿지 못한다.
-- 키가 없는 컴퓨터에서도 화면을 볼 수 있게, 키가 없으면 가짜 값('fake-key-not-used')을 넣는다. 이 값은 어디로도 나가지 않는다.
-- 승인 기록은 임시 복사본을 쓴다 (--real-proposals를 주지 않으면). 화면에서 승인, 반려를 눌러도 실제 기록은 그대로다.
+- .env를 읽지 않는다. 실제 키는 이 서버 프로세스에 들어오지 않고, 키 자리에는 가짜 값('fake-key-not-used')을 넣는다.
+- 승인 기록은 언제나 임시 복사본(임시 폴더의 jgk-fake-{포트}/proposals.json)을 쓴다. 켤 때마다 원본으로 덮어쓰므로
+  사본이 쌓이지 않는다. 복사할 원본은 --proposals로 고를 수 있다(주지 않으면 실제 승인 기록). 화면에서 승인, 반려를 눌러도 원본은 그대로다.
 """
 from __future__ import annotations
 
@@ -56,27 +57,31 @@ def fake_parse(client, schema, system, user, effort=None, model=None):
 def main() -> None:
     ap = argparse.ArgumentParser(description="가짜 모델로 로컬 서버 띄우기")
     ap.add_argument("--port", type=int, default=8000)
-    ap.add_argument("--real-proposals", action="store_true", help="임시 복사본 대신 실제 승인 기록을 읽는다 (쓰지 않도록 조심)")
+    ap.add_argument("--proposals", type=Path, default=REAL,
+                    help="임시 복사본을 만들 승인 기록 파일 (기본: 실제 승인 기록). 이 파일에는 쓰지 않는다")
     args = ap.parse_args()
 
+    # .env를 읽지 않는다 (실제 키와 다른 서비스 키를 이 프로세스에 올리지 않는다)
     os.environ["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:9"   # 빠뜨린 호출이 있어도 닿지 못하게
-    from dotenv import load_dotenv
-    load_dotenv(ROOT / ".env")
-    os.environ["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:9"   # .env에 다른 값이 있어도 이 값을 쓴다
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-        os.environ["ANTHROPIC_API_KEY"] = "fake-key-not-used"
+    os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
+    os.environ["ANTHROPIC_API_KEY"] = "fake-key-not-used"     # 화면이 '키 있음'으로 보이게 하는 자리값. 어디로도 나가지 않는다
 
     import src.query.nl as nl
     nl.parse = fake_parse
+    nl.get_client = lambda: object()   # 진짜 클라이언트를 만들지 않는다 (만들면 get_client가 .env를 읽는다)
 
     from src.review import app as review_app
     from src.review.proposals import ProposalStore
-    if not args.real_proposals:
-        tmp = Path(tempfile.mkdtemp(prefix="jgk-fake-")) / "proposals.json"
-        shutil.copy(REAL, tmp)
-        review_app.proposals = ProposalStore(tmp)
-        print(f"승인 기록 임시 복사본: {tmp}")
     import uvicorn
+    # 임시 복사본은 포트마다 한 자리에 두고 켤 때마다 원본으로 덮어쓴다. 강제로 꺼도 사본이 쌓이지 않는다
+    work = Path(tempfile.gettempdir()) / f"jgk-fake-{args.port}"
+    work.mkdir(exist_ok=True)
+    tmp = work / "proposals.json"
+    if tmp.resolve() == args.proposals.resolve():
+        raise SystemExit("임시 복사본 자리와 원본이 같다")
+    shutil.copyfile(args.proposals, tmp)
+    review_app.proposals = ProposalStore(tmp)
+    print(f"승인 기록 임시 복사본: {tmp} (원본 {args.proposals}에는 쓰지 않는다)")
     print(f"가짜 모델 서버: http://localhost:{args.port}/map (실제 모델 호출 없음)")
     uvicorn.run(review_app.app, host="127.0.0.1", port=args.port, log_level="warning")
 
