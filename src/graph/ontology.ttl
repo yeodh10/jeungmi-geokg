@@ -104,6 +104,9 @@ jgk:locatedOn a owl:ObjectProperty ; rdfs:label "필지 위에 있다"@ko ;
 jgk:housedIn a owl:ObjectProperty ; rdfs:label "건물 안에 있다"@ko ;
     rdfs:comment "역, 공공시설이 들어 있는 건물을 가리킨다."@ko ;
     rdfs:range jgk:Building .
+jgk:adjacentStation a owl:ObjectProperty, owl:SymmetricProperty ; rdfs:label "옆 역"@ko ;
+    rdfs:comment "같은 노선에서 바로 옆에 있는 역. 대칭이라 그래프에는 양쪽으로 넣는다."@ko ;
+    rdfs:domain jgk:Station ; rdfs:range jgk:Station .
 jgk:segmentOf a owl:ObjectProperty ; rdfs:label "도로의 구간이다"@ko ;
     rdfs:domain jgk:RoadSegment ; rdfs:range jgk:Road .
 jgk:addressRoad a owl:ObjectProperty ; rdfs:label "도로명주소의 도로"@ko ;

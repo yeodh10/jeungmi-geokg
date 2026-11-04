@@ -175,7 +175,7 @@ class CardMaker:
         jibun = v.jibun(jibun_of) if jibun_of and v.shown(jibun_of) else None
         if jibun:
             c["jibun"] = jibun
-        if row and "d" in row:
+        if row and "d" in row and kind != "station":   # 역 카드에는 '역에서 몇 m'를 두지 않는다
             c["d"] = row["d"]
         elif "pt" in c and self.station_pt and kind not in ("station",) and w:
             c["d"] = int(round(straight_m(c["pt"], self.station_pt)))
@@ -308,6 +308,9 @@ class CardMaker:
         d = v.value(uri, "within")
         if d:
             links.append(self.link("행정동", d, {"by": "dong", "value": v.labels.get(d)}))
+        for s in sorted(v.values(uri, "adjacentStation")):
+            if v.shown(s):
+                links.append(self.link("옆 역", s))
 
     def _parcel(self, uri, c, facts, links, lead):
         v = self.view

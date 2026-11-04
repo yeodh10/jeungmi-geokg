@@ -110,8 +110,9 @@ export function createMapApi(ctx, map) {
     // 글자: 묶음은 묶음 이름 하나, 묶이지 않은 장소는 자기 이름. 단계(t)가 없는 장소는 글자를 두지 않는다
     const labels = [];
     for (const g of d.groups) if (g.t && g.pt) labels.push(pointF(g.pt, { n: g.n, t: g.t, k: "g", g: g.g, path: d.places[g.m[0]].p, s: -g.m.length }));
-    const stationBuilding = d.station && d.station.b;   // 역사 건물 이름은 역 표식 글자와 겹치므로 뺀다
-    for (const p of d.places) if (p.t && p.g == null && p.pt && p.p !== stationBuilding) labels.push(pointF(p.pt, { n: p.n, t: p.t, k: "p", i: p.i, path: p.p, s: 0 }));
+    const stations = [d.station, ...(d.near_stations || [])].filter(s => s && s.pt);   // 중심 역과 범위 안의 옆 역
+    const stationBuildings = new Set(stations.map(s => s.b).filter(Boolean));   // 역사 건물 이름은 역 표식 글자와 겹치므로 뺀다
+    for (const p of d.places) if (p.t && p.g == null && p.pt && !stationBuildings.has(p.p)) labels.push(pointF(p.pt, { n: p.n, t: p.t, k: "p", i: p.i, path: p.p, s: 0 }));
     const numbers = fc(d.places.filter(p => p.no && p.pt).map(p => pointF(p.pt, { no: p.no, i: p.i, path: p.p })));
 
     map.addSource("bldg", { type: "geojson", data: d.shapes, buffer: 64, tolerance: 0.2 });
@@ -119,7 +120,7 @@ export function createMapApi(ctx, map) {
     map.addSource("labels", { type: "geojson", data: fc(labels) });
     map.addSource("bno", { type: "geojson", data: numbers });
     for (const id of ["sel", "spread", "link", "entrances", "markers", "me"]) map.addSource(id, { type: "geojson", data: EMPTY });
-    map.addSource("station", { type: "geojson", data: fc(d.station && d.station.pt ? [pointF(d.station.pt, { path: d.station.p, n: d.station.n })] : []) });
+    map.addSource("station", { type: "geojson", data: fc(stations.map(s => pointF(s.pt, { path: s.p, n: s.n }))) });
     // 원 밖 덮개: 범위 사각형보다 조금 큰 바깥 고리에 범위 원을 구멍으로 낸다
     const ring = area && area.features && area.features[0] && area.features[0].geometry.coordinates[0];
     map.addSource("area", { type: "geojson", data: area || EMPTY });

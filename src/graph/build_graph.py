@@ -408,6 +408,16 @@ def build(proc: Path = PROC) -> Graph:
             g.add((s, JGK.within, dong_uri[r.adm_dong_code]))
         g.add((s, DCTERMS.source, DATASET_NAVI))
         add_geometry(g, s, r.geometry)
+    # 옆 역: config/area.yaml의 adjacent_stations (근거는 위키데이터 인접역). 대칭 속성이라 추론기 없이도 보이게 양쪽으로 넣는다
+    import yaml
+    with open(ROOT / "config" / "area.yaml", encoding="utf-8") as f:
+        pairs = yaml.safe_load(f).get("adjacent_stations") or []
+    have = set(stations["uri"])
+    for a, z in pairs:
+        ua, uz = URIRef(uri.station(a)), URIRef(uri.station(z))
+        if str(ua) in have and str(uz) in have:
+            g.add((ua, JGK.adjacentStation, uz))
+            g.add((uz, JGK.adjacentStation, ua))
 
     for r in facilities.itertuples():
         s = URIRef(r.uri)

@@ -83,6 +83,8 @@ export function createIndex(places) {
     withAddr(o, station.a);
     docs.push(o);
   }
+  // 범위 안의 옆 역 (가양역, 등촌역). d는 중심 역에서 잰 직선 거리
+  for (const s of places.near_stations || []) docs.push(withAddr(nameDoc({ type: "station", path: s.p, pt: s.pt, d: s.d ?? meters(s.pt, st), bonus: 7 }, s.n), s.a));
   for (const r of places.roads || []) docs.push(nameDoc({ type: "road", path: r.p, b: r.b || 0, bonus: 5 + Math.min(1, (r.b || 0) / 1000), num: r.p.split("/")[1] }, r.n));
   for (const x of places.dongs || []) docs.push(nameDoc({ type: "dong", path: x.p, kind: x.kind, b: x.b || 0, bonus: x.kind === "legal" ? 3 : 2 }, x.n));
   for (const z of places.zones || []) docs.push(nameDoc({ type: "zone", path: z.p, b: z.b || 0, bonus: 0, num: z.p.split("/")[1], numOnly: true }, `우편구역 ${z.n}`));

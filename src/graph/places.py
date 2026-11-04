@@ -371,18 +371,23 @@ def build_places(view: GraphView, built: str) -> dict:
         if w:
             item["pt"] = list(point_of(shapely.from_wkt(w)))
         sensors.append(item)
-    station = None
-    if view.shown(STATION):
-        w = wkt_of(view, STATION)
-        b = view.value(STATION, "housedIn")
-        station = {"p": path_of(STATION), "n": display_name(view, STATION), "line": view.value(STATION, "lineName")}
-        if view.address_of(STATION):
-            station["a"] = view.address_of(STATION)
+    def station_item(u: str) -> dict:
+        w = wkt_of(view, u)
+        b = view.value(u, "housedIn")
+        item = {"p": path_of(u), "n": display_name(view, u), "line": view.value(u, "lineName")}
+        if view.address_of(u):
+            item["a"] = view.address_of(u)
         if w:
-            station["pt"] = list(point_of(shapely.from_wkt(w)))
+            item["pt"] = list(point_of(shapely.from_wkt(w)))
         if b and view.shown(b):
-            station["b"] = path_of(b)
-        station = {k: v for k, v in station.items() if v is not None}
+            item["b"] = path_of(b)
+        return {k: v for k, v in item.items() if v is not None}
+    # 중심 역(증미역)은 station, 범위 안의 다른 역(옆 역)은 near_stations. 거리(d)는 중심 역에서 잰 직선 거리다
+    station = station_item(STATION) if view.shown(STATION) else None
+    near_stations = [station_item(u) for u in objects(view, "station") if u != STATION]
+    for s in near_stations:
+        if station and station.get("pt") and s.get("pt"):
+            s["d"] = int(round(straight_m(s["pt"], station["pt"])))
 
     # 공공시설 (전체 뷰에서만 보인다. 로컬 서버가 kind facility로 더한다)
     facilities = []
@@ -408,7 +413,7 @@ def build_places(view: GraphView, built: str) -> dict:
                   "notes": {k: words[k] for k in ("absent_note", "partial_note", "outside_note", "none_note") if words.get(k)}},
         "count": {"buildings": len(rows), "places": len(place_names), "groups": len(groups_out)},
         "places": places, "groups": groups_out, "roads": roads, "dongs": dongs, "zones": zones,
-        "parcels": parcels, "sensors": sensors, "station": station,
+        "parcels": parcels, "sensors": sensors, "station": station, "near_stations": near_stations,
     }
     if facilities:
         out["facilities"] = facilities

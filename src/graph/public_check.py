@@ -299,7 +299,7 @@ class Checker:
             if entrances != truth:
                 diff = sorted(set(entrances) ^ set(truth)) + sorted(k for k in set(entrances) & set(truth) if entrances[k] != truth[k])
                 self.add("entrances.json", f"입구가 공개 뷰와 다르다 ({len(diff)}개 건물, 예: {diff[:3]})")
-        for item in places.get("sensors", []) + ([places["station"]] if places.get("station") else []):
+        for item in places.get("sensors", []) + ([places["station"]] if places.get("station") else []) + places.get("near_stations", []):
             g = expected(item["p"])
             if g is None or g["type"] != "Point" or item.get("pt") != g["coordinates"]:
                 self.add("places.json", f"좌표가 공개 뷰와 다르다 {item['p']}")

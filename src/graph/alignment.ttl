@@ -68,6 +68,9 @@ jgk:Sensor skos:closeMatch wd:Q167676 .
 
 # 같은 실물: 위키데이터의 증미역 (역 번호 908, 9호선)
 <https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660040000001> owl:sameAs wd:Q59989 .
+# 범위 안의 옆 역 둘 (위키데이터 증미역 Q59989의 인접역 P197 값)
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010400100140061000001> owl:sameAs wd:Q59987 .
+<https://yeodh10.github.io/jeungmi-geokg/id/station/1150010200106660094000001> owl:sameAs wd:Q59992 .
 
 # 화면에 보일 이름
 schema:Place rdfs:label "장소(schema.org)"@ko .
