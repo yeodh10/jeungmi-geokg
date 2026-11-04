@@ -332,3 +332,37 @@ jgk:dataset-gangseo-notice a jgk:Dataset ;
     rdfs:comment "고시공고에서 뽑은 변경 제안(src/llm/notice.py)과 첨부 표로 만든 제안(src/review/address_retirement.py)의 근거다. 고시 하나하나의 주소는 고시 객체의 dcterms:source에 적는다."@ko ;
     dcterms:license "저작권법 제7조 제2호: 국가나 지방자치단체의 고시, 공고, 훈령은 이 법의 보호를 받지 못한다"@ko ;
     dcterms:source <https://www.gangseo.seoul.kr/gs040301> .
+
+# 측량 성과의 계보 (docs/survey-data.md). 성과(도엽, 점군 타일, 정사영상)는 dcat:Dataset, 그 성과를 낸 작업은 prov:Activity로 둔다.
+# 측량 방법은 아래 분류로 적는다. 지금 그래프에 실제로 든 것은 항공사진측량(수치지형도 건물 20,091개 모두)뿐이고,
+# 나머지는 같은 구조로 받을 성과를 위해 미리 정한 개념이다.
+jgk:SurveyProduct a owl:Class ; rdfs:subClassOf geo:Feature, dcat:Dataset, prov:Entity ; rdfs:label "측량 성과"@ko ;
+    rdfs:comment "측량으로 만든 성과 하나(도엽, 점군 타일, 정사영상 타일 등). 모양은 성과가 덮는 범위다."@ko .
+jgk:SurveyActivity a owl:Class ; rdfs:subClassOf prov:Activity ; rdfs:label "측량 작업"@ko ;
+    rdfs:comment "성과를 낸 측량 사업. 성과를 고시한 기관과 고시번호로 식별한다."@ko .
+jgk:surveyMethod a owl:ObjectProperty ; rdfs:label "측량 방법"@ko ; rdfs:range skos:Concept .
+jgk:noticeNo a owl:DatatypeProperty ; rdfs:label "성과 고시번호"@ko ; rdfs:range xsd:string .
+jgk:workKind a owl:DatatypeProperty ; rdfs:label "제작 구분"@ko ; rdfs:range rdf:langString .
+jgk:photoYear a owl:DatatypeProperty ; rdfs:label "촬영 연도"@ko ; rdfs:range xsd:integer .
+jgk:fieldSurveyYear a owl:DatatypeProperty ; rdfs:label "현지 조사 연도"@ko ; rdfs:range xsd:integer .
+jgk:productionYear a owl:DatatypeProperty ; rdfs:label "제작 연도"@ko ; rdfs:range xsd:integer .
+jgk:mapScale a owl:DatatypeProperty ; rdfs:label "축척 분모"@ko ; rdfs:range xsd:integer .
+jgk:crsCode a owl:DatatypeProperty ; rdfs:label "좌표계 코드"@ko ; rdfs:range xsd:string .
+jgk:agent-ngii a prov:Organization ; rdfs:label "국토지리정보원"@ko ; dcterms:source <https://www.ngii.go.kr> .
+jgk:spec-digital-map-work-rule a dcterms:Standard ; rdfs:label "수치지형도 작성 작업규정"@ko ; dcterms:issued "2019-05-22"^^xsd:date ;
+    rdfs:comment "국토지리정보원 고시. 수치지도 2.0 지형지물 속성 목록을 포함한다."@ko .
+
+jgk:SurveyMethodScheme a skos:ConceptScheme ; rdfs:label "측량 방법 분류"@ko ;
+    rdfs:comment "성과를 어떤 방법으로 얻었는지. 같은 건물이라도 방법마다 정확도와 갱신 주기가 달라 계보에 적는다."@ko .
+jgk:method-aerial-photogrammetry a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "항공사진측량"@ko ;
+    skos:notation "사진측량" ; skos:definition "항공기에서 찍은 디지털 항공사진으로 지형지물을 도화하는 측량."@ko .
+jgk:method-airborne-lidar a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "항공 레이저측량 (LiDAR)"@ko ;
+    skos:definition "항공기에 실은 레이저 스캐너로 지표와 건물의 점군을 얻는 측량. 건물 높이를 직접 잴 수 있다."@ko .
+jgk:method-bathymetric-lidar a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "수심 레이저측량"@ko ;
+    skos:broader jgk:method-airborne-lidar ; skos:definition "녹색 파장 레이저로 얕은 바다와 하천의 바닥을 재는 항공 측량."@ko .
+jgk:method-mms a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "차량 이동형 측량 (MMS)"@ko ;
+    skos:definition "차량에 실은 카메라, 레이저 스캐너, GNSS/INS로 도로와 건물 전면을 재는 측량."@ko .
+jgk:method-hyperspectral a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "초분광 영상"@ko ;
+    skos:definition "수백 개 파장대로 나눈 영상으로 재질과 식생을 가르는 원격탐사."@ko .
+jgk:method-field-survey a skos:Concept ; skos:inScheme jgk:SurveyMethodScheme ; skos:prefLabel "현지 측량"@ko ;
+    skos:definition "현장에서 토털스테이션이나 GNSS로 직접 재는 측량."@ko .

@@ -99,3 +99,16 @@ def observation(serial: str, measured_at: str, prop: str) -> str:
     assert len(measured_at) == 12 and measured_at.isdigit() and prop.isalpha(), (measured_at, prop)
     assert serial.isalnum(), serial
     return f"{BASE}/observation/{serial}-{measured_at}-{prop}"
+
+
+def survey_sheet(sheet_code: str) -> str:
+    """국토지리정보원 수치지형도 도엽번호 8자리(1:5,000). 측량 성과 하나. 예: 37608075"""
+    assert len(sheet_code) == 8 and sheet_code.isdigit(), sheet_code
+    return f"{BASE}/survey-sheet/{sheet_code}"
+
+
+def survey_activity(agency: str, notice_no: str) -> str:
+    """측량 성과를 낸 작업. 성과를 고시한 기관과 고시번호로 부른다. 예: ngii, 2026-1397"""
+    assert agency.isalpha() and agency.islower(), agency
+    assert len(notice_no) == 9 and notice_no[4] == "-" and notice_no.replace("-", "").isdigit(), notice_no
+    return f"{BASE}/survey-activity/{agency}-{notice_no}"

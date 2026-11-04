@@ -1,0 +1,15 @@
+# 측량 계보: 우리 건물의 모양과 층수를 견준 수치지형도 건물이 어느 측량 성과(도엽)에서 왔고,
+# 그 성과를 언제 어떤 방법으로 만들었는지 거슬러 올라간다 (docs/survey-data.md)
+# 기본측량성과라 로컬 그래프에서만 답이 나온다
+PREFIX jgk: <https://yeodh10.github.io/jeungmi-geokg/def#>
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+SELECT ?sheet ?project ?method ?photoYear ?started ?ended (COUNT(DISTINCT ?b) AS ?buildings) WHERE {
+  ?b jgk:digitalMapFeature ?m .
+  ?m prov:wasDerivedFrom ?product .
+  ?product jgk:sheetCode ?sheet ; prov:wasGeneratedBy ?activity .
+  ?activity rdfs:label ?project ; jgk:photoYear ?photoYear ; prov:startedAtTime ?started ; prov:endedAtTime ?ended ;
+            jgk:surveyMethod/skos:prefLabel ?method .
+} GROUP BY ?sheet ?project ?method ?photoYear ?started ?ended ORDER BY ?sheet

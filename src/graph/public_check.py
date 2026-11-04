@@ -35,8 +35,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "data" / "processed" / "site"
 TEXT = {".html", ".ttl", ".json", ".geojson", ".js", ".css", ".txt", ".xml", ".svg"}
-HELD_PATHS = ("/id/road-segment/", "/id/basemap/", "/id/digital-map/", "/id/public-facility/")
-HELD_KINDS = ("road-segment", "basemap", "digital-map", "public-facility")
+HELD_PATHS = ("/id/road-segment/", "/id/basemap/", "/id/digital-map/", "/id/public-facility/", "/id/survey-sheet/", "/id/survey-activity/")
+HELD_KINDS = ("road-segment", "basemap", "digital-map", "public-facility", "survey-sheet", "survey-activity")
 # 보류 자료(도로 구간, 국가기본도, 수치지형도, 공공시설)에서만 쓰는 속성 이름 (src/graph/ontology.ttl)
 HELD_PROPS = ("facesRoad", "basemapFeature", "digitalMapFeature", "matchIoU", "mapFloors", "pnuAgrees", "addressAgrees",
               "roadSegmentNo", "segmentOf", "roadClass", "roadWidth", "roadLength", "basemapId", "molitUfid", "ufid", "sheetCode",

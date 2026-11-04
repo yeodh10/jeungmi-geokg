@@ -15,19 +15,16 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
-FILES = ["objects.gpkg", "facility_building.csv", "parcel.csv", "admin_dong.csv", "building_entrance.csv",
-         "road.csv", "entrance_road.csv", "building_zone.csv", "parcel_legal_dong.csv", "building_basemap.csv",
-         "building_digital_map.csv"]
-EMAP_LAYERS = ["road_segment", "legal_dong", "basic_zone", "basemap_building", "digital_map_building", "parcel_shape"]
+# 다음 자료는 지금 자료를 통째로 복사한 뒤 일부만 바꿔 만든다. 파일과 층 목록을 손으로 적으면 새 자료가 생길 때마다 빠져서
+# 그 자료의 값이 모두 사라졌다고 비교되므로, 객체 파일의 층과 processed의 표(csv)를 모두 복사한다
 FAKE_MGT = "1150010200199990000000001"  # 시험용 건물관리번호 (실제 번호 아님)
 
 
 def make_next_snapshot(dst: Path) -> dict:
-    for f in FILES:
+    import pyogrio
+    for f in ["objects.gpkg", *(x.name for x in PROC.glob("*.csv"))]:
         shutil.copy(PROC / f, dst / f)
-    have = set(pyogrio.list_layers(PROC / "objects.gpkg")[:, 0])  # 연속지적도 원본이 없는 컴퓨터에는 parcel_shape가 없다
-    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in ["building", "entrance", "station", "public_facility"] + EMAP_LAYERS
-              if n in have}
+    layers = {n: gpd.read_file(PROC / "objects.gpkg", layer=n) for n in pyogrio.list_layers(PROC / "objects.gpkg")[:, 0]}
     b = layers["building"]
     busy = set(layers["station"]["building_uri"]) | set(pd.read_csv(PROC / "facility_building.csv")["building_uri"])
     addressed = b[(b["kind"] == "building") & ~b["uri"].isin(busy)]

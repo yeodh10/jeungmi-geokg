@@ -23,6 +23,8 @@ OUT_TTL = PROC / "jeungmi_geokg.ttl"
 JGK = Namespace("https://yeodh10.github.io/jeungmi-geokg/def#")
 GEO = Namespace("http://www.opengis.net/ont/geosparql#")
 SOSA = Namespace("http://www.w3.org/ns/sosa/")
+PROV = Namespace("http://www.w3.org/ns/prov#")
+DCAT = Namespace("http://www.w3.org/ns/dcat#")
 
 STATUS = {"Active": JGK.Active, "AddressUnlinked": JGK.AddressUnlinked,
           "AddressLinked": JGK.AddressLinked, "Retired": JGK.Retired}
@@ -149,6 +151,9 @@ def add_maps(g: Graph, proc: Path) -> None:
         add(g, s, JGK.mapUse, r.use)
         add(g, s, JGK.mapFloors, None if pd.isna(r.floors) else int(r.floors), XSD.integer)
         add(g, s, JGK.matchIoU, None if pd.isna(r.match_iou) else round(float(r.match_iou), 3), XSD.decimal)
+        method = SURVEY_METHOD.get(getattr(r, "survey_method", None))
+        if method is not None:
+            g.add((s, JGK.surveyMethod, method))
         g.add((s, DCTERMS.source, DATASET_NGII))
         add_geometry(g, s, r.geometry)
     for name, prop in (("basemap", JGK.basemapFeature), ("digital_map", JGK.digitalMapFeature)):
@@ -167,6 +172,68 @@ def add_maps(g: Graph, proc: Path) -> None:
             compared = same["address_same"].isin(["True", "False"])
             if compared.any():
                 g.add((m, JGK.addressAgrees, Literal(bool(same["address_same"].eq("True").any()))))
+
+
+# 수치지형도 '측량방법' 값 -> 측량 방법 분류 (ontology.ttl jgk:SurveyMethodScheme)
+SURVEY_METHOD = {"사진측량": JGK["method-aerial-photogrammetry"], "항공레이저측량": JGK["method-airborne-lidar"],
+                 "레이저측량": JGK["method-airborne-lidar"], "현지측량": JGK["method-field-survey"], "지상측량": JGK["method-field-survey"],
+                 "MMS": JGK["method-mms"]}
+
+
+def add_survey(g: Graph, proc: Path) -> None:
+    """측량 성과의 계보: 도엽(측량 성과, dcat:Dataset)과 그 성과를 낸 작업(prov:Activity), 수치지형도 건물에서 도엽으로 가는 연결.
+
+    값은 국토정보플랫폼이 성과와 함께 주는 ISO 19115-3 메타데이터(src.model.survey_meta)에서 온다. 기본측량성과라 출처를
+    수치지형도로 적어 공개 사이트에서 빠진다. 측량 방법은 성과에 든 지형지물의 '측량방법' 값에서 모은다.
+    """
+    import shapely.geometry as sg
+    path = proc / "survey_sheet.csv"
+    if not path.exists():
+        return
+    sheets = pd.read_csv(path, dtype=str, keep_default_na=False)
+    maps = read_optional(proc, "digital_map_building")
+    methods = {}
+    if len(maps) and "survey_method" in maps.columns:
+        for code, m in zip(maps["sheet_code"], maps["survey_method"]):
+            if SURVEY_METHOD.get(m) is not None:
+                methods.setdefault(code, set()).add(SURVEY_METHOD[m])
+        for r in maps.itertuples():
+            if r.sheet_code in set(sheets["sheet"]):
+                g.add((URIRef(r.uri), PROV.wasDerivedFrom, URIRef(uri.survey_sheet(r.sheet_code))))
+    for r in sheets.itertuples():
+        s, a = URIRef(uri.survey_sheet(r.sheet)), URIRef(uri.survey_activity("ngii", r.notice_no))
+        add_feature(g, s, JGK.SurveyProduct, "Active")
+        g.add((s, RDF.type, DCAT.Dataset))
+        add(g, s, RDFS.label, f"수치지형도 도엽 {r.sheet} (1:{int(r.scale):,})" if r.scale else f"수치지형도 도엽 {r.sheet}", lang="ko")
+        add(g, s, JGK.sheetCode, r.sheet)
+        add(g, s, JGK.mapScale, int(r.scale) if r.scale else None, XSD.integer)
+        add(g, s, DCTERMS.rights, r.use_limit, lang="ko")
+        add(g, s, DCTERMS.accrualPeriodicity, r.maintenance, lang="ko")
+        add(g, s, JGK.crsCode, r.crs)
+        g.add((s, DCTERMS.conformsTo, JGK["spec-digital-map-work-rule"]))
+        g.add((s, PROV.wasGeneratedBy, a))
+        g.add((s, DCTERMS.source, DATASET_NGII))
+        if all(getattr(r, k) for k in ("west", "east", "south", "north")):
+            add_geometry(g, s, sg.box(float(r.west), float(r.south), float(r.east), float(r.north)))
+        add_feature_activity(g, a, r, methods.get(r.sheet, set()))
+
+
+def add_feature_activity(g: Graph, a: URIRef, r, methods: set) -> None:
+    """측량 작업 노드. 같은 고시로 낸 도엽은 같은 작업을 가리킨다."""
+    g.add((a, RDF.type, PROV.Activity))
+    g.add((a, RDF.type, JGK.SurveyActivity))
+    add(g, a, RDFS.label, r.project, lang="ko")
+    add(g, a, JGK.noticeNo, r.notice_no)
+    add(g, a, JGK.workKind, r.work_kind, lang="ko")
+    add(g, a, JGK.photoYear, int(r.photo_year) if r.photo_year else None, XSD.integer)
+    add(g, a, JGK.fieldSurveyYear, int(r.field_year) if r.field_year else None, XSD.integer)
+    add(g, a, JGK.productionYear, int(r.made_year) if r.made_year else None, XSD.integer)
+    add(g, a, PROV.startedAtTime, f"{r.begin}T00:00:00+09:00" if r.begin else None, XSD.dateTime)
+    add(g, a, PROV.endedAtTime, f"{r.end}T00:00:00+09:00" if r.end else None, XSD.dateTime)
+    g.add((a, PROV.wasAssociatedWith, JGK["agent-ngii"]))
+    for m in sorted(methods):
+        g.add((a, JGK.surveyMethod, m))
+    g.add((a, DCTERMS.source, DATASET_NGII))
 
 
 def add_sensors(g: Graph, proc: Path) -> None:
@@ -239,7 +306,6 @@ def add_catalog(g: Graph) -> None:
     """원천 자료 목록(DCAT): 어휘에 적은 자료마다 목록에 넣고, 공개 등급을 config/area.yaml의 공개 보류 목록에서 적는다.
     공개 등급을 어휘에 손으로 적지 않는 것은 공개 사이트를 거르는 목록(src.graph.public.hold_sources)과 어긋나지 않게 하려는 것이다."""
     import yaml
-    DCAT = Namespace("http://www.w3.org/ns/dcat#")
     onto = Graph().parse(ROOT / "src" / "graph" / "ontology.ttl", format="turtle")
     with open(ROOT / "config" / "area.yaml", encoding="utf-8") as f:
         hold = {JGK[d] for d in yaml.safe_load(f)["publish"]["hold_sources"]}
@@ -361,6 +427,7 @@ def build(proc: Path = PROC) -> Graph:
     add_maps(g, proc)
     add_sensors(g, proc)
     add_business(g, proc)
+    add_survey(g, proc)
     add_catalog(g)
     return g
 

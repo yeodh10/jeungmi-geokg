@@ -9,6 +9,8 @@
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 # 데이터 거버넌스: 원천 자료마다 이용 조건과 공개 등급이 있고, 자료 목록에 들어 있어야 한다 (docs/governance.md)
 jgks:Dataset a sh:NodeShape ;
@@ -239,3 +241,18 @@ jgks:Observation a sh:NodeShape ;
                   sh:message "관측 시각이 정확히 하나 있어야 한다"@ko ] ;
     sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:class jgk:Dataset ;
                   sh:message "관측에도 출처가 있어야 한다"@ko ] .
+
+# 측량 성과의 계보: 성과는 작업 하나에서 나오고, 작업에는 고시번호와 기간이 있다 (docs/survey-data.md)
+jgks:SurveyProduct a sh:NodeShape ;
+    sh:targetClass jgk:SurveyProduct ;
+    sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ; sh:maxCount 1 ; sh:class jgk:SurveyActivity ;
+                  sh:message "측량 성과는 그것을 낸 측량 작업 하나를 가리켜야 한다"@ko ] ;
+    sh:property [ sh:path jgk:sheetCode ; sh:maxCount 1 ; sh:pattern "^[0-9]{8}$" ; sh:message "도엽번호는 8자리 숫자여야 한다"@ko ] ;
+    sh:property [ sh:path dcterms:source ; sh:minCount 1 ; sh:message "측량 성과에는 출처 자료가 있어야 한다"@ko ] .
+jgks:SurveyActivity a sh:NodeShape ;
+    sh:targetClass jgk:SurveyActivity ;
+    sh:property [ sh:path jgk:noticeNo ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[0-9]{4}-[0-9]+$" ;
+                  sh:message "측량 작업에는 성과 고시번호가 하나 있어야 한다"@ko ] ;
+    sh:property [ sh:path prov:startedAtTime ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path prov:endedAtTime ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path jgk:surveyMethod ; sh:class skos:Concept ; sh:message "측량 방법은 측량 방법 분류의 개념이어야 한다"@ko ] .

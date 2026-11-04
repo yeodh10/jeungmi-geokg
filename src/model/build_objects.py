@@ -257,7 +257,7 @@ def make_digital_map_objects(area_gpkg: Path, buildings, metric: str, storage: s
     links, review, unmatched = match_by_shape(ours, theirs, sheet)
     iou_of = dict(zip(links["map_uri"], links["iou"]))
     layer = gpd.GeoDataFrame({
-        "uri": nb["uri"], "ufid": nb["UFID"], "sheet_code": nb["UFID"].str[5:13],
+        "uri": nb["uri"], "ufid": nb["UFID"], "sheet_code": nb["UFID"].str[5:13], "survey_method": nb["측량방법"],
         "kind": nb["종류"], "use": nb["용도"], "floors": nb["층수"].astype("Int64"), "name": nb["명칭"],
         "match_iou": nb["uri"].map(iou_of), "geometry": nb.geometry,
     }, geometry="geometry", crs=metric).to_crs(storage)
@@ -617,6 +617,10 @@ def main(proc: Path = PROC, agency_dir: Path = AGENCY_DIR) -> None:
     # 10. 국가기본도, 수치지형도 건물과 우리 건물 맞추기
     maps = {"basemap": make_basemap_objects(area_gpkg, buildings, centers, metric, storage),
             "digital_map": make_digital_map_objects(area_gpkg, buildings, metric, storage)}
+
+    # 11. 수치지형도 도엽의 측량 성과 메타데이터 (ISO 19115-3, 있으면)
+    from src.model import survey_meta
+    survey_meta.main(proc)
 
     # 저장
     if out_gpkg.exists():

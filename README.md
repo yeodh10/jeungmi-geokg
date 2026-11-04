@@ -26,7 +26,7 @@
 
 | 하는 일 | 이 저장소에서 | 바로 보기 |
 |---|---|---|
-| 여러 공간 자료를 하나의 구조로 설계하고 거버넌스를 세우기 | 12종 공공 자료를 자료 목록(DCAT)으로 묶고, 자료마다 이용 조건과 공개 등급을 적어 SHACL로 강제합니다. 출처, 변경 이력, 공개 경계, 개인정보 규칙은 문서와 검사 코드에 함께 둡니다. | [docs/governance.md](docs/governance.md) |
+| 여러 공간 자료를 하나의 구조로 설계하고 거버넌스를 세우기 | 12종 공공 자료를 자료 목록(DCAT)으로 묶고, 자료마다 이용 조건과 공개 등급을 적어 SHACL로 강제합니다. 출처, 변경 이력, 공개 경계, 개인정보 규칙은 문서와 검사 코드에 함께 둡니다. | [docs/governance.md](docs/governance.md), [docs/survey-data.md](docs/survey-data.md) |
 | 객체 사이 관계를 정의해 지식 그래프 스키마 만들기 | 건물, 출입구, 필지, 도로, 행정구역, 센서, 상호를 GeoSPARQL 객체로 쪼개고 관계(필지 위에 있다, 같은 건물이다, 면한 도로 구간 등)로 잇습니다. 국가기본도 지형지물 분류는 SKOS로 넣었습니다. | [어휘 페이지](https://yeodh10.github.io/jeungmi-geokg/def/), `src/graph/ontology.ttl` |
 | AI와 LLM으로 비정형 공간 자료를 구조화하기 | 구청 고시공고 글에서 바뀌는 건물과 필지를 LLM으로 뽑아 변경 제안으로 만들고, 자연어 질문을 GeoSPARQL로 바꿉니다. 모델이 지어낸 값이 그래프에 들어가지 않도록 입력 가드와 원문 대조 단계를 둡니다. | `src/llm/`, [docs/llm-eval.md](docs/llm-eval.md) |
 | AI 에이전트로 시맨틱 상호운용성을 검증하는 프로토타입 만들기 | Claude Code와 함께 만들었습니다. schema.org, INSPIRE, 위키데이터, BOT 어휘와 잇고, 외부 주소가 실제로 열리는지와 형식을 바꿔도 트리플이 그대로인지를 자동으로 검사합니다. | `src/graph/interop.py`, [docs/interop.md](docs/interop.md) |
@@ -95,7 +95,7 @@
 | URI 페이지 | 21,872쪽과 지도 앱 (2026-11-03 로컬 빌드, 공개 사이트에는 아직 올리지 않음. 공개 상호 2,925곳, 필지 1,760쪽(경계 1,718), 제안 7쪽 포함. 공개하지 않기로 한 공공시설, 도로 구간, 국가기본도와 수치지형도 건물, 주택 건물 안 일부 상호 등 9,191개는 뺌. 승인 가운데 근거가 모두 공개 자료인 자리표시 잇기 7건만 반영함) |
 | 전체 다시 만들기 | `python -m src.pipeline` 한 번, 12~22분 (2026-11-03~04 측정, 다른 작업이 함께 돌던 컴퓨터) |
 | LLM 평가 (실제 모델) | 자연어 질의 25문제 중 23문제 정답 (나머지 2문제도 결과에는 정답이 들어 있음), 실제 강서구 고시 95건 추출에서 근거 문장과 주소를 지어낸 것 0건. [docs/llm-eval.md](docs/llm-eval.md) |
-| 테스트 | 22종 (주소 잇기 규칙, 상호, 검토, 자동 갱신, 고시공고 LLM, 자연어 질의, SHACL, 폐지조서, 화면 API, 국가기본도 주소 연결, 평가 채점, 센서와 관측, 상호운용성, 시점별 판, BIM 연결, 입력 가드, 객체와 어휘, 공개 사이트 만들기, 공개 뷰, 공개 출력, 장소 목록, 카드) |
+| 테스트 | 23종 (측량 성과 계보, 주소 잇기 규칙, 상호, 검토, 자동 갱신, 고시공고 LLM, 자연어 질의, SHACL, 폐지조서, 화면 API, 국가기본도 주소 연결, 평가 채점, 센서와 관측, 상호운용성, 시점별 판, BIM 연결, 입력 가드, 객체와 어휘, 공개 사이트 만들기, 공개 뷰, 공개 출력, 장소 목록, 카드) |
 
 ## 구조
 
@@ -231,7 +231,7 @@ git worktree remove ../jeungmi-geokg-pages
 테스트(LLM 부분은 가짜 클라이언트로 돌아서 API 키가 없어도 됩니다. 제안 기록은 임시 복사본만 씁니다):
 
 ```bash
-for t in test_address_link test_business test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api test_basemap_link test_eval test_sensors test_interop test_editions test_bim_link test_guard test_objects test_publish test_public_view test_places test_cards test_public_output; do .venv/Scripts/python -m tests.$t; done
+for t in test_address_link test_survey test_business test_review test_diff test_notice test_nl test_shacl test_address_retirement test_api test_basemap_link test_eval test_sensors test_interop test_editions test_bim_link test_guard test_objects test_publish test_public_view test_places test_cards test_public_output; do .venv/Scripts/python -m tests.$t; done
 node tests/search_check.mjs
 ```
 
