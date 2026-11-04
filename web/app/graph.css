@@ -21,6 +21,22 @@
 /* 묻기 탭 (ask.js) */
 .ask-note { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--graph-soft); color: var(--text-2); font-size: 13px; }
 .ask-slot:empty { display: none; }
+/* 키 없는 질문 입력칸 */
+.ak { display: grid; gap: 8px; margin: 0 0 14px; padding: 12px; border: 1px solid var(--graph-line); border-radius: var(--radius); background: var(--graph-soft); }
+.ak-h { font-size: 14px; font-weight: 700; }
+.ak-row { display: flex; gap: 8px; }
+.ak-row .field { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; }
+.ak-row .btn { min-height: 44px; flex: none; }
+.ak-eg { display: flex; flex-wrap: wrap; gap: 6px; }
+.ak-eg button { min-height: 36px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.ak-eg button:hover { border-color: var(--graph-line); color: var(--graph); }
+.ak-help { margin: 0; font-size: 12px; color: var(--text-2); }
+.ak-msg:empty { display: none; }
+.ak-why { margin: 0; font-size: 13px; color: var(--text); }
+.ak-sim-h { margin: 8px 0 4px; font-size: 12px; color: var(--text-2); }
+.ak-sim { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ak-sim .btn { min-height: 40px; width: 100%; justify-content: flex-start; text-align: left; white-space: normal; }
+.ak-tag { display: inline-block; margin: 0 0 6px !important; font-size: 12px !important; color: var(--graph); border: 1px solid var(--graph-line); border-radius: 999px; padding: 1px 8px; }
 .ask-h { font-size: 13px; color: var(--text-2); margin: 12px 0 6px; }
 .ask-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .ask-q { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; padding: 8px 12px; text-align: left;

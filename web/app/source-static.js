@@ -23,6 +23,8 @@ export default {
   area: () => once("area", DATA + "area.geojson" + V),
   questions: () => once("questions", DATA + "questions.json" + V),
   sources: () => once("sources", DATA + "sources.json" + V),
+  // 키 없는 질문의 틀과 미리 실행한 결과. 묻기 탭 입력칸을 처음 쓸 때 받는다 (첫 화면 자료에 넣지 않는다)
+  askForms: () => once("ask", DATA + "ask.json" + V),
   // 상호는 첫 화면 자료에 넣지 않고 찾기창에 처음 입력할 때 받는다 (명세 0-1절)
   businesses: () => once("businesses", DATA + "businesses.json" + V),
   // 장소 하나의 카드. 경로는 'building/1150...' 꼴이다. 공개하지 않거나 없는 장소는 404라 실패로 끝난다

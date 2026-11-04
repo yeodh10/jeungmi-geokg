@@ -8,6 +8,7 @@
   assets/data/entrances.json    건물별 입구
   assets/data/businesses.json   상호 찾기 (찾기창에 처음 입력할 때 받는다)
   assets/data/questions.json    묻기 탭의 미리 실행한 답
+  assets/data/ask.json          키 없는 질문: 질문 틀, 빈칸 값, 빈칸 조합마다 실행한 결과 (묻기 입력칸에 처음 입력할 때 받는다)
   assets/data/sources.json      자료 탭
   id/{종류}/{번호}/card.json     장소 카드 (관측과 모양 노드는 빼고, 공개 페이지가 있는 장소마다)
   (area.geojson은 publish가 쓴다)
@@ -26,6 +27,7 @@ from pathlib import Path
 from src.graph.cards import CardMaker
 from src.graph.places import build_businesses, build_entrances, build_places, build_shapes, load_yaml
 from src.graph.public import public_query_store, public_view
+from src.graph.askforms import build_ask
 from src.graph.questions import build_questions
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +72,7 @@ def write(out: Path = OUT) -> dict:
     entrances = build_entrances(view)
     businesses = build_businesses(view, places)   # 상호 칩의 n도 places에 적는다
     questions = build_questions(view, qstore)
+    ask = build_ask(view, qstore, places, built)
     hidden = len([s for s in view.private if not s.endswith("/geometry")])
     sources = build_sources(hidden)
     # 첫 화면 300KB 기준 (명세 11절): 홈의 대표 질문과 기준 표기는 places.json에 넣고, questions와 sources는 탭을 열 때 받는다
@@ -79,7 +82,7 @@ def write(out: Path = OUT) -> dict:
     data.mkdir(parents=True, exist_ok=True)
     sizes = {}
     for name, obj in (("places.json", places), ("shapes.geojson", shapes), ("entrances.json", entrances),
-                      ("businesses.json", businesses), ("questions.json", questions), ("sources.json", sources)):
+                      ("businesses.json", businesses), ("questions.json", questions), ("ask.json", ask), ("sources.json", sources)):
         b = dump(obj)
         (data / name).write_bytes(b)
         sizes[name] = {"bytes": len(b), "gzip": len(gzip.compress(b, 6))}
@@ -95,7 +98,7 @@ def write(out: Path = OUT) -> dict:
         n += 1
         total += len(b)
     report = {"built": built, "buildings": places["count"]["buildings"], "places": places["count"]["places"],
-              "groups": places["count"]["groups"], "questions": len(questions["items"]), "businessLines": len(businesses["items"]),
+              "groups": places["count"]["groups"], "questions": len(questions["items"]), "askForms": len(ask["items"]), "askResults": len(ask["results"]), "businessLines": len(businesses["items"]),
               "hiddenBusinesses": hidden, "cards": n, "cardBytes": total, "files": sizes,
               "firstScreenGzip": first_screen_gzip(out, sizes),
               "seconds": round(time.perf_counter() - t0, 1)}

@@ -18,7 +18,7 @@ SITE = ROOT / "data" / "processed" / "site"
 # 두 지도 서비스의 한글 이름과 영문 이름 (유니코드 이스케이프)
 BANNED = ["\uce74\uce74\uc624", "\ub124\uc774\ubc84", "\u006b\u0061\u006b\u0061\u006f", "\u006e\u0061\u0076\u0065\u0072"]
 TEXT = {".html", ".ttl", ".json", ".geojson", ".js", ".css", ".txt", ".xml", ".svg", ".md"}
-APP_FILES = ("places.json", "shapes.geojson", "entrances.json", "businesses.json")
+APP_FILES = ("places.json", "shapes.geojson", "entrances.json", "businesses.json", "ask.json")
 
 
 def company_hits(root: Path) -> list[str]:
@@ -49,7 +49,7 @@ def check_company_names() -> None:
 
 
 def mini_site(tmp: Path) -> Path:
-    """실제 앱 자료 네 파일만 담은 작은 사이트. 공개 전 검사가 같은 규칙으로 본다."""
+    """실제 앱 자료 다섯 파일만 담은 작은 사이트. 공개 전 검사가 같은 규칙으로 본다."""
     d = tmp / "site" / "assets" / "data"
     d.mkdir(parents=True)
     for name in APP_FILES:

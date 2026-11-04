@@ -10,7 +10,7 @@
   모양 대조       shapes.geojson, entrances.json, 점 건물, 센서, 역, 상호의 좌표가 공개 뷰의 같은 객체 모양과 소수 6자리까지 다름.
                   점만 있는 건물이 POINT_BUILDINGS동이 아님. 공개 건물이 places.json에 정확히 한 번씩 있지 않음
   보류 이름       보류 객체(공개하지 않는 상호 포함) 이름 가운데 공개 객체 이름에 없는 것이 places.json, card.json, questions.json,
-                  businesses.json에 나옴 (places.json의 words 칸, 자료 탭은 예외)
+                  ask.json, businesses.json에 나옴 (places.json의 words 칸, 자료 탭은 예외)
   공개하지 않는 상호  그 상가업소번호가 어느 파일에든 나오거나 그 페이지가 있음
   보류 노드 연결  앱 자료의 장소 경로가 공개하지 않는 노드를 가리킴
   상태 수         places.json의 s로 센 '주소 연결됨', 사용, 주소 미연결이 expected_status_counts()와 다름
@@ -185,7 +185,8 @@ class Checker:
                 for m in re.findall(rf"<{tag}[^>]*>(.*?)</{tag}>", text, re.S):
                     if LONG_NO.search(m):
                         self.add(where, f"<{tag}> 화면 이름에 긴 번호")
-        if where.endswith("card.json") or where in ("assets/data/places.json", "assets/data/questions.json", "assets/data/businesses.json"):
+        if where.endswith("card.json") or where in ("assets/data/places.json", "assets/data/questions.json", "assets/data/ask.json",
+                                                    "assets/data/businesses.json"):
             self.json_names(where, text)
 
     def json_names(self, where: str, text: str):
@@ -230,9 +231,20 @@ class Checker:
         shapes = self.load("shapes.geojson")
         entrances = self.load("entrances.json")
         businesses = self.load("businesses.json")
+        ask = self.load("ask.json")
         if places is None:
             return
         rows = places["places"]
+        if ask is not None:   # 키 없는 질문: 장소 칸의 번호는 places.json의 건물 번호여야 한다 (공개 건물만 있는 곳)
+            if ask.get("built") != places.get("built"):
+                self.add("assets/data/ask.json", "places.json과 빌드 값이 다르다")
+            refs = [c for r in ask["results"] for c in r["map"] if isinstance(c, int)]
+            refs += [c for it in ask["items"] for j, col in enumerate(it["cols"]) if col.get("ref")
+                     for k in {v[0] for v in it["combos"].values() if isinstance(v, list)}
+                     for row in ask["results"][k]["rows"] if isinstance(c := row[j], int)]
+            bad = sorted({c for c in refs if not 0 <= c < len(rows)})
+            if bad:
+                self.add("assets/data/ask.json", f"places.json에 없는 건물 번호 {bad[:5]}")
         want = [s[len(BASE) + 1:] for s in objects(v, BUILDING_KINDS)]
         got = Counter(r["p"] for r in rows)
         for p in sorted(set(want) - set(got)):
