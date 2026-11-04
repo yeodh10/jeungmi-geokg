@@ -8,7 +8,8 @@ const V = "?v=" + encodeURIComponent(cfg.build || "");
 const FEATURES = ["search", "chips", "card", "popup", "nearby", "here", "ask", "datatab", "tour", "themes", "measure", "conditions"];
 const SITE = "https://yeodh10.github.io/jeungmi-geokg";
 const KIND = { building: "건물", "building-gis": "건물", station: "역", road: "길", "admin-dong": "행정동", "legal-dong": "법정동",
-  "basic-zone": "우편구역", sensor: "센서", parcel: "필지", entrance: "입구", business: "상호", group: "단지" };
+  "basic-zone": "우편구역", sensor: "센서", parcel: "필지", entrance: "입구", business: "상호", group: "단지",
+  "public-facility": "공공시설" };   // 공공시설은 로컬 서버에만 있다
 const STATUS = { "주소 미연결": "도로명주소 없는 건물" };
 const nf = n => Number(n).toLocaleString("ko-KR");
 const short = a => String(a || "").replace(/^서울특별시\s+/, "");

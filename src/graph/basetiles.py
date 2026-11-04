@@ -38,7 +38,7 @@ FONT_DIR = "MapMedium"
 RANGES = ("0-255", "256-511", "8192-8447", "8448-8703", "12288-12543", "12544-12799", "12800-13055", "65024-65279", "65280-65535")
 OFL_URL = "https://raw.githubusercontent.com/notofonts/latin-greek-cyrillic/main/OFL.txt"
 MAPLIBRE = "4.7.1"
-MAPLIBRE_FILES = {  # 파일 -> sha384 (web/review.html, web/map.html의 SRI 값과 같다). LICENSE는 확인할 값이 없다
+MAPLIBRE_FILES = {  # 파일 -> sha384 (unpkg의 maplibre-gl@4.7.1 배포 파일 값). LICENSE는 확인할 값이 없다
     "dist/maplibre-gl.js": "SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj",
     "dist/maplibre-gl.css": "MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V",
     "LICENSE.txt": None,

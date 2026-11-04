@@ -880,7 +880,8 @@ def check_one_build_and_body_limit(c, tmp, review_app) -> None:
 
 
 def check_defense_headers(c, tmp, review_app) -> None:
-    """CSP는 그 화면의 인라인 스크립트만 허용하고, CDN 파일에는 SRI가 붙는다. API 문서는 꺼져 있다."""
+    """CSP는 그 화면의 인라인 스크립트만 허용하고, 바깥 파일(글꼴 하나)에는 SRI가 붙는다. 지도 라이브러리는 저장소에서 받는다.
+    API 문서는 꺼져 있다."""
     for path in ("/", "/map"):
         r = c.get(path)
         policy = dict(x.strip().split(" ", 1) for x in r.headers["content-security-policy"].split(";"))
@@ -891,8 +892,11 @@ def check_defense_headers(c, tmp, review_app) -> None:
         assert "unsafe" not in policy["script-src"] and policy["frame-ancestors"] == "'none'" and policy["object-src"] == "'none'", policy
         assert r.headers["x-frame-options"] == "DENY" and r.headers["x-content-type-options"] == "nosniff", r.headers
         tags = re.findall(r'<(?:script|link)\b[^>]*(?:src|href)="https://[^>]*>', r.text)
-        assert len(tags) == 3, tags
+        assert len(tags) == 1 and "pretendard" in tags[0], tags
         assert all('integrity="sha384-' in t and 'crossorigin="anonymous"' in t for t in tags), tags
+        assert "/static/vendor/maplibre-gl-4.7.1/maplibre-gl.js" in r.text and "unpkg.com" not in r.text, path
+        assert " onload=" not in r.text, path   # CSP가 인라인 이벤트를 막으므로 화면 틀에 남기지 않는다
+        assert "unpkg.com" not in r.headers["content-security-policy"], path
     for path in ("/api/status", "/api/area", "/static/common.js"):
         r = c.get(path)
         assert r.status_code == 200 and r.headers["x-frame-options"] == "DENY" and r.headers["x-content-type-options"] == "nosniff", path
@@ -941,7 +945,7 @@ def check_screen_tools(c, tmp, review_app) -> None:
         print("node가 없어 화면 도구 확인을 건너뛴다")
         return
     web = ROOT / "web"
-    done = subprocess.run([node, "-e", SCREEN_TEST, str(web / "common.js"), str(web / "review.html"), str(web / "map.html")],
+    done = subprocess.run([node, "-e", SCREEN_TEST, str(web / "common.js"), str(web / "review.html")],
                           capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert done.returncode == 0, done.stderr[-600:]
     r = json.loads(done.stdout)
@@ -1232,10 +1236,81 @@ def check_broken_file(c, tmp, review_app) -> None:
         review_app.log.disabled = False
 
 
+def check_local_app(c, tmp, review_app) -> None:
+    """지도 앱의 로컬 모드 (명세 5.1절, 5.3절, 10절 WP6): 같은 화면 틀, 로컬 자료 입구, 전체 뷰 자료, 카드의 공개 여부, 키 값 숨김."""
+    from src.graph.places import build_places
+    from src.graph.public import public_view
+    html = c.get("/map").text
+    cfg = json.loads(re.search(r"window.APP_CONFIG = (\{.*?\});", html).group(1))
+    assert cfg["mode"] == "local" and cfg["source"] == "/static/local/source-api.js" and cfg["root"] == "", cfg
+    assert cfg["extra"] == list(review_app.LOCAL_EXTRA) and all(c.get(u).status_code == 200 for u in [cfg["source"], *cfg["extra"]]), cfg
+    assert '<script type="module" src="/static/app/app.js?v=' in html and "map.html" not in html
+    assert not (ROOT / "web" / "map.html").exists(), "옛 지도 화면 파일이 남아 있다"
+
+    # 키는 있음, 없음만 준다
+    keep = review_app.has_llm_key
+    try:
+        review_app.has_llm_key = lambda: False
+        caps = c.get("/api/capabilities").json()
+        assert caps["ask"] is False and caps["key"] is False and caps["history"] is True, caps
+        review_app.has_llm_key = lambda: True
+        caps = c.get("/api/capabilities")
+        assert caps.json()["ask"] is True and "sk-" not in caps.text and "api_key" not in caps.text.lower(), caps.text
+    finally:
+        review_app.has_llm_key = keep
+    assert set(caps.json()["layers"]) == {"facility", "road", "legaldong", "basemap", "digitalmap"}
+
+    # 자료: 공개판과 같은 모양이고, 전체 뷰라 공공시설이 더해진다
+    places = strict(c.get("/api/places"))
+    assert len(places["facilities"]) == 23 and all(f["p"].startswith("public-facility/") and f.get("pt") for f in places["facilities"])
+    assert places["count"]["buildings"] == len(places["places"]) and places["basis"] and places["station"]["p"].startswith("station/")
+    shapes = strict(c.get("/api/shapes"))
+    assert shapes["type"] == "FeatureCollection" and {f["properties"]["i"] for f in shapes["features"]} <= {p["i"] for p in places["places"]}
+    assert any("h" in f["properties"] for f in shapes["features"]), "입체 보기의 높이(h)가 없다"
+    assert strict(c.get("/api/entrances")) and strict(c.get("/api/businesses"))["items"]
+    src = strict(c.get("/api/sources"))
+    assert src["sources"] and "로컬" in src["history"], src["history"]
+    r = c.get("/api/places")
+    assert c.get("/api/places", headers={"If-None-Match": r.headers["etag"]}).status_code == 304
+    assert c.get("/api/places", headers={"Accept-Encoding": "gzip"}).headers.get("content-encoding") == "gzip"
+
+    # 카드: 공개 사이트에 페이지가 있는 장소만 public이 참이다. 공공시설과 도로 구간은 거짓 (화면이 공개 페이지 링크를 숨긴다)
+    fac = strict(c.get("/api/card", params={"path": places["facilities"][0]["p"]}))
+    assert fac["public"] is False and fac["kindLabel"] == "공공시설" and fac["pt"], fac
+    st = strict(c.get("/api/card", params={"path": places["station"]["p"]}))
+    assert st["public"] is True and st["kind"] == "station", st
+    seg = c.get("/api/layers/road").json()["features"][0]["properties"]["uri"].split("/id/", 1)[1]
+    assert strict(c.get("/api/card", params={"path": seg}))["public"] is False
+    bm = c.get("/api/layers/basemap").json()["features"][0]["properties"]["uri"].split("/id/", 1)[1]
+    bcard = strict(c.get("/api/card", params={"path": bm}))
+    assert bcard["public"] is False and bcard["kindLabel"] == "국가기본도 건물", bcard["kindLabel"]
+    pub = public_view()
+    pub_places = build_places(pub, "")
+    seen = {x["p"] for x in pub_places["places"]}
+    sample = [p["p"] for p in pub_places["places"][:40]] + [p["p"] for p in places["places"] if p["p"] not in seen][:40]
+    for path in sample:
+        card = strict(c.get("/api/card", params={"path": path}))
+        assert card["public"] is ((f"{BASE}/{path}") in pub.triples and f"{BASE}/{path}" not in pub.held), path
+    for bad, code in (("../etc", 400), ("building/<x>", 400), ("building/0000", 404), ("proposal/x", 404)):
+        assert c.get("/api/card", params={"path": bad}).status_code == code, bad
+    q = strict(c.get("/api/questions"))
+    assert q["items"] and "전체 그래프" in q["note"], q["note"]
+
+    # 승인으로 판이 바뀌면 다시 만든다
+    from src.review.proposals import ProposalStore
+    v0 = review_app.state["version"]
+    a = fresh(review_app, 1)[0]
+    ProposalStore(tmp).add_new([note("test-local-app", a)])
+    assert c.post("/api/proposals/test-local-app/decision", json=OK).status_code == 200
+    assert review_app.state["version"] == v0 + 1
+    r2 = c.get("/api/places")
+    assert r2.headers["etag"] != r.headers["etag"] and v0 + 1 in review_app.app_cache
+
+
 CHECKS = [check_host_origin, check_group_holds, check_bad_geometry, check_correction_reach, check_save_order, check_slow_checks,
           check_ask_limit, check_ask_errors, check_odd_requests, check_one_build_and_body_limit, check_defense_headers,
           check_screen_tools, check_status_report, check_edition_api, check_any_wkt, check_lock_wait, check_failed_correction_report,
-          check_broken_file]
+          check_broken_file, check_local_app]
 
 
 def run() -> None:

@@ -69,9 +69,10 @@ export function createPanel(ctx) {
     }
   }
 
-  function selectTab(id, { push = false } = {}) {
+  // expand: 접힌 패널을 펴는지. 찾기 결과는 접힌 채로 볼 수 있어(명세 3.2절) 찾기 모듈이 false를 준다
+  function selectTab(id, { push = false, expand = true } = {}) {
     if (!tabs.has(id)) id = "search";
-    if (collapsed) setCollapsed(false);
+    if (collapsed && expand) setCollapsed(false);
     current = id;
     syncTabs();
     body.scrollTop = 0;
@@ -101,9 +102,9 @@ export function createPanel(ctx) {
     stack.forEach((v, k) => { v.el.hidden = k !== stack.length - 1; });
   }
 
-  // view: {id, title, render(el, ctx), onBack(), focus: boolean}. 같은 id의 화면이 있으면 그 위를 모두 내리고 바꾼다
+  // view: {id, title, render(el, ctx), onBack(), focus: boolean, expand: boolean}. 같은 id의 화면이 있으면 그 위를 모두 내리고 바꾼다
   function show(view) {
-    selectTab("search");
+    selectTab("search", { expand: view.expand !== false });
     const opener = document.activeElement;
     const k = stack.findIndex(v => v.id === view.id);
     const keepOpener = k >= 0 ? stack[k].opener : opener;

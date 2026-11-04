@@ -262,7 +262,10 @@ export async function init(ctx) {
       tab: "all", page: 1, bounds: null, empty: opt.empty || null, onClear: opt.onClear || null, loading: !!opt.loading,
     };
     research.hidden = true;
-    panel.show({ id: "results", title: R.title, focus: !!opt.focus, onBack: () => closeResults({ push: true }), render: el => renderResults(el) });
+    // PC에서 패널을 접어 두었으면 결과가 있거나 찾는 중일 때 접힌 채로 둔다 (명세 3.2절). 결과가 없으면 안내를 보이게 편다
+    const keepFolded = panel.isCollapsed() && !(ctx.sheet && ctx.sheet.active()) && (R.items.length > 0 || R.loading);
+    panel.show({ id: "results", title: R.title, focus: !!opt.focus && !keepFolded, expand: !keepFolded,
+      onBack: () => closeResults({ push: true }), render: el => renderResults(el) });
     emitMarkers();
     if (!opt.quiet) ui.live(R.items.length ? `${R.title}: ${nf(R.items.length)}곳을 찾았습니다` : `${R.title}: 찾은 곳이 없습니다`);
     if (ctx.sheet && ctx.sheet.active() && ctx.sheet.current() === "peek") ctx.sheet.snap("half");
@@ -451,6 +454,12 @@ export async function init(ctx) {
     show({ kind: "query", q, title: `'${q}' 찾은 결과`, items: r.items, note: r.note, sort: "score", focus: !restore && (!auto || !r.items.length), quiet: restore && !!state.get("focus") });
     if (restore) { reopenFocus(); return r; }
     if (!index.biz) R.extraNote = "상호 자료를 받지 못해 건물과 주소만 찾았습니다.";
+    // 패널을 접은 채 찾으면 패널을 펴지 않고 지도를 결과 범위에 맞춘다 (명세 3.2절). 목록은 패널을 펴면 그대로 있다
+    if (panel.isCollapsed() && !(ctx.sheet && ctx.sheet.active()) && r.items.length) {
+      fitResults();
+      ui.live(`'${q}' ${nf(r.items.length)}곳을 찾아 지도를 결과 범위에 맞췄습니다. 패널을 펴면 목록이 보입니다`);
+      return r;
+    }
     // 찾기말 결과는 첫 결과를 자동으로 고르고 지도를 옮긴다 (칩 결과는 고르지 않는다).
     // 일부만 찾는 낱말(병원, 은행 등)은 '이름에 낱말이 든 곳만'이라는 안내가 카드에 가리지 않게 목록만 보여 준다
     if (auto && r.items.length && !(r.note && (r.note.kind === "absent" || r.note.kind === "partial"))) {
@@ -459,6 +468,18 @@ export async function init(ctx) {
       openItem(first, { from: "search", no: 1 });
     }
     return r;
+  }
+
+  // 결과 첫 쪽의 점이 모두 보이게 지도를 맞춘다 (접힌 패널에서 찾을 때)
+  function fitResults() {
+    if (!ctx.map || !R) return;
+    const pts = shown().slice(0, R.page * PAGE).map(x => x.pt).filter(p => Array.isArray(p) && p.length >= 2);
+    if (!pts.length) return;
+    const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
+    pts.forEach(p => b.extend(p));
+    const dur = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400;
+    if (b.getNorthEast().distanceTo(b.getSouthWest()) < 60) ctx.map.easeTo({ center: b.getCenter(), zoom: Math.max(ctx.map.getZoom(), 17), duration: dur });
+    else ctx.map.fitBounds(b, { padding: 64, maxZoom: 17.5, duration: dur, bearing: ctx.map.getBearing(), pitch: ctx.map.getPitch() });
   }
 
   // 주소창의 focus를 목록 위에 다시 연다 (주소창은 그대로)

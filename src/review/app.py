@@ -2,6 +2,11 @@
 
 실행: uvicorn src.review.app:app --host 127.0.0.1 --port 8000
   검토 화면 http://localhost:8000 , 지도 화면 http://localhost:8000/map
+지도 화면은 공개 사이트와 같은 앱(web/app/)이다. 화면 틀은 src.graph.app_shell.render_app_html("local")이고,
+자료 입구만 web/local/source-api.js로 바뀐다 (명세 5.1절, 5.3절). 로컬 전용 모듈(web/local/)은 공개 빌드에 들어가지 않는다.
+앱 자료(/api/places, /api/shapes, /api/entrances, /api/businesses, /api/card, /api/questions, /api/sources)는
+공개 사이트와 같은 함수(src.graph.places, cards, questions)를 전체 뷰(src.graph.public.local_view)로 불러 만들고,
+그래프 판 번호마다 메모리에 둔다. 승인으로 판이 바뀌면 다시 만든다.
 이 서버는 공개 보류 자료도 그대로 읽는 로컬 화면이다. 127.0.0.1 밖으로 열지 않는다. Host와 Origin 검사도 이 전제로 짰다.
 제안을 승인하면 그래프에 바로 반영되고, 반려하면 기록만 남는다.
 결정은 정정할 수 있다. 승인을 거두면 그래프를 원천 그래프와 남은 승인 기록으로 다시 만든다.
@@ -71,10 +76,16 @@ LOCK_WAIT = 30  # 결정과 정정이 앞 결정이 끝나기를 기다리는 �
 FILE_WAIT = 5  # 다른 프로세스가 쥔 제안 파일 잠금을 앱 잠금 밖에서 기다리는 초. 넘으면 503
 FILE_BUSY = "다른 작업이 제안 파일을 쓰고 있습니다. 잠시 뒤에 다시 시도해 주세요."
 FILE_BROKEN = "제안 파일을 읽지 못했습니다. 파일은 그대로 두었으니 고친 뒤 다시 시도해 주세요."
-# 화면이 쓰는 바깥 주소. web/review.html, web/map.html의 주소와 같아야 한다
-MAP_LIBRARY = "https://unpkg.com/maplibre-gl@4.7.1/"
+# 화면이 쓰는 바깥 주소는 글꼴(Pretendard) 하나다. 지도 라이브러리, 배경 타일, 지도 글꼴은 저장소의 web/vendor/에서 받는다
 FONT_FILES = "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/"
-MAP_TILES = "https://tile.openstreetmap.org"
+FONT_CSS = FONT_FILES + "dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+FONT_SRI = "sha384-GIdEBaqGN9mNkDkMkzMHW8EKUqtpPIe/sLj1X7DIrnc9uPtLROJgmuDlh+3rBw0j"  # web/review.html과 같은 값
+# 공개 사이트. 지도 앱의 둘러보기가 공개 객체의 기계용 원본(index.ttl)을 받아 보여 줄 때만 쓴다 (GET만, 로컬 자료를 보내지 않는다)
+PUBLIC_SITE = "https://yeodh10.github.io"
+# 지도 앱(/map)이 더 불러오는 로컬 전용 모듈 (명세 5.1절 __CONFIG__ 로컬의 extra). 길찾기(route-local.js)는 만들지 않았다
+LOCAL_EXTRA = ("/static/local/layers-local.js", "/static/local/ask-local.js", "/static/local/history-local.js")
+# 로컬 카드의 종류 이름. 공개 사이트에 없는 종류 가운데 src.graph.cards가 이름을 모르는 것만 여기서 붙인다
+LOCAL_KIND_LABEL = {"basemap": "국가기본도 건물", "digital-map": "수치지형도 건물"}
 LOCKED_CSP = "default-src 'none'; frame-ancestors 'none'"  # 화면이 아닌 응답. /static/의 HTML도 여기서 스크립트가 돌지 않는다
 INLINE_SCRIPT = re.compile(r"<script>(.*?)</script>", re.S)
 # 글자로 보이지 않는 문자: 유니코드 Default_Ignorable_Code_Point와 점자 빈칸. 이름이나 사유가 비었는데 찬 것처럼 보이게 한다
@@ -92,14 +103,13 @@ def preload() -> None:
         system_prompt()
         from src.query.nl import prepare
         prepare(g)  # 쿼리 일꾼을 미리 띄운다. 기다리지 않는다
-        # 지도 화면이 처음에 받는 레이어도 미리 만들어 둔다 (처음 화면이 비어 있는 시간을 줄인다)
-        for kind in ("station", "facility", "sensor", "building", "road"):
-            layer_bytes(kind, state["version"])
+        # 지도 화면이 처음에 받는 앱 자료도 미리 만들어 둔다 (처음 화면이 비어 있는 시간을 줄인다)
+        app_data()
         area_geojson()
     except Exception:  # 미리 불러오기에 실패해도 서버는 뜨고, 첫 요청이 다시 불러 보며 오류를 낸다
         log.exception("그래프를 미리 불러오지 못했다")
         return
-    log.info("그래프와 지도 레이어를 미리 불러왔다: 트리플 %d개, %.1f초", len(g), time.perf_counter() - t0)
+    log.info("그래프와 지도 앱 자료를 미리 불러왔다: 트리플 %d개, %.1f초", len(g), time.perf_counter() - t0)
 
 
 @asynccontextmanager
@@ -380,15 +390,29 @@ def page_csp(html: str) -> str:
     hashes = " ".join("'sha256-" + base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).decode() + "'"
                       for s in INLINE_SCRIPT.findall(html))
     return "; ".join([
-        "default-src 'none'", f"script-src 'self' {hashes} {MAP_LIBRARY}",
-        f"style-src 'self' 'unsafe-inline' {MAP_LIBRARY} {FONT_FILES}", f"font-src {FONT_FILES}",
-        f"img-src 'self' data: blob: {MAP_TILES}", f"connect-src 'self' {MAP_TILES}", "worker-src blob:", "child-src blob:",
+        "default-src 'none'", f"script-src 'self' {hashes}",
+        f"style-src 'self' 'unsafe-inline' {FONT_FILES}", f"font-src {FONT_FILES}",
+        "img-src 'self' data: blob:", f"connect-src 'self' {PUBLIC_SITE}", "worker-src blob:", "child-src blob:",
         "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"])
 
 
-def page_file(path: Path) -> HTMLResponse:
-    html = path.read_text(encoding="utf-8")  # 브라우저처럼 줄바꿈을 LF로 읽어야 해시가 맞는다
+def page_html(html: str) -> HTMLResponse:
     return HTMLResponse(html, headers={"Content-Security-Policy": page_csp(html)})
+
+
+def page_file(path: Path) -> HTMLResponse:
+    return page_html(path.read_text(encoding="utf-8"))  # 브라우저처럼 줄바꿈을 LF로 읽어야 해시가 맞는다
+
+
+def local_app_html() -> str:
+    """지도 앱의 로컬 화면 틀. 글꼴 줄은 CSP가 인라인 이벤트(onload)를 막으므로 SRI를 붙인 보통 링크로 바꾼다."""
+    from src.graph.app_shell import render_app_html
+    html = render_app_html("local", extra=LOCAL_EXTRA)
+    font = re.compile(r'<link rel="stylesheet" href="' + re.escape(FONT_CSS) + r'"[^>]*>')
+    html, n = font.subn(f'<link rel="stylesheet" href="{FONT_CSS}" integrity="{FONT_SRI}" crossorigin="anonymous">', html)
+    if n != 1:
+        raise RuntimeError("지도 앱 화면 틀에서 글꼴 줄을 찾지 못했다")
+    return html
 
 
 @app.get("/")
@@ -535,6 +559,7 @@ def adopt(g: ox.Store, report: ReplayReport | None = None) -> None:
     state["version"] += 1
     layer_cache.clear()
     system_cache.clear()
+    app_cache.clear()
 
 
 @app.post("/api/proposals/{pid}/decision")
@@ -1115,7 +1140,8 @@ def ask_question(body: AskIn):
 
 @app.get("/map")
 def map_page():
-    return page_file(ROOT / "web" / "map.html")
+    """공개 사이트와 같은 지도 앱의 로컬 모드 (명세 5.1절). 검토 화면의 ?focus={전체 URI} 링크도 앱이 경로로 읽는다."""
+    return page_html(local_app_html())
 
 
 @app.get("/api/proposals/{pid}/context")
@@ -1163,3 +1189,153 @@ SELECT ?b ?wkt ?label ?status WHERE {{
         elif wkt:
             skipped += 1
     return {"type": "FeatureCollection", "features": features, "skipped": skipped}
+
+
+# ---- 지도 앱의 자료 입구 (명세 5.3절, web/local/source-api.js가 받는다) ------------------------------------------------
+# 공개 사이트의 정적 파일과 같은 모양이다. 다른 점: 전체 뷰로 만들어 공공시설(places의 facilities)과 보류 자료가 들어 있고,
+# 카드의 public은 공개 사이트에 그 장소의 페이지가 있는지를 적는다 (false면 화면이 공개 페이지 링크를 숨긴다).
+APP_PATH = re.compile(r"^[a-z-]+/[0-9A-Za-z_.-]+$")
+app_cache: dict = {}   # 그래프 판 번호 -> {"view", "places", ...}. 판이 바뀌면 다시 만든다
+app_lock = threading.RLock()
+
+
+def has_llm_key() -> bool:
+    """자유 질문에 쓸 키가 있는지만 본다. 값은 어디에도 내보내지 않는다."""
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / ".env")
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+
+
+def public_uris(view) -> set[str]:
+    """공개 사이트에 페이지가 있는 우리 URI. 공개 뷰(src.graph.public.public_view)와 같은 판단을 이 그래프에 한다:
+    출처가 모두 공개 자료인 노드에서 공개하지 않는 상호를 뺀다. 근거 자료가 모두 공개 자료인 승인만 공개로 본다.
+    공개 근거가 없는 승인이 새로 만든 객체(자동 갱신의 새 건물과 새 출입구)는 공개 사이트에 없으므로 뺀다."""
+    from src.graph.public import JGK as PJGK, hold_sources, private_businesses, public_nodes, publishable
+    approved = [p for p in proposals.load() if p.status == "approved"]
+    given = {p.uri: {PJGK + d for d in p.based_on} for p in approved if publishable(p)}
+    made = {c.s for p in approved if not publishable(p) for c in p.changes if c.op == "add" and c.p == RDF_TYPE.value}
+    made |= {s + "/geometry" for s in made}
+    return public_nodes(view.triples, hold_sources(), given) - private_businesses(view.triples) - made
+
+
+def app_data() -> dict:
+    """지금 그래프 판의 앱 자료. 만드는 사이에 승인이 들어오면 담아 두지 않는다 (layer_bytes와 같은 방식)."""
+    store()
+    version = state["version"]
+    d = app_cache.get(version)
+    if d is not None:
+        return d
+    with app_lock:
+        d = app_cache.get(version)
+        if d is not None:
+            return d
+        from src.graph.app_shell import STARTED
+        from src.graph.appdata import build_sources
+        from src.graph.cards import CardMaker
+        from src.graph.places import build_businesses, build_entrances, build_places, build_shapes
+        from src.graph.public import local_view
+        t0 = time.perf_counter()
+        view = local_view(store())
+        places = build_places(view, STARTED)
+        businesses = build_businesses(view, places)
+        sources = build_sources(0)
+        # 로컬은 공개하지 않는 자료도 보여 주므로 자료 탭의 공개 범위 글을 이 화면에 맞게 바꾼다
+        sources["history"] = "이 화면은 이 컴퓨터의 로컬 서버입니다. 변경 기록은 기록 탭에서, 승인과 반려는 검토 화면에서 봅니다."
+        sources["hiddenBusinessesNote"] = ("로컬 서버는 공개 사이트에 싣지 않는 상호와 공공시설, 보류 자료도 함께 보여 줍니다. "
+                                           "이 화면을 찍어 바깥에 올리지 않습니다.")
+        places["basis"] = sources["basis"]
+        d = {"view": view, "places": places, "shapes": build_shapes(view, places), "entrances": build_entrances(view),
+             "businesses": businesses, "sources": sources, "public": public_uris(view), "questions": None, "maker": None,
+             "bytes": {}, "version": version}
+        d["maker"] = CardMaker(view, places, public=d["public"], business_lines=businesses["items"])
+        if state["version"] == version:
+            app_cache.clear()
+            app_cache[version] = d
+        log.info("지도 앱 자료를 만들었다: 판 %d, %.1f초", version, time.perf_counter() - t0)
+    return d
+
+
+def app_questions(d: dict) -> dict:
+    """묻기 탭의 답. 공개 사이트와 같은 사람이 쓴 쿼리를 이 컴퓨터의 전체 그래프에서 실행한다 (처음 열 때 한 번)."""
+    if d["questions"] is None:
+        from src.graph.questions import QuestionError, build_questions
+        with app_lock:
+            if d["questions"] is None:
+                try:
+                    q = build_questions(d["view"], d["view"].store)
+                except QuestionError as e:
+                    log.warning("미리 정한 질문을 실행하지 못했다: %s", e)
+                    raise HTTPException(500, "미리 정한 질문을 실행하지 못했습니다") from None
+                q["note"] = "이 컴퓨터의 전체 그래프에서 미리 정한 쿼리로 실행한 답입니다. 자유 질문은 위 칸에서 합니다."
+                d["questions"] = q
+    return d["questions"]
+
+
+def app_json(name: str, request: Request, make) -> Response:
+    """판 번호로 ETag를 붙인 JSON 응답. 같은 판이면 304로 브라우저가 가진 것을 다시 쓰게 한다."""
+    d = app_data()
+    etag = f'W/"app-{name}-{state["boot"]}-{d["version"]}"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    sent = [t.strip() for t in request.headers.get("if-none-match", "").split(",")]
+    if etag in sent or "*" in sent:
+        return Response(status_code=304, headers=headers)
+    body = d["bytes"].get(name)
+    if body is None:
+        body = json.dumps(make(d), ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+        d["bytes"][name] = body
+    return Response(body, media_type="application/json", headers=headers)
+
+
+@app.get("/api/capabilities")
+def capabilities():
+    """로컬 화면이 쓸 수 있는 기능. 키는 있는지 없는지만 알린다 (값을 넣지 않는다)."""
+    key = has_llm_key()
+    return {"mode": "local", "ask": key, "key": key, "layers": ["facility", "road", "legaldong", "basemap", "digitalmap"],
+            "history": True, "review": True, "route": False}
+
+
+@app.get("/api/places")
+def app_places(request: Request):
+    return app_json("places", request, lambda d: d["places"])
+
+
+@app.get("/api/shapes")
+def app_shapes(request: Request):
+    return app_json("shapes", request, lambda d: d["shapes"])
+
+
+@app.get("/api/entrances")
+def app_entrances(request: Request):
+    return app_json("entrances", request, lambda d: d["entrances"])
+
+
+@app.get("/api/businesses")
+def app_businesses(request: Request):
+    return app_json("businesses", request, lambda d: d["businesses"])
+
+
+@app.get("/api/sources")
+def app_sources(request: Request):
+    return app_json("sources", request, lambda d: d["sources"])
+
+
+@app.get("/api/questions")
+def app_question_list(request: Request):
+    return app_json("questions", request, app_questions)
+
+
+@app.get("/api/card")
+def app_card(path: str):
+    """장소 하나의 카드 (card.json 모양). 모양 노드, 변경 기록, 제안, 고시는 카드가 없다 (제안은 검토 화면에서 본다)."""
+    path = path.strip("/")
+    if not APP_PATH.match(path):
+        raise HTTPException(400, "장소 경로가 맞지 않습니다")
+    d = app_data()
+    uri = f"{BASE}/{path}"
+    if uri not in d["view"].triples or path.split("/", 1)[0] in ("proposal", "notice") or "/change/" in uri:
+        raise HTTPException(404, "없는 장소입니다")
+    with app_lock:   # 카드를 만드는 도구는 안에 기억을 쌓는다. 한 번에 하나씩 만든다
+        card = d["maker"].card(uri)
+    if card["kind"] in LOCAL_KIND_LABEL:
+        card["kindLabel"] = LOCAL_KIND_LABEL[card["kind"]]
+    return card

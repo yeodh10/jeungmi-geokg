@@ -47,7 +47,8 @@ export function init(ctx) {
     if (sel.group != null) { const g = data.groupById.get(Number(sel.group)); return g ? { pt: g.pt, name: g.n, kind: "단지" } : null; }
     const p = sel.path ? data.byPath.get(sel.path) : null;
     const kind = String(sel.path || "").split("/")[0];
-    const label = { building: "건물", "building-gis": "건물", station: "역", sensor: "센서", parcel: "필지", entrance: "입구", business: "상호" }[kind] || "장소";
+    const label = { building: "건물", "building-gis": "건물", station: "역", sensor: "센서", parcel: "필지", entrance: "입구", business: "상호",
+      "public-facility": "공공시설" }[kind] || "장소";
     if (kind === "parcel") {
       const first = p && p.m && p.m.length ? data.byIndex[p.m[0]] : null;
       return first ? { pt: first.pt, name: p.j || sel.path, kind: label } : null;

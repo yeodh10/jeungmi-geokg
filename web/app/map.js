@@ -293,12 +293,24 @@ export function createMapApi(ctx, map) {
     return out;
   };
 
+  // 바라는 여백. 지도가 움직이는 동안 여백을 바꾸면 그 움직임(easeTo, fitBounds)이 시작 때의 여백으로 되돌려 놓는다.
+  // 휴대폰에서 찾기로 장소를 고르면 시트가 오르는 사이 지도가 움직여, 고른 곳이 옛 여백의 가운데(시트 경계)에 남았다.
+  // 그래서 움직임이 멎을 때 실제 여백이 바라는 여백과 다르면 다시 맞춘다. 가운데 점은 그대로라 고른 곳이 보이는 지도 가운데로 온다
+  let wantPad = null;
+  const samePad = (a, b) => ["top", "right", "bottom", "left"].every(k => Math.round(a[k] || 0) === Math.round(b[k] || 0));
+  map.on("moveend", () => {
+    if (!wantPad || map.isMoving()) return;
+    if (samePad(map.getPadding(), wantPad)) { wantPad = null; return; }
+    map.easeTo({ padding: wantPad, duration: dur(200) });
+  });
+
   const api = {
     get ready() { return ready; },
     whenReady,
     setPadding(padding, { animate = true } = {}) {
       const cur = map.getPadding();
       const next = { top: 0, right: 0, bottom: 0, left: 0, ...cur, ...padding };
+      wantPad = next;
       if (["top", "right", "bottom", "left"].every(k => Math.round(cur[k]) === Math.round(next[k]))) return;
       if (animate && !map.isMoving()) map.easeTo({ padding: next, duration: dur(180) });
       else map.setPadding(next);
