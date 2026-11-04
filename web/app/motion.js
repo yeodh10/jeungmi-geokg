@@ -72,8 +72,8 @@ export function init(ctx) {
   map.on("moveend", e => {
     if (!e.drive) return;
     requestAnimationFrame(() => {
-      if (map.isMoving()) { cur = null; stopping = false; return; }
-      if (stopping) { cur = null; stopping = false; return; }
+      // 다른 움직임이 돌고 있거나, 멎는 토막이 끝났거나, 그 사이 지도를 눌러 키 움직임을 놓았으면(cur가 없다) 여기서 끝낸다
+      if (map.isMoving() || stopping || !cur) { cur = null; stopping = false; return; }
       const v = want();
       if (zero(v)) { stopping = true; step(cur, STOP, easeOut, 0.5); return; }
       step(v, SEG, linear, 1);

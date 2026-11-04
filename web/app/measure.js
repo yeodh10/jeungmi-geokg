@@ -1,5 +1,6 @@
 // 재기 (명세 4.2절 있으면 좋음 2): 거리와 반경. 반경 안 건물 수와 용도별 수를 보여 준다.
-// 지도를 눌러 점을 찍는다. 백스페이스는 한 점 취소, Esc나 오른쪽 단추는 끝내기, '지우기'는 처음부터. 시간은 내지 않는다(근거가 없다).
+// 지도를 눌러 점을 찍는다. Enter나 오른쪽 단추는 끝내기, Esc는 재기 취소(찍은 점과 창을 모두 지운다), '한 점 취소'와 '지우기'는 창의 단추로.
+// 백스페이스는 쓰지 않는다(글을 지우려다 점이 지워지는 일이 없게). 시간은 내지 않는다(근거가 없다).
 // 재는 동안 지도 누르기는 장소 고르기 대신 점 찍기가 된다 (지도 칸의 click을 먼저 받아 멈춘다). 층 이름은 measure-*다.
 
 const nf = n => Number(n).toLocaleString("ko-KR");
@@ -94,7 +95,7 @@ export async function init(ctx) {
 
   function render() {
     const guide = mode === "distance"
-      ? (done ? "재기를 마쳤습니다." : pts.length ? "다음 점을 누르세요. 백스페이스로 한 점을 취소하고, Esc 키나 마우스 오른쪽 버튼으로 끝냅니다." : "지도에서 출발점을 누르세요.")
+      ? (done ? "재기를 마쳤습니다." : pts.length ? "다음 점을 누르세요. Enter 키나 마우스 오른쪽 버튼으로 끝내고, Esc 키로 재기를 취소합니다." : "지도에서 출발점을 누르세요.")
       : (done ? "재기를 마쳤습니다." : pts.length ? "반경 끝점을 누르세요. 아래 버튼으로 반경을 바로 고를 수도 있습니다." : "지도에서 가운데 점을 누르세요.");
     let body = "";
     if (mode === "distance") body = `<p class="measure-val">직선 거리 합계 <b>${fmt(total())}</b>${pts.length > 2 ? ` <span class="muted">(점 ${pts.length}개)</span>` : ""}</p>`;
@@ -158,8 +159,8 @@ export async function init(ctx) {
   }
   function onKey(e) {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (!done && pts.length) finish(); else stop(); }
-    else if (e.key === "Backspace" && !done && pts.length) { e.preventDefault(); undo(); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); stop({ cancel: true }); }
+    else if (e.key === "Enter" && !done && pts.length && !/^(BUTTON|A)$/.test(e.target.tagName)) { e.preventDefault(); finish(); }
   }
   let armed = false;
   function arm(on) {
@@ -217,7 +218,7 @@ export async function init(ctx) {
     box.querySelector(".pop-title").focus();
     ui.live(`${mode === "distance" ? "거리" : "반경"} 재기를 시작했습니다. 지도를 눌러 점을 찍으세요`);
   }
-  function stop() {
+  function stop({ cancel = false } = {}) {
     arm(false);
     mode = null;
     pts = [];
@@ -225,7 +226,7 @@ export async function init(ctx) {
     btn.classList.remove("on");
     btn.setAttribute("aria-expanded", "false");
     if (map.getSource("measure")) map.getSource("measure").setData(EMPTY);
-    ui.live("재기를 마쳤습니다");
+    ui.live(cancel ? "재기를 취소했습니다" : "재기를 마쳤습니다");
     const o = opener;
     opener = null;
     if (o && document.contains(o) && o !== document.body) o.focus();

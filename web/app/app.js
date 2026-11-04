@@ -126,12 +126,27 @@ if (typeof ResizeObserver === "function") {
 
 // ---- 지도. WebGL을 못 쓰면 안내만 띄우고 찾기, 목록, 장소 정보는 그대로 쓴다 (명세 3.11절)
 const mapEl = document.getElementById("map");
+// 마지막에 보던 곳(이 브라우저에만 남는다). 주소창에 위치도 고른 장소도 없으면 거기서 연다. 입체 보기 시점(d3)도 함께 되살린다
+const LAST_KEY = "jgk-last-view";
+if (!state.get("z") && !state.get("c") && !state.get("focus")) {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_KEY) || "null");
+    if (v && viewFrom(v.z, v.c)) state.set({ z: v.z, c: v.c, d3: typeof v.d3 === "string" ? v.d3 : null }, { silent: true });
+  } catch (e) { /* 저장소가 막히면 처음 화면으로 연다 */ }
+}
 const urlView = viewFrom(state.get("z"), state.get("c"));
 let mapReady = null;
 try {
   const start = urlView || { center: MAP_CENTER, zoom: sheet.active() ? 15 : 14.6 };
   ctx.map = M.createMap(mapEl, start);
   ctx.map.setPadding(padding());
+  let saveTimer = 0;   // 움직임이 멎고 주소창이 바뀐 뒤(map.js가 300ms 뒤에 적는다) 마지막 위치로 남긴다
+  ctx.map.on("moveend", () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(LAST_KEY, JSON.stringify({ z: state.get("z"), c: state.get("c"), d3: state.get("d3") || null })); } catch (e) { /* 저장소 막힘 */ }
+    }, 600);
+  });
   const made = M.createMapApi(ctx, ctx.map);
   ctx.mapApi = made.api;
   mapReady = made;
@@ -185,7 +200,7 @@ function indexData(places, shapes) {
   d.groupById = new Map(places.groups.map(g => [g.g, g]));
   d.groupOf = i => { const p = d.byIndex[i]; return p && p.g != null ? d.groupById.get(p.g) || null : null; };
   for (const list of [places.roads, places.dongs, places.zones, places.sensors]) for (const x of list || []) d.byPath.set(x.p, x);
-  if (places.station) d.byPath.set(places.station.p, places.station);
+  for (const s of [places.station, ...(places.near_stations || [])]) if (s) d.byPath.set(s.p, s);
   // 필지: 건물 행의 pnu와 지번에서 만든다. 위에 건물이 없는 필지는 parcels에 따로 있다 (좌표 없음)
   const parcels = new Map();
   for (const p of places.places) {

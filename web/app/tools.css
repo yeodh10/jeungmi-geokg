@@ -81,7 +81,8 @@ body.measuring .maplibregl-canvas-container, body.measuring .maplibregl-canvas-c
   .theme-pop, .measure-pick { top: calc(116px + env(safe-area-inset-top)); right: 60px; left: 8px; width: auto;
                               max-height: calc(100dvh - var(--sheet-h) - 130px - env(safe-area-inset-top)); }
   .theme-legend { left: 8px; bottom: calc(var(--sheet-h) + 34px); width: min(240px, calc(100vw - 72px)); max-height: 40dvh; overflow-y: auto; }
-  .measure-box { left: 8px; right: 8px; width: auto; transform: none; bottom: calc(var(--sheet-h) + 8px); max-height: 50dvh; overflow-y: auto; }
+  /* 오른쪽은 아래 도구 줄(3D, 역, 내 위치) 폭만큼 비워 단추를 가리지 않는다 */
+  .measure-box { left: 8px; right: 60px; width: auto; transform: none; bottom: calc(var(--sheet-h) + 8px); max-height: 50dvh; overflow-y: auto; }
   body.sheet-full .theme-legend, body.sheet-full .measure-box { visibility: hidden; }
 }
 @media (max-width: 900px) and (max-height: 500px) {
