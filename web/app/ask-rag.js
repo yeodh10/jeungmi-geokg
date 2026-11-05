@@ -23,7 +23,7 @@ export const ASPECTS = [
   { id: "cat", label: "업종", re: /업종|뭐\s*파는|무엇을\s*파는|무슨\s*가게|어떤\s*가게|뭐\s*하는\s*곳|뭐하는\s*곳|무슨\s*업/, keys: ["업종"] },
   { id: "jibun", label: "지번", re: /지번|번지/, field: "jibun" },
   { id: "no", label: "공식 번호", re: /관리\s*번호|식별\s*번호|번호가|번호는|번호\s*알|pnu|코드/i, field: "officialNo" },
-  { id: "addr", label: "주소", re: /주소|어디\s*(있|야|에|인)|어디야|위치/, field: "addr" },
+  { id: "addr", label: "주소", re: /주소|어디\s*(있|야|에|인|쯤|$)|어디야|위치|찾아\s*가|가는\s*길|어느\s*쪽/, field: "addr" },
   { id: "dong", label: "동", re: /무슨\s*동|어느\s*동|몇\s*동이|행정동|법정동|동네/, rels: ["행정동", "법정동"] },
   { id: "zip", label: "우편구역", re: /우편/, rels: ["우편구역"] },
   { id: "road", label: "길", re: /무슨\s*길|어느\s*길|무슨\s*도로|어느\s*도로|길\s*이름/, rels: ["길"] },
@@ -109,6 +109,8 @@ export function read(core, index, text, { basis = null } = {}) {
       const cover = core.compact(s).length / Math.max(1, core.compact(top.name).length);
       const strong = top.field === "number"
         || (top.field === "name" && top.score >= 75 && cover >= 0.4)
+        // 초성은 상호 감점(-25) 때문에 점수가 낮다. 세 글자 넘게 이름 전체가 맞고 다음 후보와 뚜렷이 다르면 받는다 ('ㅈㅇㅅㅌㄹ' -> 지오스토리)
+        || (top.field === "name" && core.hasJamo(s) && core.compact(s).length >= 3 && cover >= 0.99 && top.score >= 65 && !(r.items[1] && r.items[1].score > top.score - 10))
         || (top.field === "addr" && top.score >= 80 && span.some(w => /(로|길)$/.test(w)) && span.some(w => /\d/.test(w)))
         || (top.field === "jibun" && top.score >= 70 && span.some(w => /(동|가)$/.test(w)) && span.some(w => /\d/.test(w)));
       // 여러 낱말이 함께 맞으면 앞세운다 ('등촌동 666-40'이 '등촌동'보다 먼저)
@@ -138,8 +140,12 @@ export function read(core, index, text, { basis = null } = {}) {
       if (items.length) near = { word: w, radius, items };
     }
   }
+  // '어디에 있어'를 물으면 가장 가까운 역까지 함께 알려 준다 (찾기 색인의 역 목록)
+  const where = /어디|위치|찾아\s*가|가는\s*길|어느\s*쪽/.test(q);
+  const stations = where ? (index.docs || []).filter(d => d.type === "station" && d.pt).map(d => ({ name: d.name, pt: d.pt, path: d.path })) : [];
   const here = basis && basis.pt && /여기|기준|고른\s*곳/.test(q) ? { name: basis.n || "거리 기준", pt: basis.pt, basis: true } : null;
-  return { q, aspects, absent, near, ents: ents.map(e => ({ path: e.item.path, name: e.item.name, type: e.item.type, pt: e.item.pt, group: e.item.group ?? null, score: e.item.score, field: e.item.field, said: words.slice(e.i, e.i + e.len).join(" ") })), here, basis };
+  return { q, aspects, absent, near, ents: ents.map(e => ({ path: e.item.path, name: e.item.name, type: e.item.type, pt: e.item.pt, group: e.item.group ?? null, score: e.item.score, field: e.item.field, said: words.slice(e.i, e.i + e.len).join(" "),
+    building: e.item.building || null, floor: e.item.floor || "", src: e.item.src || null })), here, basis, where, stations };
 }
 
 // 질문 틀보다 먼저 답할까: 장소를 찾았고, 그 장소에 대해 무엇을 묻는지가 분명할 때.
@@ -156,6 +162,9 @@ export function prefer(plan, centerPath) {
 // 부르는 쪽은 장소 카드를 받은 뒤 이 경로들의 카드도 받아 cards에 넣는다
 const VIA = ["역사 건물", "들어 있는 건물", "설치 주소의 건물"];
 export const follow = card => (card && card.links || []).filter(l => VIA.includes(l.rel) && l.path).map(l => l.path);
+// 상호 카드 없이 들어 있는 건물로 가는 장소 (사람이 넣은 장소). 카드는 건물 카드다
+const inside = e => e.type === "business" && !!e.building && e.path === e.building;
+const floorText = f => (/^\d+$/.test(f) ? `${f}층` : /^B(\d+)$/.test(f) ? `지하 ${f.slice(1)}층` : f === "지" ? "지하" : f);
 const viaRel = (card, via) => ((card.links || []).find(l => l.path === via.path) || {}).rel || "건물";
 
 // ---- 2) 답 만들기. cards: 장소 경로 -> card.json (없으면 null)
@@ -205,7 +214,8 @@ export function answer(plan, cards) {
     const card = cards[e.path];
     out.paths.push(e.path);
     if (!card) { out.sentences.push(`${e.name}의 카드 자료를 받지 못했습니다.`); continue; }
-    const name = e.type === "group" ? e.name : card.name || e.name;
+    const ins = inside(e);
+    const name = e.type === "group" ? e.name : ins ? `${josa(e.name, "이/가")} 들어 있는 ${card.name}` : card.name || e.name;
     if (e.type === "group") out.sentences.push(`${josa(e.name, "은/는")} 여러 동이 모인 단지라, 대표 동(${card.name})의 카드로 답합니다.`);
     const facts = card.facts || [], links = card.links || [], missing = new Set(card.missing || []);
     const src = (card.sources && card.sources.object || []).join(", ");
@@ -219,6 +229,10 @@ export function answer(plan, cards) {
     }
     for (const a of aspects) {
       if (a.id === "dist") continue;
+      if (ins && a.id === "floors") {
+        out.sentences.push(e.floor ? `${josa(e.name, "은/는")} ${floorText(e.floor)}에 있습니다.` : `${josa(e.name, "이/가")} 몇 층에 있는지는 이 자료에 없습니다.`);
+        if (e.floor) out.evidence.push({ label: "층", value: floorText(e.floor), path: e.path });
+      }
       if (a.keys) {
         const hit = a.keys.map(fact).filter(Boolean);
         if (hit.length) {
@@ -261,9 +275,21 @@ export function answer(plan, cards) {
         if (!a.field) { out.sentences.push(`${name}에는 이어진 ${josa(a.label, "이/가")} 없습니다.`); said++; continue; }
       }
       if (a.field === "addr") {
-        if (card.addr) { out.sentences.push(`${name}의 주소는 ${card.addr}입니다.${card.jibun ? ` 지번은 ${card.jibun}입니다.` : ""}`); out.evidence.push({ label: "도로명주소", value: card.addr, path: e.path, src }); if (card.jibun) out.evidence.push({ label: "지번", value: card.jibun, path: e.path, src }); }
+        if (ins) {
+          out.sentences.push(`${josa(e.name, "은/는")} ${card.name}${e.floor ? ` ${floorText(e.floor)}` : ""}에 있습니다.${card.addr ? ` 주소는 ${card.addr}${card.jibun ? `, 지번은 ${card.jibun}` : ""}입니다.` : ""}`);
+          out.evidence.push({ label: "들어 있는 건물", value: card.name, path: e.path, link: true });
+          if (card.addr) out.evidence.push({ label: "도로명주소", value: card.addr, path: e.path, src });
+          if (card.jibun) out.evidence.push({ label: "지번", value: card.jibun, path: e.path, src });
+          if (e.src && e.src.note) out.evidence.push({ label: `${e.name} 출처`, value: e.src.note + (e.src.checked ? ` (${e.src.checked} 확인)` : ""), path: null });
+        } else if (card.addr) { out.sentences.push(`${name}의 주소는 ${card.addr}입니다.${card.jibun ? ` 지번은 ${card.jibun}입니다.` : ""}`); out.evidence.push({ label: "도로명주소", value: card.addr, path: e.path, src }); if (card.jibun) out.evidence.push({ label: "지번", value: card.jibun, path: e.path, src }); }
         else if (card.jibun) { out.sentences.push(`${name}에는 도로명주소가 없고, 지번은 ${card.jibun}입니다.`); out.evidence.push({ label: "지번", value: card.jibun, path: e.path, src }); }
         else out.sentences.push(`${name}의 주소는 자료에 없습니다.`);
+        // 상호는 들어 있는 건물도 함께 (상호 카드의 '들어 있는 건물')
+        const inB = !ins && e.type === "business" && links.find(l => l.rel === "들어 있는 건물");
+        if (inB) { out.sentences.push(`${josa(card.name || e.name, "이/가")} 들어 있는 건물은 ${inB.name}입니다.`); out.evidence.push({ label: "들어 있는 건물", value: inB.name, path: inB.path, link: true }); }
+        // '어디에 있어'에는 가장 가까운 역도 (그 장소가 역이면 빼고)
+        const st = plan.where && e.pt && e.type !== "station" && (plan.stations || []).map(x => ({ ...x, d: meters(e.pt, x.pt) })).sort((x, y) => x.d - y.d)[0];
+        if (st) { out.sentences.push(`가장 가까운 역은 ${st.name}으로, 직선 약 ${nf(st.d)}m입니다.`); out.evidence.push({ label: "가까운 역", value: `${st.name} ${nf(st.d)}m`, path: st.path, link: true }); out.paths.push(st.path); }
         said++; continue;
       }
       if (a.field === "jibun") {
@@ -281,6 +307,10 @@ export function answer(plan, cards) {
       if (a.field === "sources") {
         const s = card.sources || {};
         const all = [...new Set([...(s.object || []), ...(s.shape || [])])];
+        if (ins && e.src && e.src.note) {
+          out.sentences.push(`${josa(e.name, "은/는")} 공공 자료가 아니라 직접 넣은 장소이고, 근거는 ${e.src.note.replace(/^직접 넣은 장소,?\s*(출처:\s*)?/, "")}${e.src.checked ? `(${e.src.checked} 확인)` : ""}입니다.`);
+          out.evidence.push({ label: `${e.name} 출처`, value: e.src.note + (e.src.url ? ` ${e.src.url}` : ""), path: null });
+        }
         out.sentences.push(all.length ? `${name}의 자료는 ${all.join(", ")}에서 왔습니다.` : `${name}의 출처는 카드에 적혀 있지 않습니다.`);
         all.forEach(x => out.evidence.push({ label: "출처", value: x, path: e.path }));
         said++; continue;
