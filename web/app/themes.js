@@ -129,7 +129,8 @@ export async function init(ctx) {
     }
     if (!threeD && map.getLayer("bldg-3d")) map.removeLayer("bldg-3d");
     allowTurn(threeD);
-    north.hidden = spin.hidden = !threeD;
+    spin.hidden = !threeD;
+    if (threeD) north.hidden = false;   // 끌 때는 북쪽으로 돌아간 뒤 moveend에서 감춘다
     d3btn.setAttribute("aria-pressed", String(threeD));
     const pitch = view ? view[0] : 55, bearing = view ? view[1] : -20;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -139,7 +140,7 @@ export async function init(ctx) {
     btn.classList.toggle("on", !!key || threeD);
     if (write) state.set({ d3: threeD ? `${Math.round(pitch)},${Math.round(bearing)}` : null }, { silent: true });
     renderPop();
-    if (announce) ui.live(threeD ? "입체 보기를 켰습니다. Q와 E 키로 왼쪽 오른쪽으로 돌리고, 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌면 돌리거나 기울일 수 있습니다" : "입체 보기를 껐습니다");
+    if (announce) ui.live(threeD ? "입체 보기를 켰습니다. Q와 E 키로 왼쪽 오른쪽으로 돌리고, R과 F 키로 기울이며, 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌면 돌리거나 기울일 수 있습니다" : "입체 보기를 껐습니다");
   }
   // 입체 보기의 시점을 주소창에 적어, 링크로 같은 시점을 나눌 수 있게 한다
   map.on("moveend", () => { if (threeD) state.set({ d3: `${Math.round(map.getPitch())},${Math.round(map.getBearing())}` }, { silent: true }); });
@@ -147,7 +148,11 @@ export async function init(ctx) {
   const north = ui.toolButton({ id: "tool-north", icon: "compass", label: "북쪽을 위로", group: "d3", order: 1,
     onClick: () => { setSpin(false, { announce: false }); map.easeTo({ bearing: 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 }); } });
   north.hidden = true;
+  // 평면 보기에서도 Q와 E 키로 돌릴 수 있으니, 돌아가 있으면 평면에서도 보인다
+  const northShown = () => { north.hidden = !(threeD || Math.abs(map.getBearing()) > 0.5); };
   map.on("rotate", () => { const svg = north.querySelector("svg"); if (svg) svg.style.transform = `rotate(${-map.getBearing()}deg)`; });
+  map.on("rotateend", northShown);
+  map.on("moveend", northShown);
   // 아래 도구 줄의 3D 단추: 지도 보기 창을 열지 않고 바로 입체 보기를 켜고 끈다
   const d3btn = ui.toolButton({ id: "tool-3d", icon: "cube", label: "입체 보기", group: "d3", order: 0, onClick: () => setThreeD(!threeD) });
   d3btn.innerHTML = '<span class="tool-txt" aria-hidden="true">3D</span>';
@@ -226,7 +231,7 @@ export async function init(ctx) {
       <div class="pop-legend">${spec ? legendRows(spec) + (spec.note ? `<p class="small muted">${esc(spec.note)}</p>` : "") : baseLegend()}</div>
       <label class="pick pick-3d"><input type="checkbox" id="theme-3d"${threeD ? " checked" : ""}>입체 보기 (LoD1 높이)</label>
       ${threeD ? `<p class="small muted">높이는 건축물대장 높이(GIS건물통합정보)이고, 없으면 지상 층수 × ${FLOOR_H}m로 추정합니다. 측량한 높이는 아닙니다. 점으로만 표시된 건물과 높이, 층수가 모두 없는 건물은 입체로 세우지 않습니다.</p>
-        <p class="small muted">돌리기와 기울이기: Q와 E 키, 또는 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌기(휴대폰은 두 손가락). 옮기기는 W, A, S, D나 방향키입니다. 오른쪽 위 나침반 버튼을 누르면 북쪽이 위로 돌아옵니다. 그 아래 돌아보기 버튼을 누르면 지도 가운데를 축으로 천천히 돌고, 지도를 만지면 멈춥니다.</p>` : ""}
+        <p class="small muted">돌리기는 Q와 E 키, 기울이기는 R과 F 키, 또는 마우스 오른쪽 버튼이나 Ctrl 키를 누른 채 끌기(휴대폰은 두 손가락). 옮기기는 W, A, S, D나 방향키이고, 두 키를 같이 누르면 대각선으로 가며 Shift를 누르고 있으면 빨리 갑니다. 3D 버튼 옆 나침반 버튼을 누르면 북쪽이 위로 돌아옵니다. 그 옆 돌아보기 버튼을 누르면 지도 가운데를 축으로 천천히 돌고, 지도를 만지면 멈춥니다.</p>` : ""}
       <fieldset class="pick-set bright-set"><legend>화면 모드</legend>
         <div class="seg">${[["system", "시스템"], ["light", "밝게"], ["dark", "어둡게"]].map(([v, l]) => `<label class="pick"><input type="radio" name="theme-pick2" value="${v}"${themeChoice() === v ? " checked" : ""}>${l}</label>`).join("")}</div>
         <label for="map-bright" class="small">지도 밝기 <b>${brightness}%</b></label>

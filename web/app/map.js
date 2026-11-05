@@ -18,7 +18,7 @@ export function createMap(container, view) {
   if (typeof maplibregl === "undefined") throw new Error("지도 라이브러리를 받지 못했습니다");
   const map = new maplibregl.Map(mapOptions({
     container, style: baseStyle(), center: view.center, zoom: view.zoom,
-    attributionControl: false, dragRotate: false, pitchWithRotate: true, touchPitch: false, maxPitch: 60,   // 회전, 기울이기는 층수 입체 보기에서만 연다 (themes.js)
+    attributionControl: false, dragRotate: false, pitchWithRotate: true, touchPitch: false, maxPitch: 72,   // 끌어서 돌리기, 기울이기는 입체 보기에서만 연다 (themes.js). 키 돌리기(Q, E)는 평면에서도 된다 (motion.js)
     fadeDuration: reduced() ? 0 : 200,
   }));
   map.touchZoomRotate.disableRotation();
@@ -214,7 +214,8 @@ export function createMapApi(ctx, map) {
     map.on("click", e => {
       if (ctx.sheet && ctx.sheet.active()) ctx.sheet.snap("peek");   // 휴대폰: 지도를 누르면 시트가 접힘으로 내려간다
       const cands = hitTest(e.point);
-      if (!cands.length) { bus.emit("map:blank", { lngLat: e.lngLat, point: e.point, context: false }); return; }
+      // 빈 땅을 누르면 Esc와 같다: 말풍선과 고른 장소를 닫는다 (app.js dismiss). '여기' 말풍선은 우클릭과 길게 누르기로 연다
+      if (!cands.length) { if (!document.body.classList.contains("measuring")) bus.emit("map:dismiss", { from: "map" }); return; }
       const [first, ...more] = cands;
       // 단지를 골랐으면 그 단지의 동은 '여기 있는 다른 곳'에 넣지 않는다
       const members = first.group != null && data.groupById.get(first.group) ? new Set(data.groupById.get(first.group).m.map(i => data.byIndex[i].p)) : null;

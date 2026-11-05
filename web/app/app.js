@@ -287,9 +287,8 @@ function onSelect(sel) {
   if (r.paths.length) ctx.mapApi.highlight(r.paths, { style: "select", label: labelPt });
   else if (r.pt) ctx.mapApi.highlight([], { style: "select", label: labelPt, pt: r.pt });
   else ctx.mapApi.clearHighlight("select");
-  // 고른 장소와 역 사이 점선 (점이 없는 유형과 역 자신은 긋지 않는다)
-  const st = ctx.data.station;
-  ctx.mapApi.setLine(r.pt && st && st.pt && r.path !== st.p && r.kind !== "group" ? st.pt : null, r.pt);
+  // 장소를 골랐다고 어느 곳과 잇는 선을 긋지 않는다 (거리는 사용자가 거리재기나 '거리 기준'으로 직접 잰다)
+  ctx.mapApi.setLine(null);
   if (sel.fit && ctx.map) {
     if (r.paths.length && ctx.mapApi.fitPlaces(r.paths)) { /* 옮김 */ }
     else if (r.pt) ctx.map.easeTo({ center: r.pt, zoom: Math.max(ctx.map.getZoom(), 17), duration: M.dur(400) });
@@ -357,6 +356,13 @@ async function openFocus(focus, unit, { fit }) {
 
 bus.on("select", onSelect);
 bus.on("deselect", onDeselect);
+
+// 닫기: Esc 키와 지도의 빈 땅 누르기가 같은 일을 한다. 떠 있는 말풍선을 닫고, 고른 장소가 있으면 닫는다
+function dismiss() {
+  bus.emit("popup:close");
+  if (selected) closePlace();
+}
+bus.on("map:dismiss", dismiss);
 
 // 뒤로 가기, 앞으로 가기
 state.onChange((changed, s, source) => {
@@ -463,7 +469,10 @@ document.addEventListener("keydown", e => {
     e.preventDefault();
     document.getElementById("q").focus();
   }
-  if (e.key === "Escape" && !menu.hidden) { openMenu(false); menuBtn.focus(); }
+  if (e.key === "Escape" && !menu.hidden) { openMenu(false); menuBtn.focus(); return; }
+  // 다른 곳(찾기 칸, 메뉴, 재기, 시트 손잡이, 패널 뒤로)이 받지 않은 Esc는 지도의 빈 땅 누르기와 같다
+  if (e.key === "Escape" && !e.defaultPrevented && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.isContentEditable
+      && !document.querySelector(".copy-fallback")) dismiss();
 });
 
 // ---- 시작

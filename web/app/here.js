@@ -1,4 +1,4 @@
-// 여기 보기 (명세 3.4절 5번, WP5): 빈 곳 누름, 우클릭, 길게 누르기(500ms)에 말풍선을 띄운다.
+// 여기 보기 (명세 3.4절 5번, WP5): 우클릭과 길게 누르기(500ms)에 말풍선을 띄운다. 빈 곳을 그냥 누르면 Esc처럼 닫기만 한다(app.js dismiss).
 // 30m 안 건물, 고른 거리 기준점에서 직선 거리(있을 때만), 좌표, 여기서 주변 찾기, 여기서 재기(재기 기능이 있을 때만), 여기를 거리 기준으로.
 // 범위(증미역 반경 1km) 밖이면 범위 안내를 낸다. 배경 길 이름을 누르면 같은 이름 길의 카드를 연다 (있으면 좋음 8).
 
@@ -146,6 +146,7 @@ export function init(ctx) {
   bus.on("map:blank", e => { if (e && e.lngLat) show(e); });
   bus.on("select", sel => { if (!sel || sel.from !== "road-label") close(); });
   bus.on("deselect", close);
+  bus.on("popup:close", close);
 
   // 길게 누르기 (손가락 하나, 500ms, 8px 안에서만)
   const canvas = map.getCanvasContainer();
