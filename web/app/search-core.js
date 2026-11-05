@@ -209,6 +209,15 @@ export function addBusinesses(index, biz) {
 }
 
 // ---- 찾기말 풀기
+// 상표 철자. 공공 상가정보는 같은 상표를 여러 철자로 적는다 ('GS25'와 '지에스25', 'CU'와 '씨유').
+// 찾기말이 이 가운데 하나로 시작하면 나머지 철자로도 찾는다 ('cu증미' -> '씨유증미')
+export const BRANDS = [["gs25", "지에스25"], ["cu", "씨유"], ["세븐일레븐", "7-11"], ["이마트24", "emart24"], ["배스킨라빈스", "베스킨라빈스"],
+  ["서브웨이", "써브웨이"], ["bhc", "비에이치씨"], ["bbq", "비비큐"], ["메가커피", "메가엠지씨커피", "메가mgc커피"], ["맥도날드", "맥도널드"], ["파리바게뜨", "파리바게트"]];
+export function brandAlts(qc) {
+  const out = [];
+  for (const g of BRANDS) for (const k of g) if (qc.startsWith(k)) for (const v of g) if (v !== k) out.push(v + qc.slice(k.length));
+  return out;
+}
 export function parseQuery(index, raw) {
   const { words } = index;
   const text = String(raw || "").normalize("NFC").trim();
@@ -218,6 +227,7 @@ export function parseQuery(index, raw) {
   const alts = [];
   // 찾기말 전체의 다른 표기 (등촌1동 -> 등촌제1동, 증미 -> 증미역)
   for (const [k, v] of Object.entries(words.aliases)) if (compact(k) === qc) alts.push(compact(v));
+  alts.push(...brandAlts(qc));
   // 끝 줄임말 (백석초 -> 백석초등학교). 마지막 낱말이 그 글자로 끝날 때
   for (const [k, v] of Object.entries(words.suffix)) {
     const kc = compact(k);

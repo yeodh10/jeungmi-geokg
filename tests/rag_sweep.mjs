@@ -5,6 +5,8 @@
 //    - '들어간 곳이 없습니다'라고 했는데 공개 자료의 상호 이름, 업종, 건물 이름에 그 말이 있으면 실패 (있는 곳을 없다고 하면 안 된다)
 //    - 기준 장소를 잘못 읽으면 실패, 질문 틀이 다른 업종의 답을 내면 실패
 // 2) 장소 질문: 상호 60곳, 이름 있는 건물 60곳, 단지 20곳 x 말투 6개. 물은 장소를 찾아 답해야 한다
+// 3) 건물 안 질문: 건물 40곳의 '뭐 있어'와 '안 (업종)'. 같은 필지의 건물에 이어진 상호를 하나도 빠뜨리면 안 된다
+// 4) 순위 질문: '가장 높은 건물' 같은 질문의 1위가 자료에서 직접 고른 1위와 같아야 한다
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -82,7 +84,45 @@ for (const t of targets) for (const f of pforms) {
   if (!ok) bad2.push(["장소를 못 찾음", q, `${e ? e.name : "(없음)"} | ${r.text.slice(0, 60)}`]);
 }
 console.log(`장소 질문 ${targets.length * pforms.length}개 (이름 ${pool.length - targets.length}개는 종류 낱말이거나 쉼표가 있어 뺌): 문제 ${bad2.length}개`);
-for (const b of [...bad, ...bad2].slice(0, 80)) console.log("  " + b.join("  |  "));
-const fail = bad.length + bad2.length;
+// 3) 건물 안 질문: 상호가 이어진 이름 있는 건물 40곳. 같은 필지의 건물에 이어진 상호를 직접 세어 답과 견준다
+const rowsByPnu = new Map();
+for (const r of places.places) if (r.pnu) { if (!rowsByPnu.has(r.pnu)) rowsByPnu.set(r.pnu, []); rowsByPnu.get(r.pnu).push(r.p); }
+const rowOf = new Map(places.places.map(r => [r.p, r]));
+const bizIn = new Map(); for (const b of biz) if (b.b) { if (!bizIn.has(b.b)) bizIn.set(b.b, []); bizIn.get(b.b).push(b); }
+const plotBiz = r => [...new Set((rowsByPnu.get(r.pnu) || [r.p]).flatMap(p => bizIn.get(p) || []))];
+const hosts = places.places.filter(r => r.n && !/^이름 없는/.test(r.n) && r.n.length >= 3 && !/[,]/.test(r.n) && !rag.isKindWord(core, r.n) && plotBiz(r).length && r.g == null);
+const bad3 = [];
+let n3 = 0;
+for (const r of pick(hosts, 40, 3)) {
+  const want = plotBiz(r);
+  const q1 = `${r.n}에 뭐 있어`, a1 = flow(q1); n3++;
+  const m = a1.text.match(/상호는 ([\d,]+)곳/);
+  if (!m || Number(m[1].replace(/,/g, "")) < want.length) bad3.push(["건물 안 상호 수가 모자람", q1, `답 ${m ? m[1] : "없음"}, 자료 ${want.length}곳`]);
+  const c = want.find(b => b.c && b.c.length >= 2);
+  if (c) {
+    const q2 = `${r.n} 안 ${c.c}`, a2 = flow(q2); n3++;
+    if (!a2.text.includes(c.n)) bad3.push(["건물 안 업종을 빠뜨림", q2, `${c.n}이 답에 없음 | ${a2.text.slice(0, 60)}`]);
+  }
+}
+console.log(`건물 안 질문 ${n3}개: 문제 ${bad3.length}개`);
+
+// 4) 순위 질문: 답의 1위가 자료에서 직접 고른 1위와 같아야 한다
+const bad4 = [];
+const meters = (a, b) => { const k = Math.cos(((a[1] + b[1]) / 2) * Math.PI / 180); return Math.hypot((a[0] - b[0]) * 111320 * k, (a[1] - b[1]) * 110540); };
+const st = places.station.pt;
+const top = (rows, key, dir) => rows.filter(x => x[key] != null && x[key] !== "").sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0) * dir)[0];
+const rankCases = [
+  ["가장 높은 건물", top(places.places, "h", -1)], ["제일 오래된 건물", top(places.places, "ad", 1)], ["층수가 가장 많은 건물", top(places.places, "fa", -1)],
+  ["증미역 근처 가장 높은 건물", top(places.places.filter(x => meters(x.pt, st) <= 300), "h", -1)],
+  ["세대수 가장 많은 아파트", top((places.groups || []).filter(g => /아파트/.test(g.n)), "hh", -1)],
+];
+for (const [q, want] of rankCases) {
+  const r = flow(q), gn = want && want.g != null ? (places.groups.find(g => g.g === want.g) || {}).n : null;
+  const name = want ? (gn || want.n) : "";
+  if (!want || !r.text.split("그다음")[0].includes(name)) bad4.push(["순위 1위가 다름", q, `자료 1위 ${name} | ${r.text.slice(0, 80)}`]);
+}
+console.log(`순위 질문 ${rankCases.length}개: 문제 ${bad4.length}개`);
+for (const b of [...bad, ...bad2, ...bad3, ...bad4].slice(0, 80)) console.log("  " + b.join("  |  "));
+const fail = bad.length + bad2.length + bad3.length + bad4.length;
 console.log(fail ? `\n실패 ${fail}건` : "\n통과");
 process.exit(fail ? 1 : 0);
