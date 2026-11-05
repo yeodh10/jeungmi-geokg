@@ -12,6 +12,89 @@ const tokensOf = s => String(s || "").normalize("NFC").trim().split(/\s+/).filte
 const hasDigit = s => /\d/.test(s);
 const onlyNum = s => /^[\d-]+$/.test(s);
 
+// ---- 초성 찾기 (ㅇㄹㅂㅇ -> 올리브영, 올ㄹㅂ -> 올리브영)
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+const JONG = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+const isCho = c => CHO.includes(c);
+export const hasJamo = s => /[ㄱ-ㅎ]/.test(s);
+const syl = c => { const k = c.charCodeAt(0) - 0xac00; return k >= 0 && k < 11172 ? k : -1; };
+const choOf = c => { const k = syl(c); return k < 0 ? c : CHO[Math.floor(k / 588)]; };
+// 글자 하나 견주기: 같은 글자이거나, 찾기말이 자음이고 이름 글자의 첫소리가 그 자음이면 맞다
+const same = (c, q) => c === q || (isCho(q) && choOf(c) === q);
+// 아직 다 치지 않은 마지막 글자 (올립 -> 올리 + ㅂ: '올리브'를 치는 중). 받침이 하나일 때만 나눈다
+function splitLast(s) {
+  const k = syl(s[s.length - 1]);
+  if (k < 0 || k % 28 === 0) return null;
+  const j = JONG[k % 28];
+  if (!isCho(j)) return null;
+  return s.slice(0, -1) + String.fromCharCode(0xac00 + k - (k % 28)) + j;
+}
+// 이름 hay에서 찾기말 q가 맞는 첫 자리. 없으면 -1
+function findJamo(hay, q) {
+  for (let i = 0; i + q.length <= hay.length; i++) {
+    let k = 0;
+    while (k < q.length && same(hay[i + k], q[k])) k++;
+    if (k === q.length) return i;
+  }
+  return -1;
+}
+// 자음이 섞인 찾기말의 이름 점수. 자음만 하나는 너무 많이 맞아 보지 않는다
+function jamoScore(doc, s) {
+  if ([...s].every(isCho) && s.length < 2) return 0;
+  let best = 0;
+  for (const q of [s, splitLast(s)].filter(Boolean)) {
+    const at = findJamo(doc.nc, q);
+    if (at < 0) continue;
+    let n = 50;   // 가운데에서 맞은 초성은 우연히 맞은 것이 많아 가장 낮게 둔다
+    if (at === 0) n = q.length === doc.nc.length ? 95 : 78;
+    else if (doc.toks && doc.toks.length > 1 && doc.toks.some(t => findJamo(t, q) === 0)) n = 73;
+    best = Math.max(best, n);
+  }
+  return best;
+}
+
+// ---- 한영 자판 오타 (dhfflqmdud -> 올리브영). 두벌식 자판 자리로 바꾼다
+const KEY = { q: "ㅂ", w: "ㅈ", e: "ㄷ", r: "ㄱ", t: "ㅅ", y: "ㅛ", u: "ㅕ", i: "ㅑ", o: "ㅐ", p: "ㅔ", a: "ㅁ", s: "ㄴ", d: "ㅇ", f: "ㄹ", g: "ㅎ",
+  h: "ㅗ", j: "ㅓ", k: "ㅏ", l: "ㅣ", z: "ㅋ", x: "ㅌ", c: "ㅊ", v: "ㅍ", b: "ㅠ", n: "ㅜ", m: "ㅡ", Q: "ㅃ", W: "ㅉ", E: "ㄸ", R: "ㄲ", T: "ㅆ", O: "ㅒ", P: "ㅖ" };
+const VJOIN = { "ㅗㅏ": "ㅘ", "ㅗㅐ": "ㅙ", "ㅗㅣ": "ㅚ", "ㅜㅓ": "ㅝ", "ㅜㅔ": "ㅞ", "ㅜㅣ": "ㅟ", "ㅡㅣ": "ㅢ" };
+const CJOIN = { "ㄱㅅ": "ㄳ", "ㄴㅈ": "ㄵ", "ㄴㅎ": "ㄶ", "ㄹㄱ": "ㄺ", "ㄹㅁ": "ㄻ", "ㄹㅂ": "ㄼ", "ㄹㅅ": "ㄽ", "ㄹㅌ": "ㄾ", "ㄹㅍ": "ㄿ", "ㄹㅎ": "ㅀ", "ㅂㅅ": "ㅄ" };
+const CSPLIT = Object.fromEntries(Object.entries(CJOIN).map(([k, v]) => [v, [k[0], k[1]]]));
+export function engToKor(text) {
+  let out = "", cho = "", jung = "", jong = "";
+  const flush = () => {
+    if (cho && jung) out += String.fromCharCode(0xac00 + (CHO.indexOf(cho) * 21 + JUNG.indexOf(jung)) * 28 + JONG.indexOf(jong));
+    else out += cho + jung + jong;
+    cho = jung = jong = "";
+  };
+  for (const ch of String(text || "")) {
+    const j = KEY[ch] || KEY[ch.toLowerCase()];
+    if (!j) { flush(); out += ch; continue; }
+    if (JUNG.includes(j)) {
+      if (jong) {   // 받침이 다음 글자의 첫소리로 넘어간다 (닭 + ㅏ -> 달가)
+        const [keep, move] = CSPLIT[jong] || ["", jong];
+        jong = keep; flush(); cho = move; jung = j;
+      } else if (cho && jung && VJOIN[jung + j]) jung = VJOIN[jung + j];
+      else if (cho && !jung) jung = j;
+      else if (!cho && jung && VJOIN[jung + j]) jung = VJOIN[jung + j];
+      else { flush(); jung = j; }
+    } else if (cho && jung && !jong && JONG.includes(j)) jong = j;
+    else if (jong && CJOIN[jong + j]) jong = CJOIN[jong + j];
+    else { flush(); cho = j; }
+  }
+  flush();
+  return out;
+}
+// 영문 자판으로 친 것 같은 찾기말이면 바꾼 한글, 아니면 null (영문자만 있고, 바꾸면 온전한 한글 글자가 나와야 한다)
+export function typoKor(raw) {
+  const t = String(raw || "").trim();
+  if (!/[a-z]/i.test(t) || /[^a-z0-9\s-]/i.test(t)) return null;
+  const k = engToKor(t);
+  const letters = k.replace(/[\s\d-]/g, "");
+  if (!letters || [...letters].some(c => syl(c) < 0 && !isCho(c))) return null;   // 홀로 남은 모음은 영문 낱말이다
+  return /[가-힣]/.test(k) ? k : null;
+}
+
 // 주소 꼴: '서울특별시'와 빼는 낱말('지하', '번지')을 지운 뒤 붙인다. 구 이름을 뺀 꼴도 만든다
 function addrForms(a, drop) {
   const t = tokensOf(a).filter(x => !SEOUL.test(x) && !drop.has(x));
@@ -148,6 +231,7 @@ export function parseQuery(index, raw) {
 function nameScore(index, doc, s) {
   if (!s || !doc.nc) return 0;
   if (doc.nc === s) return 100;
+  if (hasJamo(s)) return jamoScore(doc, s);
   if (doc.type === "dong" && doc.nc.replace(/동$/, "") === s) return 92;   // '가양'으로 가양동
   if (doc.toks && doc.toks.length > 1 && doc.toks.includes(s)) return 88;
   if (doc.nc.startsWith(s)) return 80;
@@ -250,18 +334,35 @@ function toItem(index, h) {
 const cmpHit = (a, b) => b.score - a.score || (a.doc.d ?? 9e9) - (b.doc.d ?? 9e9) || (b.doc.b || 0) - (a.doc.b || 0) || a.doc.name.length - b.doc.name.length;
 
 // 찾기. 결과: {items, note, direct}. note.kind: absent(없는 자료 낱말), partial(일부만 찾는 낱말), outside(범위 밖), none(없음)
+function collect(index, Q) {
+  const hits = [];
+  for (const doc of index.docs) {
+    const r = scoreDoc(index, doc, Q);
+    if (r && r.raw >= MIN) hits.push({ doc, ...r });   // 버릴지는 덧붙이기 전 점수로 정한다 (씨제이올리브영가양역점도 '올리브영'에 나온다)
+  }
+  return hits;
+}
+const bestRaw = hits => hits.reduce((m, h) => Math.max(m, h.raw ?? h.score), 0);
+
 export function search(index, raw, { limit = 400 } = {}) {
-  const Q = parseQuery(index, raw);
-  const out = { query: Q.raw, items: [], note: null, direct: null, total: 0 };
+  let Q = parseQuery(index, raw);
+  const out = { query: Q.raw, items: [], note: null, direct: null, total: 0, typo: null };
   if (!Q.qc) return out;
   const num = numberHit(index, Q);
   let hits = [];
   if (num) { hits.push(num); out.direct = true; }
   else {
-    for (const doc of index.docs) {
-      const r = scoreDoc(index, doc, Q);
-      if (r && r.raw >= MIN) hits.push({ doc, ...r });   // 버릴지는 덧붙이기 전 점수로 정한다 (씨제이올리브영가양역점도 '올리브영'에 나온다)
+    hits = collect(index, Q);
+    // 영문 자판으로 친 한글 (dhfflqmdud): 영문 그대로는 이름이 제대로 맞지 않고, 한글로 바꾸면 맞을 때만 바꾼다 (GS25, CU는 그대로)
+    const ko = typoKor(Q.raw);
+    if (ko && bestRaw(hits) < 75) {
+      const K = parseQuery(index, ko);
+      const kh = collect(index, K);
+      if (kh.length && bestRaw(kh) > bestRaw(hits)) { hits = kh; Q = K; out.typo = { from: out.query, to: K.raw }; }
     }
+    // 치는 중인 마지막 글자 (올립 -> 올리브): 그대로는 하나도 맞지 않을 때만 받침을 떼어 다시 본다
+    const cut = !hits.length && splitLast(Q.qc);
+    if (cut) hits = collect(index, { ...Q, qc: cut, alts: [], toks: [cut] });
   }
   // 찾기말이 칩 이름과 같으면 (병원, 학원, 음식점) 그 칩의 장소도 결과에 넣는다. 이미 더 높은 점수로 맞은 곳은 그대로 둔다
   if (!num) {
@@ -328,9 +429,14 @@ export function markRange(name, raw) {
     if (!ch) continue;
     for (const x of ch) { c += x; map.push(k); }
   }
-  const at = c.indexOf(s);
-  if (at < 0) return null;
-  return [map[at], map[at + s.length - 1] + 1];
+  // 그대로, 초성 섞인 꼴, 치는 중인 마지막 글자, 영문 자판 오타를 차례로 본다
+  const ko = typoKor(raw);
+  const tries = [s, splitLast(s), ko && compact(ko), ko && splitLast(compact(ko))].filter(Boolean);
+  for (const q of tries) {
+    const at = hasJamo(q) ? findJamo(c, q) : c.indexOf(q);
+    if (at >= 0) return [map[at], map[at + q.length - 1] + 1];
+  }
+  return null;
 }
 
 // ---- 칩 (명세 9절, 0-1절). places.json의 chips 규칙을 그대로 쓴다. 묶음은 한 곳으로 센다

@@ -464,7 +464,9 @@ export async function init(ctx) {
     if (panel.has("place")) bus.emit("deselect");
     if (!restore) state.set({ q, cat: null, focus: null, unit: null }, { push, silent: true });
     bus.emit("chips:clear");
-    show({ kind: "query", q, title: `'${q}' 찾은 결과`, items: r.items, note: r.note, sort: "score", focus: !restore && (!auto || !r.items.length), quiet: restore && !!state.get("focus") });
+    const shownQ = r.typo ? r.typo.to : q;
+    show({ kind: "query", q: shownQ, title: `'${shownQ}' 찾은 결과`, items: r.items, note: r.note, sort: "score", focus: !restore && (!auto || !r.items.length), quiet: restore && !!state.get("focus"),
+      extraNote: r.typo ? `'${r.typo.from}'을 한글 자판으로 바꿔 '${r.typo.to}'(으)로 찾았습니다.` : "" });
     if (restore) { reopenFocus(); return r; }
     if (!index.biz) R.extraNote = "상호 자료를 받지 못해 건물과 주소만 찾았습니다.";
     // 패널을 접은 채 찾으면 패널을 펴지 않고 지도를 결과 범위에 맞춘다 (명세 3.2절). 목록은 패널을 펴면 그대로 있다

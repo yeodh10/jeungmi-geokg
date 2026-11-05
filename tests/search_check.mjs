@@ -69,6 +69,22 @@ const extra = [
   ["'백석초'가 한 줄 (17동 묶음)", bs.length === 1 && bs[0].size === 17],
   ["공식 번호는 바로 가기", core.search(index, "1150010200106660040000001").direct === true],
 ];
+// 초성 찾기와 한영 자판 오타
+const top = q => core.search(index, q).items[0] || { name: "" };
+const zm = core.search(index, "wmdaldur");
+extra.push(
+  ["초성 'ㅈㅁㅇ' 1위가 증미역", top("ㅈㅁㅇ").path === "station/1150010200106660040000001"],
+  ["초성 섞인 '올ㄹㅂ' 1위가 '올리'로 시작", top("올ㄹㅂ").name.startsWith("올리")],
+  ["치는 중인 '올립'도 '올리'로 시작하는 곳", top("올립").name.startsWith("올리")],
+  ["자음 하나 'ㅇ'은 찾지 않음", core.search(index, "ㅇ").items.length === 0],
+  ["'wmdaldur'는 증미역으로 바꿔 찾음", zm.typo && zm.typo.to === "증미역" && zm.items[0].path === "station/1150010200106660040000001"],
+  ["'dhfflqmdud'는 올리브영", top("dhfflqmdud").name.includes("올리브영")],
+  ["'gs25'는 바꾸지 않음", !core.search(index, "gs25").typo && top("gs25").name.startsWith("GS25")],
+  ["자판 바꾸기: 겹받침이 다음 글자로 넘어감 (ekfrrhrl -> 닭고기)", core.engToKor("ekfrrhrl") === "닭고기"],
+  ["자판 바꾸기: 겹모음 (rhkdtj -> 광서)", core.engToKor("rhkdtj") === "광서"],
+  ["'olive'는 한글로 보지 않음", core.typoKor("olive") === null],
+  ["초성 자리 표시 (ㅈㅁㅇ -> 증미역 앞 세 글자)", JSON.stringify(core.markRange("증미역", "ㅈㅁㅇ")) === "[0,3]"],
+);
 console.log("\n그 밖의 약속");
 for (const [t, ok] of extra) { if (!ok) fail = true; console.log(`  ${ok ? "맞음" : "틀림"}  ${t}`); }
 
