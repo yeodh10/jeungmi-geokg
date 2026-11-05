@@ -52,7 +52,7 @@ export function init(ctx) {
       <div class="ak-eg" role="group" aria-label="질문 예시">${EXAMPLES.map(t => `<button type="button" data-eg="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       <p class="ak-help" id="ak-help">미리 만든 질문 틀에 맞춰 읽습니다. 거리, 층수, 용도, 법정동, 길 이름, 업종 같은 빈칸 값을 바꿔 물을 수 있고,
         답은 사람이 쓴 쿼리를 빌드 때 실행해 둔 결과입니다. '강서아이티밸리 몇 층이야', '증미역에서 가양역까지 거리'처럼 한 장소를 물으면
-        그 장소의 카드 자료에서 근거를 찾아 답합니다. AI는 쓰지 않습니다.</p>
+        그 장소의 카드 자료에서 근거를 찾아 답하고, '증미역에서 가장 가까운 약국'처럼 종류를 물으면 이름과 업종으로 모두 찾아 가까운 차례로 답합니다. AI는 쓰지 않습니다.</p>
       <div class="ak-msg" aria-live="polite"></div></form>`;
   }
 
@@ -92,9 +92,10 @@ export function init(ctx) {
       // 그래프에서 찾아 답하기: 장소와 묻는 것이 분명하면 틀보다 먼저, 틀이 못 알아들으면 그다음에
       const plan = await readRag(text);
       const m = AM.match(idx, text);
-      if (plan && RAG.prefer(plan, ctx.data && ctx.data.station && ctx.data.station.p) && await showRag(plan, text)) { msg.innerHTML = ""; return; }
+      const center = ctx.data && ctx.data.station && ctx.data.station.p;
+      if (RAG.ragFirst(plan, m, center) && await showRag(plan, text)) { msg.innerHTML = ""; return; }
       if (m.ok) { msg.innerHTML = ""; showTyped(idx, m, text); return; }
-      if (m.why === "low" && plan && plan.ents.length && await showRag(plan, text)) { msg.innerHTML = ""; return; }
+      if (RAG.ragAfter(plan) && await showRag(plan, text)) { msg.innerHTML = ""; return; }
       // 답하지 않을 때는 앞서 보이던 답과 지도 강조를 지워, 옛 답을 이 질문의 답으로 오해하지 않게 한다
       const old = pane && pane.querySelector(".ask-ans");
       if (old && old.innerHTML) { old.innerHTML = ""; bus.emit("spread:clear"); openId = null; }
