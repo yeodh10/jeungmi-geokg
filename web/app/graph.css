@@ -136,3 +136,7 @@
   .tour p { font-size: 12px; }
   .tour pre { max-height: 72px; }
 }
+/* 그래프에서 찾은 답의 근거 목록 (ask.js showRag) */
+.rg-ev { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.rg-ev li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.rg-k { color: var(--text-2); min-width: 84px; }
