@@ -287,8 +287,7 @@ function onSelect(sel) {
   if (r.paths.length) ctx.mapApi.highlight(r.paths, { style: "select", label: labelPt });
   else if (r.pt) ctx.mapApi.highlight([], { style: "select", label: labelPt, pt: r.pt });
   else ctx.mapApi.clearHighlight("select");
-  // 장소를 골랐다고 어느 곳과 잇는 선을 긋지 않는다 (거리는 사용자가 거리재기나 '거리 기준'으로 직접 잰다)
-  ctx.mapApi.setLine(null);
+  // 장소를 골랐다고 어느 곳과 잇는 선을 긋지 않는다. 선 그리기 층 자체를 없앴다 (거리는 사용자가 거리재기나 '거리 기준'으로 직접 잰다)
   if (sel.fit && ctx.map) {
     if (r.paths.length && ctx.mapApi.fitPlaces(r.paths)) { /* 옮김 */ }
     else if (r.pt) ctx.map.easeTo({ center: r.pt, zoom: Math.max(ctx.map.getZoom(), 17), duration: M.dur(400) });
@@ -303,7 +302,6 @@ function onSelect(sel) {
 function onDeselect() {
   selected = null;
   ctx.mapApi.clearHighlight("select");
-  ctx.mapApi.setLine(null);
   ctx.mapApi.setEntrances([]);
   panel.remove("place");
 }

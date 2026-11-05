@@ -54,7 +54,6 @@ export function createMapApi(ctx, map) {
       "sel-line": { "line-color": css("--select"), "line-width": 3 },
       "mask": { "fill-color": css("--map-mask") },
       "area-line": { "line-color": css("--map-text-2"), "line-width": 1.5, "line-dasharray": [2, 2], "line-opacity": 0.7 },
-      "station-link": { "line-color": css("--select"), "line-width": 2, "line-dasharray": [1.5, 1.5], "line-opacity": 0.85 },
       "entrance": { "circle-color": css("--panel"), "circle-radius": 4.5, "circle-stroke-color": css("--select"), "circle-stroke-width": 2.5 },
       "bldg-no": { "text-color": css("--map-text-2"), "text-halo-color": halo(), "text-halo-width": 1.5 },
       "label-3": { "text-color": css("--map-text"), "text-halo-color": halo(), "text-halo-width": 1.5 },
@@ -119,7 +118,7 @@ export function createMapApi(ctx, map) {
     map.addSource("bldg-pts", { type: "geojson", data: ptBuildings });
     map.addSource("labels", { type: "geojson", data: fc(labels) });
     map.addSource("bno", { type: "geojson", data: numbers });
-    for (const id of ["sel", "spread", "link", "entrances", "markers", "me"]) map.addSource(id, { type: "geojson", data: EMPTY });
+    for (const id of ["sel", "spread", "entrances", "markers", "me"]) map.addSource(id, { type: "geojson", data: EMPTY });
     map.addSource("station", { type: "geojson", data: fc(stations.map(s => pointF(s.pt, { path: s.p, n: s.n }))) });
     // 원 밖 덮개: 범위 사각형보다 조금 큰 바깥 고리에 범위 원을 구멍으로 낸다
     const ring = area && area.features && area.features[0] && area.features[0].geometry.coordinates[0];
@@ -145,7 +144,6 @@ export function createMapApi(ctx, map) {
     // 배경 글자 위: 덮개, 범위, 점선, 점, 글자, 표식
     if (map.getSource("mask")) add({ id: "mask", type: "fill", source: "mask" });
     add({ id: "area-line", type: "line", source: "area" });
-    add({ id: "station-link", type: "line", source: "link" });
     add({ id: "spread-pt", type: "circle", source: "spread", filter: POINT });
     add({ id: "entrance", type: "circle", source: "entrances" });
     const sym = (size, more = {}) => ({ "text-font": ["MapMedium"], "text-size": size, "text-max-width": 7, "text-padding": 2, ...more });
@@ -352,9 +350,6 @@ export function createMapApi(ctx, map) {
       activeNo = no;
       setData("markers", fc(markers.map(x => pointF(x.pt, { no: x.no, on: String(x.no) === String(no) }))));
     },
-    setLine(from, to) {
-      setData("link", from && to ? { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [from, to] } } : EMPTY);
-    },
     setEntrances(list) {
       setData("entrances", fc((list || []).filter(x => Array.isArray(x) && okLngLat(x)).map(x => pointF([x[0], x[1]], { kind: x[2] || "", no: x[3] || "" }))));
     },
@@ -398,6 +393,6 @@ export function createMapApi(ctx, map) {
 export function nullMapApi() {
   const noop = () => {};
   return { ready: false, whenReady: noop, setPadding: noop, fitPlaces: () => false, highlight: noop, clearHighlight: noop,
-    setMarkers: noop, clearMarkers: noop, setActiveMarker: noop, setLine: noop, setEntrances: noop, setMe: noop, onTheme: noop,
+    setMarkers: noop, clearMarkers: noop, setActiveMarker: noop, setEntrances: noop, setMe: noop, onTheme: noop,
     setBuildingPaint: noop, resetBuildingPaint: noop, defaultBuildingColor: () => null, hitTest: () => [], restyle: noop };
 }

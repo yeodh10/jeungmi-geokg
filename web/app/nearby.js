@@ -37,7 +37,7 @@ export function init(ctx) {
       const f = pt ? { type: "FeatureCollection", features: [circle(pt, r)] } : { type: "FeatureCollection", features: [] };
       if (!map.getSource("nearby")) {
         map.addSource("nearby", { type: "geojson", data: f });
-        const before = map.getLayer("station-link") ? "station-link" : undefined;
+        const before = map.getLayer("entrance") ? "entrance" : undefined;
         map.addLayer({ id: "nearby-fill", type: "fill", source: "nearby", paint: { "fill-color": css("--accent"), "fill-opacity": 0.06 } }, before);
         map.addLayer({ id: "nearby-line", type: "line", source: "nearby", paint: { "line-color": css("--accent"), "line-width": 2, "line-dasharray": [3, 2] } }, before);
         ctx.mapApi.onTheme(() => {

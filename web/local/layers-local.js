@@ -77,7 +77,7 @@ export function init(ctx) {
     return { "line-color": c, "line-width": 1.2, "line-dasharray": [2, 1] };
   }
   const layerId = k => "local-" + k;
-  const before = () => ["entrance", "station-link", "spread-pt"].find(id => map.getLayer(id));
+  const before = () => ["entrance", "spread-pt"].find(id => map.getLayer(id));
 
   async function addLayer(k) {
     if (!map || map.getLayer(layerId(k))) return;
