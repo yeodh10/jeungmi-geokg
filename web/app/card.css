@@ -14,7 +14,7 @@
 .cd-dist .ic { color: var(--muted); }
 
 /* 행동 줄: 모든 유형에서 같은 자리, 스크롤해도 위에 붙어 있다 */
-.cd-actions { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+.cd-actions { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
               margin: 0 -16px 12px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .cd-act { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 2px;
           border: 0; border-radius: 8px; background: none; color: var(--accent); font-size: 12px; font-weight: 600; line-height: 1.2; }

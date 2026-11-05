@@ -368,8 +368,8 @@ export function chipItems(index, chip) {
   return items;
 }
 
-// ---- 조건 찾기 (용도 묶음, 층수, 사용승인 연도, 역 거리). 건물 행을 고른 뒤 묶음은 한 줄로 합친다
-// cond: {ug: Set|array, minFloors, yearFrom, yearTo, maxD}
+// ---- 조건 찾기 (용도 묶음, 층수, 사용승인 연도, 거리 기준점에서의 거리). 건물 행을 고른 뒤 묶음은 한 줄로 합친다
+// cond: {ug: Set|array, minFloors, yearFrom, yearTo, maxD, basisPt}. maxD는 basisPt(사용자가 고른 거리 기준점)가 있을 때만 쓴다
 export function conditionItems(index, cond) {
   const ug = cond.ug && (cond.ug.size || cond.ug.length) ? new Set(cond.ug) : null;
   const pick = p => {
@@ -379,7 +379,7 @@ export function conditionItems(index, cond) {
     if ((cond.yearFrom || cond.yearTo) && !y) return false;
     if (cond.yearFrom && y < cond.yearFrom) return false;
     if (cond.yearTo && y > cond.yearTo) return false;
-    if (cond.maxD && !(p.d != null && p.d <= cond.maxD)) return false;
+    if (cond.maxD && cond.basisPt && !(p.pt && meters(p.pt, cond.basisPt) <= cond.maxD)) return false;
     return true;
   };
   const rows = index.places.places.filter(pick);
@@ -393,14 +393,14 @@ export function conditionItems(index, cond) {
     if (list.length === 1 || !doc) items.push(toItem(index, { doc: index.placeDoc.get(list[0].i), score: 0, field: "name" }));
     else { const it = toItem(index, { doc, score: 0, field: "name" }); it.hit = list.length; items.push(it); }
   }
-  items.sort((a, b) => (a.d ?? 9e9) - (b.d ?? 9e9));
-  return { items, buildings: rows.length };
+  return { items: cond.basisPt ? sortItems(items, "basis", null, cond.basisPt) : items, buildings: rows.length };
 }
 
-// 결과 정렬: score(맞는 순), station(역에서 가까운 순), center(지도 가운데서 가까운 순)
-export function sortItems(items, by, center) {
+// 결과 정렬: score(맞는 순), basis(사용자가 고른 거리 기준점에서 가까운 순), center(지도 가운데서 가까운 순)
+export function sortItems(items, by, center, basisPt) {
   const a = items.slice();
-  if (by === "station") a.sort((x, y) => (x.d ?? 9e9) - (y.d ?? 9e9));
+  const far = (x, p) => (x.pt && p ? meters(x.pt, p) : 9e9);
+  if (by === "basis" && basisPt) a.sort((x, y) => far(x, basisPt) - far(y, basisPt));
   else if (by === "center" && center) a.sort((x, y) => meters(x.pt, center) - meters(y.pt, center));
   return a;
 }

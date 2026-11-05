@@ -142,33 +142,43 @@ export function init(ctx) {
     return `<header class="cd-head">${kindLine(sel, opts)}<h2 class="cd-name" tabindex="-1">${esc(sel.name)}</h2></header>`;
   }
 
-  // 주소 줄: 도로명, 지번, 복사, 역에서 직선 거리
-  function addrBlock(addr, jibun, d) {
+  // 주소 줄: 도로명, 지번, 사용자가 고른 거리 기준점에서 직선 거리(기준점을 고르기 전에는 두지 않는다)
+  function addrBlock(addr, jibun, pt, path) {
     const rows = [];
     if (addr) rows.push(`<p class="cd-addr">${esc(short(addr))}</p>`);
     if (jibun) rows.push(`<p class="cd-jibun"><span class="muted">지번</span> ${esc(jibun)}</p>`);
-    if (Number.isFinite(d) && d > 0) rows.push(`<p class="cd-dist">${icon("station", 14)}역에서 직선 ${nf(d)}m</p>`);
+    const b = ctx.basis.get(), d = ctx.basis.dist(pt);
+    if (b && b.p !== path && Number.isFinite(d) && d > 0) rows.push(`<p class="cd-dist">${icon("flag", 14)}${esc(b.n)}에서 직선 ${nf(d)}m</p>`);
     return rows.length ? `<div class="cd-addrs">${rows.join("")}</div>` : "";
   }
 
-  // 행동 줄: 주변 찾기, 링크 복사, 주소 복사, 기계용 원본. 쓸 수 없는 단추도 자리를 지키고 까닭을 알린다
-  function actions({ pt, label, link, addr, ttl, why = {} }) {
+  // 행동 줄: 주변 찾기, 거리 기준, 링크 복사, 주소 복사, 기계용 원본. 쓸 수 없는 단추도 자리를 지키고 까닭을 알린다
+  const basisText = path => (ctx.basis.get() && ctx.basis.get().p === path ? "기준 해제" : "거리 기준");
+  function actions({ pt, label, link, addr, ttl, path, why = {} }) {
     const btn = (id, ic, text, off, reason) =>
       `<button type="button" class="cd-act" data-act="${id}"${off ? ` aria-disabled="true" data-why="${esc(reason)}" title="${esc(reason)}"` : ""}>${icon(ic)}<span>${text}</span></button>`;
     return `<div class="cd-actions" role="group" aria-label="이 장소로 할 수 있는 일">
       ${btn("near", "near", "주변 찾기", !pt, why.near || "위치 점이 없는 장소라 주변을 잴 수 없습니다")}
+      ${btn("basis", "flag", basisText(path), !pt, why.basis || "위치 점이 없는 장소라 거리 기준으로 쓸 수 없습니다")}
       ${btn("link", "link", "링크 복사", !link, why.link || "")}
       ${btn("addr", "addr", "주소 복사", !addr, why.addr || "주소가 없는 장소입니다")}
       ${btn("ttl", "code", "기계용 원본", !ttl, why.ttl || "공개 사이트에 원본이 없는 장소입니다")}
     </div>`;
   }
-  function bindActions(el, { pt, label, link, addr, ttl }) {
+  function bindActions(el, { pt, label, link, addr, ttl, path }) {
     el.querySelectorAll(".cd-act").forEach(b => b.addEventListener("click", () => {
       if (b.getAttribute("aria-disabled") === "true") { ui.toast(b.dataset.why); return; }
       const a = b.dataset.act;
       if (a === "near") {
         if (ctx.features.has("nearby")) bus.emit("nearby:open", { center: pt, label, radius: 300 });
         else ui.toast("주변 찾기 기능을 불러오지 못했습니다.");
+      } else if (a === "basis") {
+        // 이 장소를 거리 기준으로: 다른 카드의 거리, 목록의 '가까운 순', 주변 찾기가 여기서 잰다. 다시 누르면 지운다
+        const on = !(ctx.basis.get() && ctx.basis.get().p === path);
+        ctx.basis.set(on ? { pt, n: label, p: path } : null);
+        b.querySelector("span").textContent = basisText(path);
+        if (on) el.querySelectorAll(".cd-dist").forEach(x => x.remove());
+        ui.toast(on ? `거리 기준을 ${label}(으)로 정했습니다. 카드와 목록의 거리가 여기서 잽니다` : "거리 기준을 지웠습니다");
       } else if (a === "link") ui.copy(typeof link === "function" ? link() : link, "이 장소의 지도 링크를 복사했습니다");
       else if (a === "addr") ui.copy(addr, "주소를 복사했습니다");
       else if (a === "ttl") window.open(ttl, "_blank", "noopener");
@@ -317,11 +327,11 @@ export function init(ctx) {
     // 이름은 화면 머리에도 같다 (카드 이름이 더 정확하면 바꾼다)
     const h = el.querySelector(".cd-name");
     if (h && name !== sel.name) h.textContent = name;
-    rest.innerHTML = `${addrBlock(card.addr, card.jibun || (sel.kind === "parcel" ? null : p.j), card.d ?? p.d)}
-      ${actions({ pt, label: name, link, addr, ttl, why })}
+    rest.innerHTML = `${addrBlock(card.addr, card.jibun || (sel.kind === "parcel" ? null : p.j), pt, sel.path)}
+      ${actions({ pt, label: name, link, addr, ttl, path: sel.path, why })}
       ${lead}${factsBlock(card.facts)}${sensorBlock(card.sensor)}${tenantsBlock(card)}${roadBg}
       ${linksBlock(card.links, card.external)}${othersBlock(sel)}${missingBlock(card.missing)}${sourcesBlock(card.sources)}${footBlock(card)}`;
-    bindActions(rest, { pt, label: name, link, addr, ttl });
+    bindActions(rest, { pt, label: name, link, addr, ttl, path: sel.path });
     bindCommon(el, sel);
     const rb = rest.querySelector(".cd-roadbg");
     if (rb) rb.addEventListener("click", () => {
@@ -339,11 +349,11 @@ export function init(ctx) {
     const rest = el.querySelector(".cd-rest");
     if (!rest) return;
     const addr = p.a ? short(p.a) : p.j ? `${p.j} (지번)` : null;
-    rest.innerHTML = `${addrBlock(p.a, p.j, p.d)}
-      ${actions({ pt: sel.pt, label: sel.name, link: true, addr, ttl: null, why: { ttl: "자세한 정보를 받지 못해 원본 링크를 확인하지 못했습니다" } })}
+    rest.innerHTML = `${addrBlock(p.a, p.j, sel.pt, sel.path)}
+      ${actions({ pt: sel.pt, label: sel.name, link: true, addr, ttl: null, path: sel.path, why: { ttl: "자세한 정보를 받지 못해 원본 링크를 확인하지 못했습니다" } })}
       <div class="cd-fail" role="alert"><p>이 장소의 자세한 정보를 받지 못했습니다.</p>
         <button type="button" class="btn mini cd-retry">${ui.icon("refresh", 14)}다시 시도</button></div>`;
-    bindActions(rest, { pt: sel.pt, label: sel.name, link: () => viewUrl({ focus: sel.path, unit: null }), addr, ttl: null });
+    bindActions(rest, { pt: sel.pt, label: sel.name, link: () => viewUrl({ focus: sel.path, unit: null }), addr, ttl: null, path: sel.path });
     rest.querySelector(".cd-retry").addEventListener("click", () => {
       if (current !== sel) return;
       rest.innerHTML = ui.skeleton(5);
@@ -381,8 +391,8 @@ export function init(ctx) {
       return `<li><button type="button" class="linkish cd-open" data-path="${esc(m.p)}">${esc(m.n)}</button>${bits ? ` <span class="muted">${esc(bits)}</span>` : ""}</li>`;
     }).join("");
     el.innerHTML = `<article class="cd">${head(sel, { kindLabel: "단지" })}<div class="cd-rest">
-      ${addrBlock(rep.a ? `${rep.a} (대표 동)` : null, null, g.pt && data.station && data.station.pt ? Math.round(meters(g.pt, data.station.pt)) : null)}
-      ${actions({ pt: g.pt, label: g.n, link, addr, ttl: null, why: { addr: "단지 자체에는 주소가 없고, 대표 동에도 도로명주소가 없습니다", ttl: "단지는 화면용 묶음이라 기계용 원본이 없습니다" } })}
+      ${addrBlock(rep.a ? `${rep.a} (대표 동)` : null, null, g.pt, sel.path)}
+      ${actions({ pt: g.pt, label: g.n, link, addr, ttl: null, path: sel.path, why: { addr: "단지 자체에는 주소가 없고, 대표 동에도 도로명주소가 없습니다", ttl: "단지는 화면용 묶음이라 기계용 원본이 없습니다" } })}
       ${factsBlock(facts)}
       <section class="cd-sec"><h3 class="cd-h">동 목록 <span class="muted">${nf(members.length)}동</span></h3><ul class="cd-members">${memberRows}</ul></section>
       <section class="cd-sec g-sec"><h3 class="cd-h g-h">이어진 것</h3><ul class="g-links">
@@ -395,7 +405,7 @@ export function init(ctx) {
         <div><dt>이 장소의 출처</dt><dd>동마다 다릅니다. 동을 눌러 각 동의 카드에서 확인하세요.${g.hh || g.site ? " 세대수와 대지면적은 서울시 건축물대장 총괄표제부입니다." : ""}</dd></div>
         <div><dt>이 모양의 출처</dt><dd>동마다 다릅니다.</dd></div></dl></section>
     </div></article>`;
-    bindActions(el, { pt: g.pt, label: g.n, link, addr, ttl: null });
+    bindActions(el, { pt: g.pt, label: g.n, link, addr, ttl: null, path: sel.path });
     bindCommon(el, sel);
   }
 

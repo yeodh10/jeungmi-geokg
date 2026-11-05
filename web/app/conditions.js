@@ -1,4 +1,4 @@
-// 조건 찾기 (명세 4.2절 있으면 좋음 3): 용도, 층수, 사용승인 연도, 역 거리. 적용하기 전에 건수를 보여 준다.
+// 조건 찾기 (명세 4.2절 있으면 좋음 3): 용도, 층수, 사용승인 연도, 거리 기준점에서의 거리(기준점을 고른 뒤에만). 적용하기 전에 건수를 보여 준다.
 // 결과는 찾기와 같은 목록(ctx.results)과 번호 표식으로 나온다. 입구는 칩 줄의 더보기에 있다 (chips.js가 ctx.features를 보고 그린다).
 
 const V = "?v=" + encodeURIComponent((window.APP_CONFIG || {}).build || "");
@@ -18,13 +18,14 @@ export async function init(ctx) {
   for (let d = Math.floor(yMin / 10) * 10; d <= yMax; d += 10) decades.push(d);
   let cond = { ug: [], minFloors: 0, yearFrom: 0, yearTo: 0, maxD: 0 };
 
-  const count = c => core.conditionItems(ctx.results.index(), c);
+  const basisPt = () => (ctx.basis.get() ? ctx.basis.get().pt : null);
+  const count = c => core.conditionItems(ctx.results.index(), { ...c, basisPt: basisPt() });
   const label = c => {
     const parts = [];
     if (c.ug.length) parts.push(c.ug.map(k => (data.useGroups.find(g => g.key === k) || { label: k }).label).join(", "));
     if (c.minFloors) parts.push(`지상 ${c.minFloors}층 이상`);
     if (c.yearFrom || c.yearTo) parts.push(`${c.yearFrom || yMin}~${c.yearTo || yMax}년 사용승인`);
-    if (c.maxD) parts.push(`역에서 ${c.maxD}m 안`);
+    if (c.maxD && ctx.basis.get()) parts.push(`${ctx.basis.get().n}에서 ${c.maxD}m 안`);
     return parts.join(", ") || "조건 없음";
   };
 
@@ -40,7 +41,8 @@ export async function init(ctx) {
       <div class="cond-row"><label for="cond-yf">사용승인 연도</label><span class="cond-years"><select id="cond-yf" aria-label="시작 연도">${yOpt(cond.yearFrom, "처음부터")}</select>
         <span aria-hidden="true">~</span><select id="cond-yt" aria-label="끝 연도">${yOpt(cond.yearTo ? Math.floor(cond.yearTo / 10) * 10 : 0, "지금까지")}</select></span></div>
       <p class="small muted">사용승인일은 2018년까지의 자료입니다. 연도를 고르면 사용승인일이 없는 건물은 빠집니다.</p>
-      <div class="cond-row"><label for="cond-d">역에서 직선 거리</label><select id="cond-d">${DIST.map(([v, t]) => `<option value="${v}"${cond.maxD === v ? " selected" : ""}>${t}</option>`).join("")}</select></div>
+      ${ctx.basis.get() ? `<div class="cond-row"><label for="cond-d">${esc(ctx.basis.get().n)}에서 직선 거리</label><select id="cond-d">${DIST.map(([v, t]) => `<option value="${v}"${cond.maxD === v ? " selected" : ""}>${t}</option>`).join("")}</select></div>`
+        : `<p class="small muted">거리 조건을 쓰려면 먼저 장소 카드나 지도에서 '거리 기준'을 고르세요.</p>`}
       <p class="cond-count" aria-live="polite"></p>
       <div class="res-acts"><button type="button" class="btn cond-apply">적용</button><button type="button" class="btn ghost cond-reset">조건 지우기</button></div>
     </div>`;
@@ -50,7 +52,8 @@ export async function init(ctx) {
       cond.yearFrom = Number(el.querySelector("#cond-yf").value);
       const yt = Number(el.querySelector("#cond-yt").value);
       cond.yearTo = yt ? yt + 9 : 0;
-      cond.maxD = Number(el.querySelector("#cond-d").value);
+      const dSel = el.querySelector("#cond-d");
+      cond.maxD = dSel ? Number(dSel.value) : 0;
     };
     const update = () => {
       read();
@@ -65,7 +68,7 @@ export async function init(ctx) {
       read();
       const r = count(cond);
       const c = { ...cond, ug: cond.ug.slice() };
-      ctx.results.show({ kind: "cond", key: "cond", title: "조건 찾기 결과", items: r.items, sort: "station", focus: true,
+      ctx.results.show({ kind: "cond", key: "cond", title: "조건 찾기 결과", items: r.items, sort: "near", focus: true,
         extraNote: `${label(c)}. 조건에 맞는 건물은 ${nf(r.buildings)}동입니다.`,
         empty: `<p>맞는 건물이 없습니다.</p><div class="res-acts"><button type="button" class="btn" data-cond-back>조건 바꾸기</button></div>` });
       ui.live(`조건에 맞는 곳 ${nf(r.items.length)}곳을 목록과 지도에 표시했습니다`);

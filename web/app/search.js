@@ -9,7 +9,8 @@ const core = await import(`${app}/search-core.js${V}`);
 const PAGE = 15;
 const KIND = { place: "건물", group: "단지", station: "역", road: "길", dong: "동네", zone: "우편구역", sensor: "센서", parcel: "필지", business: "상호" };
 const TABS = [["all", "전체"], ["place", "장소"], ["addr", "주소"], ["road", "길"], ["dong", "동네"]];
-const SORTS = { score: "맞는 순", station: "역에서 가까운 순", center: "지도 가운데서 가까운 순" };
+// 정렬 이름. basis는 거리 기준점을 고른 뒤에만 고를 수 있고, 이름에 그 장소 이름이 들어간다
+const SORTS = { score: "맞는 순", basis: "거리 기준에서 가까운 순", center: "지도 가운데서 가까운 순" };
 const RECENT_KEY = "jgk-recent";
 const nf = n => Number(n).toLocaleString("ko-KR");
 const short = a => String(a || "").replace(/^서울특별시\s+/, "");
@@ -244,7 +245,8 @@ export async function init(ctx) {
     if (!R) return [];
     let a = R.tab === "all" ? R.items : R.items.filter(x => x.tab === R.tab);
     const c = ctx.map ? ctx.map.getCenter() : null;
-    a = R.sort === "score" ? a : core.sortItems(a, R.sort, c ? [c.lng, c.lat] : null);
+    const b = ctx.basis.get();
+    a = R.sort === "score" ? a : core.sortItems(a, R.sort, c ? [c.lng, c.lat] : null, b && b.pt);
     return a;
   }
 
@@ -255,10 +257,20 @@ export async function init(ctx) {
     ownMarkers = false;
   }
 
+  // '가까운 순'으로 부르면 기준점이 있을 때는 기준점, 없으면 지도 가운데에서 잰다 (예전 이름 station도 같다)
+  const sortOf = k => (k === "near" || k === "station" || k === "basis" ? (ctx.basis.get() ? "basis" : "center") : k);
+  const sortName = k => (k === "basis" && ctx.basis.get() ? `${ctx.basis.get().n}에서 가까운 순` : SORTS[k]);
+  bus.on("basis:change", () => {
+    if (!R) return;
+    if (R.sort === "basis" && !ctx.basis.get()) R.sort = "center";
+    const v = document.querySelector(".view-results .view-body");
+    if (v && v.offsetParent) { renderResults(v); emitMarkers(); }   // 목록이 보일 때만 다시 그린다 (번호 표식과 순서를 맞춘다)
+  });
+
   function show(opt) {
     R = {
       key: opt.key || opt.title, title: opt.title, kind: opt.kind || "query", q: opt.q || "", chip: opt.chip || null, cond: opt.cond || null,
-      items: opt.items || [], base: opt.items || [], note: opt.note || null, extraNote: opt.extraNote || "", sort: opt.sort || (opt.kind === "query" ? "score" : "station"),
+      items: opt.items || [], base: opt.items || [], note: opt.note || null, extraNote: opt.extraNote || "", sort: sortOf(opt.sort || (opt.kind === "query" ? "score" : "near")),
       tab: "all", page: 1, bounds: null, empty: opt.empty || null, onClear: opt.onClear || null, loading: !!opt.loading,
     };
     research.hidden = true;
@@ -290,7 +302,7 @@ export async function init(ctx) {
     const tabs = R.kind === "query" && R.items.length ? TABS.filter(([k]) => k === "all" || counts[k]) : [];
     const rows = shown();
     const page = rows.slice(0, R.page * PAGE);
-    const sortOpts = Object.entries(SORTS).filter(([k]) => k !== "score" || R.kind === "query");
+    const sortOpts = Object.keys(SORTS).filter(k => (k !== "score" || R.kind === "query") && (k !== "basis" || ctx.basis.get())).map(k => [k, sortName(k)]);
     el.innerHTML = `<div class="res">
       <h2 class="res-title" tabindex="-1">${esc(R.title)}</h2>
       <p class="res-count" aria-live="polite">${R.loading ? "불러오는 중입니다" : `${R.bounds ? "지금 지도 안 " : ""}${nf(R.items.length)}곳`}${R.bounds ? ` <button type="button" class="linkish res-all">전체 범위로</button>` : ""}</p>
@@ -305,7 +317,7 @@ export async function init(ctx) {
     </div>`;
     el.querySelectorAll(".res-tab").forEach(b => b.onclick = () => { R.tab = b.dataset.tab; R.page = 1; rerender(); emitMarkers(); });
     const sel = el.querySelector("#res-sort");
-    if (sel) sel.onchange = () => { R.sort = sel.value; R.page = 1; rerender(); emitMarkers(); ui.live(`${SORTS[R.sort]}으로 정렬했습니다`); };
+    if (sel) sel.onchange = () => { R.sort = sel.value; R.page = 1; rerender(); emitMarkers(); ui.live(`${sortName(R.sort)}으로 정렬했습니다`); };
     const more = el.querySelector(".res-more");
     if (more) more.onclick = () => { R.page += 1; const k = (R.page - 1) * PAGE; rerender(); emitMarkers(); const b = el.querySelectorAll(".res-row")[k]; if (b) b.focus(); };
     const all = el.querySelector(".res-all");
@@ -324,7 +336,8 @@ export async function init(ctx) {
 
   function rowHtml(x, no) {
     const sub = subOf(x);
-    const dist = x.d != null && Number.isFinite(x.d) && x.type !== "station" ? `역에서 직선 ${distText(x.d)}` : "";
+    const bp = ctx.basis.get(), bd = bp && (!x.path || x.path !== bp.p) ? ctx.basis.dist(x.pt) : null;
+    const dist = Number.isFinite(bd) ? `${bp.n}에서 직선 ${distText(bd)}` : "";
     const extra = x.hit && x.size ? `조건에 맞는 건물 ${nf(x.hit)}동` : "";
     return `<li><button type="button" class="res-row" data-no="${no}">
       <span class="res-no" aria-hidden="true">${no}</span>

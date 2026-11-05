@@ -90,7 +90,7 @@ export async function init(ctx) {
     if (!restore) state.set({ cat: key, q: null, focus: null, unit: null }, { push, silent: true });
     document.getElementById("q").value = "";
     const note = c.kind === "biz" ? "공공데이터(소상공인 상가정보 2026년 9월 기준)에 등록된 상호만 나옵니다. 영업시간, 리뷰는 없습니다." : c.note || "";
-    ctx.results.show({ kind: "chip", key: "chip:" + key, title: c.label, items, extraNote: note, sort: "station", onClear: () => { current = null; syncPressed(); },
+    ctx.results.show({ kind: "chip", key: "chip:" + key, title: c.label, items, extraNote: note, sort: "near", onClear: () => { current = null; syncPressed(); },
       empty: `<p>맞는 곳이 없습니다.</p>`, quiet: restore });
     if (restore) { ctx.results.reopenFocus(); return; }
     ui.live(`${c.label} ${nf(items.length)}곳을 목록과 지도에 표시했습니다`);

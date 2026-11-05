@@ -26,10 +26,9 @@ function bizMatch(chip, x) {
 export function init(ctx) {
   ctx.css("graph.css");
   const { bus, ui, panel, data, map } = ctx;
-  let st = null;          // {origin:{pt,label}, base:"place"|"center"|"station", radius, view, list}
+  let st = null;          // {origin:{pt,label}, base:"place"|"center"|"basis", radius, view, list}. basis는 사용자가 고른 거리 기준점
   let ownMarkers = false;
   let bizP = null;
-  const station = data.station && data.station.pt ? data.station.pt : data.center;
 
   // ---- 반경 원 층
   function ring(pt, r) {
@@ -51,7 +50,7 @@ export function init(ctx) {
 
   function basePt() {
     if (!st) return null;
-    if (st.base === "station") return { pt: station, label: "증미역" };
+    if (st.base === "basis") { const b = ctx.basis.get(); if (b) return { pt: b.pt, label: b.n }; st.base = "center"; }
     if (st.base === "center") {
       if (map) { const c = map.getCenter(); return { pt: [c.lng, c.lat], label: "지도 가운데" }; }
       return { pt: data.center, label: "지도 가운데" };
@@ -149,20 +148,19 @@ export function init(ctx) {
     const seg = (name, opts, cur) => opts.map(([v, t, dis]) => `<label><input type="radio" name="${name}" value="${v}" ${String(cur) === String(v) ? "checked" : ""} ${dis ? "disabled" : ""}>${esc(t)}</label>`).join("");
     el.innerHTML = `
       <fieldset class="nb-pick"><legend>기준</legend><div class="nb-seg">${seg("nb-base", [
-        ["place", st.origin ? st.origin.label : "고른 장소", !st.origin], ["center", "지도 가운데"], ["station", "증미역"]], st.base)}</div></fieldset>
+        ["place", st.origin ? st.origin.label : "고른 장소", !st.origin], ["center", "지도 가운데"],
+        ...(ctx.basis.get() ? [["basis", `거리 기준(${ctx.basis.get().n})`]] : [])], st.base)}</div></fieldset>
       <fieldset class="nb-pick"><legend>반경</legend><div class="nb-seg">${seg("nb-r", RADII.map(x => [x, `${x}m`]), r)}</div></fieldset>
       <p class="nb-basis" aria-live="polite">${esc(b.label)}에서 <b>직선 거리 ${r}m</b> 안. 걷는 거리가 아니라 건물 대표점까지의 직선 거리입니다.</p>
       ${all ? `<h3 class="cd-h">종류별 건수</h3><ul class="nb-counts">${cats.map(btn).join("")}</ul>`
         : `<div class="nb-empty" role="status"><p>이 반경 안에는 건물 자료가 없습니다.</p>
-          ${r < 500 ? `<button type="button" class="btn mini nb-wider">반경 500m로 넓히기</button>` : `<button type="button" class="btn mini nb-station">증미역 기준으로 보기</button>`}</div>`}
+          ${r < 500 ? `<button type="button" class="btn mini nb-wider">반경 500m로 넓히기</button>` : ""}</div>`}
       ${biz ? `<h3 class="cd-h">상호 <span class="muted">(공공데이터에 등록된 곳만)</span></h3><ul class="nb-counts">${bizCats.map(btn).join("")}</ul>`
         : `<p class="muted small nb-biz-wait">상호 건수를 불러오는 중입니다.</p>`}`;
     el.querySelectorAll('input[name="nb-base"]').forEach(x => x.addEventListener("change", () => { st.base = x.value; draw(); }));
     el.querySelectorAll('input[name="nb-r"]').forEach(x => x.addEventListener("change", () => { st.radius = Number(x.value); draw(); }));
     const wider = el.querySelector(".nb-wider");
     if (wider) wider.addEventListener("click", () => { st.radius = 500; draw(); });
-    const toSt = el.querySelector(".nb-station");
-    if (toSt) toSt.addEventListener("click", () => { st.base = "station"; draw(); });
     const byKey = new Map([...cats, ...bizCats].map(c => [c.key, c]));
     el.querySelectorAll(".nb-counts button[data-key]").forEach(x => x.addEventListener("click", () => list(byKey.get(x.dataset.key), b, r)));
     ui.live(`${b.label}에서 직선 거리 ${r}m 안 건물 ${nf(all)}동`);

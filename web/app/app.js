@@ -48,7 +48,33 @@ const ctx = {
   },
 };
 const { bus, state, ui } = ctx;
-window.__app = ctx;   // 확인용 (콘솔과 자동 시험에서 상태를 읽는다)
+window.__app = ctx;
+
+// ---- 거리 기준점: 사용자가 카드나 지도에서 고른 곳. 카드의 거리, 목록의 '가까운 순', 주변 찾기의 기준이 된다.
+// 고르기 전에는 거리를 보이지 않는다(어느 한 역을 기준으로 미리 정하지 않는다). 이 브라우저에만 남는다
+const BASIS_KEY = "jgk-basis";
+let basis = null;
+try {
+  const b = JSON.parse(localStorage.getItem(BASIS_KEY) || "null");
+  if (b && okLngLat(b.pt) && typeof b.n === "string" && b.n) basis = { pt: b.pt, n: b.n, p: typeof b.p === "string" ? b.p : null };
+} catch (e) { /* 저장소가 막히면 기준점 없이 연다 */ }
+const R_EARTH = 6371008.8, rad = x => x * Math.PI / 180;
+ctx.basis = {
+  get: () => basis,
+  set(b) {
+    basis = b && okLngLat(b.pt) ? { pt: b.pt, n: String(b.n || "고른 곳"), p: b.p || null } : null;
+    try { basis ? localStorage.setItem(BASIS_KEY, JSON.stringify(basis)) : localStorage.removeItem(BASIS_KEY); } catch (e) { /* 저장소 막힘 */ }
+    bus.emit("basis:change", { basis });
+    ui.live(basis ? `거리 기준을 ${basis.n}(으)로 정했습니다` : "거리 기준을 지웠습니다");
+  },
+  // 기준점에서 직선 거리(m, 반올림). 기준점이 없거나 점이 없으면 null
+  dist(pt) {
+    if (!basis || !okLngLat(pt)) return null;
+    const [a, b] = [basis.pt, pt];
+    const h = Math.sin(rad(b[1] - a[1]) / 2) ** 2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(rad(b[0] - a[0]) / 2) ** 2;
+    return Math.round(2 * R_EARTH * Math.asin(Math.sqrt(h)));
+  },
+};   // 확인용 (콘솔과 자동 시험에서 상태를 읽는다)
 
 
 // ---- 찾기창 틀과 메뉴. 찾기 동작은 search 모듈이 #q에 붙인다
@@ -349,7 +375,8 @@ function defaultPlace(el, s) {
   const rows = [];
   if (addr) rows.push(`<p class="pl-addr">${esc(short(addr))}</p>`);
   if (p.j && s.kind !== "parcel") rows.push(`<p class="pl-sub">지번 ${esc(p.j)}</p>`);
-  if (Number.isFinite(p.d) && p.d > 0) rows.push(`<p class="pl-sub">역에서 직선 ${nf(p.d)}m</p>`);
+  const bd = ctx.basis.dist(p.pt);
+  if (Number.isFinite(bd) && bd > 0 && ctx.basis.get().p !== p.p) rows.push(`<p class="pl-sub">${esc(ctx.basis.get().n)}에서 직선 ${nf(bd)}m</p>`);
   if (s.group) {
     const g = s.group;
     rows.push(`<p class="pl-sub">건물 ${nf(g.m.length)}동${g.hh ? `, 세대수 ${nf(g.hh)}` : ""}${g.part && g.part.length ? " (일부 필지만 값이 있습니다)" : ""}</p>`);

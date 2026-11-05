@@ -1,5 +1,5 @@
 // 여기 보기 (명세 3.4절 5번, WP5): 빈 곳 누름, 우클릭, 길게 누르기(500ms)에 말풍선을 띄운다.
-// 30m 안 건물, 역에서 직선 거리, 좌표, 여기서 주변 찾기, 여기서 재기(재기 기능이 있을 때만).
+// 30m 안 건물, 고른 거리 기준점에서 직선 거리(있을 때만), 좌표, 여기서 주변 찾기, 여기서 재기(재기 기능이 있을 때만), 여기를 거리 기준으로.
 // 범위(증미역 반경 1km) 밖이면 범위 안내를 낸다. 배경 길 이름을 누르면 같은 이름 길의 카드를 연다 (있으면 좋음 8).
 
 const NEAR_M = 30;
@@ -113,12 +113,14 @@ export function init(ctx) {
         <span class="muted small">${x.d < 1 ? "누른 곳" : `${nf(Math.round(x.d))}m`}</span></li>`).join("");
       const measure = ctx.features.has("measure") ? `<button type="button" class="btn ghost mini" data-a="measure">여기서 재기</button>` : "";
       const nearby = ctx.features.has("nearby") ? `<button type="button" class="btn ghost mini" data-a="nearby">여기서 주변 찾기</button>` : "";
+      const basisBtn = ctx.basis ? `<button type="button" class="btn ghost mini" data-a="basis">여기를 거리 기준으로</button>` : "";
+      const b0 = ctx.basis && ctx.basis.get(), dB = b0 ? ctx.basis.dist(pt) : null;
       box.innerHTML = `<p class="pp-kind"><span class="chip type">여기 보기</span></p>
         ${near.length ? `<p class="pp-sub">${NEAR_M}m 안 건물 ${nf(near.length)}동</p><ul class="pp-list">${list}</ul>`
           : `<p class="pp-name">여기에는 건물 자료가 없습니다</p>`}
-        <p class="pp-sub">역에서 직선 ${nf(Math.round(dSt))}m</p>
+        ${Number.isFinite(dB) && dB > 0 ? `<p class="pp-sub">${esc(b0.n)}에서 직선 ${nf(dB)}m</p>` : ""}
         <p class="pp-sub">좌표 <span class="mono">${coord}</span> <button type="button" class="linkish small" data-a="copy" aria-label="좌표 복사">복사</button></p>
-        <div class="pp-acts">${nearby}${measure}</div>`;
+        <div class="pp-acts">${nearby}${measure}${basisBtn}</div>`;
     }
     box.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => {
       close();
@@ -130,6 +132,7 @@ export function init(ctx) {
       close();
       if (a === "nearby") bus.emit("nearby:open", { center: pt, label: "누른 곳", radius: 300 });
       else if (a === "measure") bus.emit("measure:start", { mode: "distance", from: pt });
+      else if (a === "basis") { ctx.basis.set({ pt, n: "누른 곳", p: null }); ui.toast("누른 곳을 거리 기준으로 정했습니다. 카드와 목록의 거리가 여기서 잽니다"); }
       else if (a === "station") map.easeTo({ center: station, zoom: Math.max(map.getZoom(), 15), duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 });
     }));
     popup = new maplibregl.Popup({ className: "pp", closeButton: true, closeOnClick: false, focusAfterOpen: false, offset: 8, maxWidth: "280px" })
