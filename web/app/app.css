@@ -145,6 +145,9 @@ body.panel-collapsed #map-top { left: 404px; }
   .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin: 0 8px 6px 0; }
   .maplibregl-ctrl-scale { display: none; }
   body.sheet-full .tools-bottom, body.sheet-full .maplibregl-ctrl-bottom-right, body.sheet-full #map-top { visibility: hidden; }
+  /* 시트가 올라와 세로로 들어갈 틈이 없을 때 (sheet.js fitTools) */
+  .tools-bottom.tools-row { flex-direction: row; right: 60px; }
+  .tools-bottom.tools-none { visibility: hidden; }
   .retry-bar { top: calc(116px + env(safe-area-inset-top)); }
   #toast { bottom: calc(var(--sheet-h) + 16px); }
   .map-fallback { padding: 140px 24px 140px; }

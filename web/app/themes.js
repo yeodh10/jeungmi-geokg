@@ -144,7 +144,7 @@ export async function init(ctx) {
   // 입체 보기의 시점을 주소창에 적어, 링크로 같은 시점을 나눌 수 있게 한다
   map.on("moveend", () => { if (threeD) state.set({ d3: `${Math.round(map.getPitch())},${Math.round(map.getBearing())}` }, { silent: true }); });
   // 북쪽으로: 입체 보기에서만 보인다. 아이콘은 지도의 방위각만큼 돌아 북쪽을 가리킨다
-  const north = ui.toolButton({ id: "tool-north", icon: "compass", label: "북쪽을 위로", group: "view", order: 1,
+  const north = ui.toolButton({ id: "tool-north", icon: "compass", label: "북쪽을 위로", group: "d3", order: 1,
     onClick: () => { setSpin(false, { announce: false }); map.easeTo({ bearing: 0, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 }); } });
   north.hidden = true;
   map.on("rotate", () => { const svg = north.querySelector("svg"); if (svg) svg.style.transform = `rotate(${-map.getBearing()}deg)`; });
@@ -159,7 +159,7 @@ export async function init(ctx) {
   // 90도씩 이어 돌려서 moveend가 한 바퀴에 네 번만 난다(주소창 시점 적기가 프레임마다 돌지 않게)
   const SPIN_QUARTER_MS = 9000;  // 한 바퀴 36초
   let spinning = false;
-  const spin = ui.toolButton({ id: "tool-spin", icon: "orbit", label: "한 바퀴 돌아보기", group: "view", order: 2,
+  const spin = ui.toolButton({ id: "tool-spin", icon: "orbit", label: "한 바퀴 돌아보기", group: "d3", order: 2,
     onClick: () => setSpin(!spinning) });
   spin.hidden = true;
   spin.setAttribute("aria-pressed", "false");

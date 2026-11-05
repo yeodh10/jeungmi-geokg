@@ -44,6 +44,7 @@ body.panel-collapsed .local-pop { left: 12px; }
 @media (max-width: 900px) {
   .local-badge, body.panel-collapsed .local-badge { left: 8px; bottom: calc(var(--sheet-h) + 36px); min-height: 40px; transition: bottom .18s; }
   body.sheet-full .local-badge { visibility: hidden; }
+  body.tools-row .local-badge { bottom: calc(var(--sheet-h) + 88px); }
   .local-pop, body.panel-collapsed .local-pop { left: 8px; right: 8px; width: auto; bottom: calc(var(--sheet-h) + 84px); max-height: calc(100dvh - var(--sheet-h) - 200px); }
 }
 `;

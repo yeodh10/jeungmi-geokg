@@ -23,10 +23,29 @@ export function createSheet(ctx, panelEl) {
     return { peek, half: Math.max(peek, Math.round(h * 0.5)), full: Math.max(peek, h - 72) };
   };
 
+  // 시트가 올라오면 아래 도구 묶음(3D, 역, 내 위치)이 위 도구 묶음과 겹칠 수 있다.
+  // 세로로 들어갈 틈이 없으면 위 도구 줄 왼쪽에 가로 한 줄로 눕히고, 그래도 모자라면 감춘다.
+  function fitTools(px) {
+    const b = document.querySelector(".tools-bottom"), t = document.querySelector(".tools-top");
+    if (!b) return;
+    b.classList.remove("tools-row", "tools-none");
+    document.body.classList.remove("tools-row");
+    const shown = el => [...el.children].filter(c => !c.hidden).length;
+    if (!mobile.matches || !t || !shown(t) || land.matches) return;
+    const n = shown(b);
+    if (!n) return;
+    const r = t.getBoundingClientRect();
+    const bottom = vh() - px - 36;                 // 아래 도구 묶음의 아래 끝 (app.css .tools-bottom)
+    if (bottom - (r.bottom + 8) >= n * 44 + (n - 1) * 8) return;
+    b.classList.add(bottom - 44 >= r.top ? "tools-row" : "tools-none");
+    document.body.classList.toggle("tools-row", b.classList.contains("tools-row"));   // 왼쪽 아래에 뜨는 것들이 줄을 피하게
+  }
+
   function setPx(px, animate) {
     panelEl.classList.toggle("sheet-dragging", !animate);
     panelEl.style.height = px + "px";
     root.style.setProperty("--sheet-h", px + "px");
+    fitTools(px);
   }
 
   function apply(notify = true) {
@@ -99,6 +118,11 @@ export function createSheet(ctx, panelEl) {
   };
   panelEl.addEventListener("pointerup", end);
   panelEl.addEventListener("pointercancel", end);
+
+  // 입체 보기를 켜면 위 도구가 늘어나므로 도구가 바뀔 때도 다시 맞춘다
+  const toolsEl = document.querySelector(".tools-top") && document.querySelector(".tools-top").parentElement;
+  if (toolsEl) new MutationObserver(() => fitTools(mobile.matches ? heights()[name] : 0))
+    .observe(toolsEl, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
 
   const relayout = () => apply(true);
   mobile.addEventListener("change", relayout);
