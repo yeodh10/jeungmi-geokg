@@ -245,9 +245,8 @@ function onSelect(sel) {
   if (r.paths.length) ctx.mapApi.highlight(r.paths, { style: "select", label: labelPt });
   else if (r.pt) ctx.mapApi.highlight([], { style: "select", label: labelPt, pt: r.pt });
   else ctx.mapApi.clearHighlight("select");
-  // 고른 장소와 역 사이 점선 (점이 없는 유형과 역 자신은 긋지 않는다)
-  const st = ctx.data.station;
-  ctx.mapApi.setLine(r.pt && st && st.pt && r.path !== st.p && r.kind !== "group" ? st.pt : null, r.pt);
+  // 장소를 골랐다고 역과 잇는 점선을 긋지 않는다
+  ctx.mapApi.setLine(null);
   if (sel.fit && ctx.map) {
     if (r.paths.length && ctx.mapApi.fitPlaces(r.paths)) { /* 옮김 */ }
     else if (r.pt) ctx.map.easeTo({ center: r.pt, zoom: Math.max(ctx.map.getZoom(), 17), duration: M.dur(400) });
