@@ -23,7 +23,7 @@ export const ASPECTS = [
   { id: "cat", label: "업종", re: /업종|뭐\s*파는|무엇을\s*파는|무슨\s*가게|어떤\s*가게|뭐\s*하는\s*곳|뭐하는\s*곳|무슨\s*업/, keys: ["업종"] },
   { id: "jibun", label: "지번", re: /지번|번지/, field: "jibun" },
   { id: "no", label: "공식 번호", re: /관리\s*번호|식별\s*번호|번호가|번호는|번호\s*알|pnu|코드/i, field: "officialNo" },
-  { id: "addr", label: "주소", re: /주소|어디\s*(있|야|에|인|쯤|$)|어디야|위치|찾아\s*가|가는\s*길|어느\s*쪽/, field: "addr" },
+  { id: "addr", label: "주소", re: /주소|어디\s*(있|야|에|인|쯤|$)|어디야|위치|찾아\s*가|가는\s*(길|법|방법)|가려면|어떻게\s*가|어느\s*쪽/, field: "addr" },
   { id: "dong", label: "동", re: /무슨\s*동|어느\s*동|몇\s*동이|행정동|법정동|동네/, rels: ["행정동", "법정동"] },
   { id: "zip", label: "우편구역", re: /우편/, rels: ["우편구역"] },
   { id: "road", label: "길", re: /무슨\s*길|어느\s*길|무슨\s*도로|어느\s*도로|길\s*이름/, rels: ["길"] },
@@ -38,6 +38,7 @@ export const ABSENT = [
   ["영업시간", /영업\s*시간|몇\s*시(에|까지|부터)|문\s*(열|닫)|여는\s*시간|닫는\s*시간/],
   ["전화번호", /전화|연락처/], ["리뷰", /리뷰|후기|평점|별점|맛있/], ["사진", /사진(?!관|촬영|스튜디오|인화)|이미지/],
   ["시간표", /시간표|첫차|막차|배차/], ["출구 번호", /출구/], ["도착 정보", /도착|언제\s*와/], ["가격", /가격|얼마야|비싸|싸[요다게니]/],
+  ["길 안내(걷는 길과 대중교통 경로)", /가는\s*(길|법|방법)|가려면|길\s*안내|길\s*찾기|어떻게\s*가/],
 ];
 const ASK_WORDS = /^(가장|제일|젤|있는|있을까|있나|있니|어딨어|어딨|찾아줘|추천|추천해줘|먹을|중|중에|중에서|몇|언제|어디|어디야|어디에|뭐|뭐야|무슨|어느|어떤|얼마나|알려줘|알려|줘|좀|이야|인가요|인가|이에요|예요|야|있어|있나요|해줘|말해줘|궁금해|정도|대략|약|혹시|그|이|저|거기|무엇|무엇인가요)$/;
 // 장소 이름이 될 수 없는 흔한 낱말 (이것만으로 된 묶음은 장소로 찾지 않는다)
@@ -243,7 +244,7 @@ export const isKindWord = (core, w) => !!SYN[core.compact(w)];
 const kindish = (core, w) => { const c = core.compact(w); return (/(집|가게|식당|전문점|매장|점|샵|숍|학원|방|소)$/.test(c) && c.length >= 2) || !!SYN[c]; };
 const NEARW = /^(가까운|가까이|가깝|가장가까운|근처|주변|둘레|부근|인근|근방|쪽|앞|옆|건너편|맞은편|걸어갈|걸어서)/;
 const SUPER = /(가장|제일|젤)\s*(가까|근처)|가까운\s*(데|곳)\s*(하나|한\s*곳)/;
-const KIND_ASK = /어디|있어|있나|있니|있을까|몇\s*(곳|개|군데)|알려|추천|찾아|위치|목록|어딨|주소/;
+const KIND_ASK = /어디|있어|있나|있니|있을까|몇\s*(곳|개|군데)|알려|추천|찾아|위치|목록|어딨|주소|가는\s*(길|법|방법)|가려면|어떻게\s*가/;
 
 // ---- 건물 안의 상호 ('강서아이티밸리 안 카페', '강서아이티밸리에 뭐 있어', '지오스토리 건물에 뭐 있어')
 const INSIDE_RE = /뭐\s*(가\s*)?(있|들어)|무엇이\s*있|무슨\s*(가게|상호|회사|업체|매장)|어떤\s*(가게|상호|회사|업체|매장)|입점|입주|들어\s*(와|있는|있어|온)|(상호|가게|매장)\s*(목록|뭐|다)/;
@@ -282,7 +283,7 @@ const RANK = [
   { re: /지하(가|로)?\s*(가장|제일)\s*(깊|많)|(가장|제일)\s*깊은/, key: "fb", dir: -1, label: "지하 층수", phr: "지하가 가장 깊은" },
   { re: /세대(수)?(가|가장)?\s*(가장|제일)?\s*많|(가장|제일)\s*(큰|많은)\s*(아파트|단지)/, key: "hh", dir: -1, label: "세대수", phr: "세대수가 가장 많은", group: true },
 ];
-const RANK_SKIP = /^(가장|제일|젤|높은|높이|높이가|낮은|오래된|오래|된|옛날|낡은|먼저|일찍|지어진|지어|지은|최근|최근에|새로|새|늦게|나중에|최신|생긴|층수|층수가|층이|많은|많이|세대|세대수|세대수가|깊은|큰|곳|건물|빌딩|동)$/;
+const RANK_SKIP = /^(안에서|안의|안|이내|이내에서|이내의|내에서|반경|가장|제일|젤|높은|높이|높이가|낮은|오래된|오래|된|옛날|낡은|먼저|일찍|지어진|지어|지은|최근|최근에|새로|새|늦게|나중에|최신|생긴|층수|층수가|층이|많은|많이|세대|세대수|세대수가|깊은|큰|곳|건물|빌딩|동)$/;
 const UG_WORD = { 상가: "shop", 상가건물: "shop", 업무: "office", 사무실: "office", 업무건물: "office", 오피스: "office", 학교: "edu", 공장: "factory", 창고: "factory", 주택: "home", 집: "home" };
 const rankVal = (key, v) => (key === "h" ? `높이 ${v}m` : key === "fa" ? `지상 ${v}층` : key === "fb" ? `지하 ${v}층` : key === "ad" ? `사용승인 ${v}` : `${nf(v)}세대`);
 
@@ -410,7 +411,7 @@ export function read(core, index, text, { basis = null } = {}) {
     const used = new Set(); for (const e of betweenAsk ? ents : anchor ? [anchor] : []) for (let k = e.i; k < e.i + e.len; k++) used.add(k);
     const left = words.map((w, k) => ({ w, k })).filter(({ w, k }) => !used.has(k) && w && !ASK_WORDS.test(w) && !GENERIC.test(w) && !NEARW.test(w)
       && !/^\d/.test(w) && !/^(m|km|미터|킬로|킬로미터)$/i.test(w) && !ASPECTS.some(a => a.re && a.re.test(w)) && !ABSENT.some(([, re]) => re.test(w))
-      && !(insideAsk && (INSIDE_SKIP.test(w) || INSIDE_TOK.test(w))) && !MOD_WORD.test(w) && !/^(사이|사이에|사이의|중|중에|층|층에|일층|지하|지하에)$/.test(w));
+      && !(insideAsk && (INSIDE_SKIP.test(w) || INSIDE_TOK.test(w))) && !MOD_WORD.test(w) && !/^(사이|사이에|사이의|중|중에|층|층에|일층|지하|지하에|가는|가려면|가는길|가는법|가는방법|방법|법)$/.test(w));
     // 이웃한 두 낱말을 붙인 것('치킨 집' -> 치킨집)과 낱말 하나씩. 앞의 것부터 처음 맞는 것을 쓴다
     const tries = [];
     for (let k = 0; k + 1 < left.length; k++) if (left[k + 1].k === left[k].k + 1) tries.push({ w: left[k].w + left[k + 1].w, pair: true });
@@ -497,8 +498,11 @@ export function read(core, index, text, { basis = null } = {}) {
     const words2 = words.filter((w, k) => !(anchor && k >= anchor.i && k < anchor.i + anchor.len) && w && !ASK_WORDS.test(w) && !GENERIC.test(w) && !NEARW.test(w) && !RANK_SKIP.test(w) && !/^\d/.test(w) && !/^(m|km|미터)$/i.test(w));
     const kw = words2.map(w => core.compact(w)).find(w => w.length >= 2) || null;
     const r = q.match(/(\d+(?:\.\d+)?)\s*(km|킬로|m|미터)/i);
-    const radius = anchor && (r || nearAt >= 0) ? (r ? Math.min(2000, Math.round(Number(r[1]) * (/km|킬로/i.test(r[2]) ? 1000 : 1))) : 300) : null;
+    // 동, 길, 우편구역이면 그 안에서 ('가양동에서 가장 오래된 건물'). 다른 장소면 둘레 반경 안에서 (반경을 안 적으면 300m, 답에 밝힌다)
+    const A = anchor && AREA.has(anchor.item.type) ? areaOf(index, anchor.item, nearAt >= 0) : null;
+    const radius = anchor && !A && anchor.item.pt ? (r ? Math.min(2000, Math.round(Number(r[1]) * (/km|킬로/i.test(r[2]) ? 1000 : 1))) : 300) : null;
     const P = index.places || {};
+    if (A && !index._byPath) index._byPath = new Map((P.places || []).map(x => [x.p, x]));
     const gname = new Map((P.groups || []).map(g => [g.g, g.n]));
     const fits = row => {
       if (!kw) return true;
@@ -506,7 +510,9 @@ export function read(core, index, text, { basis = null } = {}) {
       return nm.includes(kw) || gn.includes(kw) || core.compact(row.use || "").includes(kw) || (UG_WORD[kw] && UG_WORD[kw] === row.ug);
     };
     let rows = rankDef.group ? (P.groups || []).map(g => ({ n: g.n, p: index.byI[g.m[0]] && index.byI[g.m[0]].p, pt: g.pt, hh: g.hh, g: null, use: "" })) : (P.places || []);
-    rows = rows.filter(x => x.pt && fits(x) && (!radius || meters(anchor.item.pt, x.pt) <= radius));
+    // 단지 줄은 대표 동의 건물 값으로 동네와 길을 본다
+    const inArea = x => { const row = rankDef.group ? index._byPath.get(x.p) : x; return !!row && A.test(row); };
+    rows = rows.filter(x => x.pt && fits(x) && (!radius || meters(anchor.item.pt, x.pt) <= radius) && (!A || inArea(x)));
     const all = rows.length;
     const withV = rows.filter(x => x[rankDef.key] != null && x[rankDef.key] !== "");
     withV.sort((a, b) => (a[rankDef.key] < b[rankDef.key] ? -1 : a[rankDef.key] > b[rankDef.key] ? 1 : 0) * rankDef.dir);
@@ -518,7 +524,8 @@ export function read(core, index, text, { basis = null } = {}) {
       list.push({ name: x.g != null ? `${gname.get(x.g) || x.n}${x.n && x.n !== gname.get(x.g) ? ` (${x.n})` : ""}` : x.n, path: x.p, pt: x.pt, v: x[rankDef.key], fa: x.fa, h: x.h });
       if (list.length >= 10) break;
     }
-    rank = { ...rankDef, re: undefined, kw, radius, anchor: anchor ? { name: anchor.item.name, path: anchor.item.path } : null, all, withV: withV.length, list };
+    rank = { ...rankDef, re: undefined, kw, radius, area: A ? { name: A.name, label: A.label, sides: !!A.sides } : null, radiusSaid: !!r || nearAt >= 0,
+      anchor: anchor ? { name: anchor.item.name, path: anchor.item.path } : null, all, withV: withV.length, list };
     ents.splice(0, ents.length, ...(anchor ? [anchor] : []));
   }
   // 길 이름과 번호를 물었는데 그 번호의 건물을 못 찾았다 ('양천로 58'): 길 카드로 답하지 않고 없다고 밝힌다
@@ -526,7 +533,7 @@ export function read(core, index, text, { basis = null } = {}) {
   const addrMiss = rq && !kind && !rank && !insideAll && !around && !ents.some(e => !AREA.has(e.item.type)) ? `${rq[1]} ${rq[2]}` : null;
   if (addrMiss) ents.splice(0, ents.length);
   // '어디에 있어'를 물으면 가장 가까운 역까지 함께 알려 준다 (찾기 색인의 역 목록)
-  const where = /어디|위치|찾아\s*가|가는\s*길|어느\s*쪽/.test(q);
+  const where = /어디|위치|찾아\s*가|가는\s*(길|법|방법)|가려면|어떻게\s*가|어느\s*쪽/.test(q);
   const stations = where ? (index.docs || []).filter(d => d.type === "station" && d.pt).map(d => ({ name: d.name, pt: d.pt, path: d.path })) : [];
   const here = basis && basis.pt && /여기|기준|고른\s*곳/.test(q) ? { name: basis.n || "거리 기준", pt: basis.pt, basis: true } : null;
   return { q, aspects, absent, mods, kind, addrMiss, rank, insideAll, around, ents: ents.map(e => ({ path: e.item.path, name: e.item.name, type: e.item.type, pt: e.item.pt, group: e.item.group ?? null, score: e.item.score, field: e.item.field, said: words.slice(e.i, e.i + e.len).join(" "),
@@ -704,8 +711,9 @@ function insideAnswer(plan, out) {
 function rankAnswer(plan, out) {
   const k = plan.rank;
   const what = k.kw ? `'${k.kw}'에 맞는 ${k.group ? "단지" : "건물"}` : k.group ? "단지" : "건물";
-  const where = k.anchor && k.radius ? `${k.anchor.name}에서 직선 ${nf(k.radius)}m 안에서` : `${SCOPE}에서`;
-  out.how = `${k.anchor && k.radius ? `${k.anchor.name}의 좌표에서 직선 ${nf(k.radius)}m 안의 ` : "범위 안의 "}${k.group ? "단지" : "건물"} 가운데${k.kw ? ` 이름이나 용도에 '${k.kw}'가 든 곳만 골라` : ""} ${k.label} 값으로 줄을 세웠습니다. 같은 단지의 여러 동은 가장 앞선 동 하나만 남겼습니다.`;
+  const areaWord = A => A.label === "길" ? `${A.name}${A.sides ? `와 곁길(${A.name}N길)` : ""}에 주소를 둔` : `${A.label} ${A.name} 안의`;
+  const where = k.area ? (k.area.label === "길" ? `${areaWord(k.area)} 곳 가운데` : `${k.area.label} ${k.area.name} 안에서`) : k.anchor && k.radius ? `${k.anchor.name}에서 직선 ${nf(k.radius)}m 안에서` : `${SCOPE}에서`;
+  out.how = `${k.area ? `${areaWord(k.area)} ` : k.anchor && k.radius ? `${k.anchor.name}의 좌표에서 직선 ${nf(k.radius)}m 안의 ` : "범위 안의 "}${k.group ? "단지" : "건물"} 가운데${k.kw ? ` 이름이나 용도에 '${k.kw}'가 든 곳만 골라` : ""} ${k.label} 값으로 줄을 세웠습니다. 같은 단지의 여러 동은 가장 앞선 동 하나만 남겼습니다.${k.area ? ` 동네와 길은 건물의 주소 값으로 봤습니다${k.group ? "(단지는 대표 동의 주소)" : ""}.` : ""}${k.anchor && k.radius && !k.radiusSaid ? ` 반경을 적지 않아 ${nf(k.radius)}m로 봤습니다. 'N m 안'을 함께 적으면 그 반경으로 셉니다.` : ""}`;
   if (!k.list.length) {
     out.sentences.push(k.all ? `${where} ${what} ${nf(k.all)}곳 가운데 ${josa(k.label, "이/가")} 자료에 있는 곳이 없어 견줄 수 없습니다.` : `${where} ${josa(what, "이/가")} 없습니다.`);
     return out;

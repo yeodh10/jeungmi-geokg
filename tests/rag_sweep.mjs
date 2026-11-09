@@ -6,7 +6,7 @@
 //    - 기준 장소를 잘못 읽으면 실패, 질문 틀이 다른 업종의 답을 내면 실패
 // 2) 장소 질문: 상호 60곳, 이름 있는 건물 60곳, 단지 20곳 x 말투 6개. 물은 장소를 찾아 답해야 한다
 // 3) 건물 안 질문: 건물 40곳의 '뭐 있어'와 '안 (업종)'. 같은 필지의 건물에 이어진 상호를 하나도 빠뜨리면 안 된다
-// 4) 순위 질문: '가장 높은 건물' 같은 질문의 1위가 자료에서 직접 고른 1위와 같아야 한다
+// 4) 순위 질문: '가장 높은 건물' 같은 질문의 1위가 자료에서 직접 고른 1위와 같아야 한다. 동네나 길이 붙은 순위는 그 안의 1위와 같아야 한다
 // 5) 조건 질문: 동네, 길, 층 조건과 두 곳 사이, 자료에 없는 조건(24시, 주차 등)을 밝히는지
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -117,6 +117,13 @@ const rankCases = [
   ["증미역 근처 가장 높은 건물", top(places.places.filter(x => meters(x.pt, st) <= 300), "h", -1)],
   ["세대수 가장 많은 아파트", top((places.groups || []).filter(g => /아파트/.test(g.n)), "hh", -1)],
 ];
+// 동네와 길 조건이 붙은 순위 ('가양동에서 제일 오래된 건물'): 조건을 버리고 범위 전체의 1위를 답하면 안 된다
+{
+  const legal0 = places.legalDong || {}, road0 = new Map((places.roads || []).map(r => [r.p.split("/")[1], r.n]));
+  const rdefs = [["가장 높은 건물", "h", -1], ["제일 오래된 건물", "ad", 1], ["층수가 가장 많은 건물", "fa", -1]];
+  for (const dn of Object.values(legal0)) for (const [w, key, dir] of rdefs) rankCases.push([`${dn}에서 ${w}`, top(places.places.filter(x => legal0[x.ld] === dn), key, dir)]);
+  for (const rn of ["양천로", "공항대로", "화곡로", "등촌로", "허준로"]) for (const [w, key, dir] of rdefs) rankCases.push([`${rn}에서 ${w}`, top(places.places.filter(x => road0.get(x.road) === rn), key, dir)]);
+}
 for (const [q, want] of rankCases) {
   const r = flow(q), gn = want && want.g != null ? (places.groups.find(g => g.g === want.g) || {}).n : null;
   const name = want ? (gn || want.n) : "";
