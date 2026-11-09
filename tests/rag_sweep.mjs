@@ -7,6 +7,7 @@
 // 2) 장소 질문: 상호 60곳, 이름 있는 건물 60곳, 단지 20곳 x 말투 6개. 물은 장소를 찾아 답해야 한다
 // 3) 건물 안 질문: 건물 40곳의 '뭐 있어'와 '안 (업종)'. 같은 필지의 건물에 이어진 상호를 하나도 빠뜨리면 안 된다
 // 4) 순위 질문: '가장 높은 건물' 같은 질문의 1위가 자료에서 직접 고른 1위와 같아야 한다
+// 5) 조건 질문: 동네, 길, 층 조건과 두 곳 사이, 자료에 없는 조건(24시, 주차 등)을 밝히는지
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -122,7 +123,38 @@ for (const [q, want] of rankCases) {
   if (!want || !r.text.split("그다음")[0].includes(name)) bad4.push(["순위 1위가 다름", q, `자료 1위 ${name} | ${r.text.slice(0, 80)}`]);
 }
 console.log(`순위 질문 ${rankCases.length}개: 문제 ${bad4.length}개`);
-for (const b of [...bad, ...bad2, ...bad3, ...bad4].slice(0, 80)) console.log("  " + b.join("  |  "));
-const fail = bad.length + bad2.length + bad3.length + bad4.length;
+// 5) 조건 질문: 동네, 길, 층 조건은 자료에서 직접 센 수보다 적게 답하면 안 되고(이름이나 업종에 그 말이 든 곳만 센다),
+//    자료에 없는 조건(24시, 주차, 걸어서 5분 등)은 뺐다고 밝혀야 한다
+const bad5 = [];
+let n5 = 0;
+const legal = places.legalDong || {}, roadName = new Map((places.roads || []).map(r => [r.p.split("/")[1], r.n]));
+const rowP = new Map(places.places.map(r => [r.p, r]));
+const ckinds = ["카페", "편의점", "약국", "미용실", "치킨", "부동산", "학원", "세탁소", "중국집", "국밥"];
+const countIn = (k, test) => biz.filter(b => { const r = rowP.get(b.b); return r && test(r) && (C(b.n).includes(C(k)) || C(b.c).includes(C(k)) || C(b.m).includes(C(k))); }).length;
+const numOf = t => { const m = t.match(/([\d,]+)곳입니다/); return m ? Number(m[1].replace(/,/g, "")) : (/없습니다/.test(t) ? 0 : -1); };
+for (const dn of Object.values(legal)) for (const k of ckinds) {
+  const q = `${dn}에 ${k} 몇 개야`, r = flow(q), want = countIn(k, row => legal[row.ld] === dn), got = numOf(r.text); n5++;
+  if (got < want) bad5.push(["동네 조건 수가 모자람", q, `답 ${got}, 자료 ${want}`]);
+}
+for (const rn of ["양천로", "공항대로", "화곡로", "등촌로", "허준로"]) for (const k of ckinds) {
+  const q = `${rn}에 있는 ${k}`, r = flow(q), want = countIn(k, row => roadName.get(row.road) === rn), got = numOf(r.text); n5++;
+  if (got < want) bad5.push(["길 조건 수가 모자람", q, `답 ${got}, 자료 ${want}`]);
+}
+for (const f of ["1", "2", "3"]) for (const k of ckinds) {
+  const q = `${f}층에 있는 ${k}`, r = flow(q), got = numOf(r.text);
+  const want = biz.filter(b => b.f === f && (C(b.n).includes(C(k)) || C(b.c).includes(C(k)) || C(b.m).includes(C(k)))).length; n5++;
+  if (got < want) bad5.push(["층 조건 수가 모자람", q, `답 ${got}, 자료 ${want}`]);
+}
+for (const mq of ["증미역 근처 24시 편의점", "가양역 근처 주차되는 카페", "등촌역에서 걸어서 5분 거리 약국", "증미역 근처 맛있는 국밥집", "증미역 근처 배달되는 치킨", "가양역 근처 조용한 카페", "증미역 근처 싼 미용실", "등촌역 근처 카페 추천해줘"]) {
+  const r = flow(mq); n5++;
+  if (!/이 자료에 없어 그 조건은 빼고 찾았습니다/.test(r.text)) bad5.push(["없는 조건을 밝히지 않음", mq, r.text.slice(0, 80)]);
+}
+for (const [a, b2] of [["증미역", "가양역"], ["증미역", "등촌역"], ["가양역", "강서아이티밸리"]]) for (const k of ["카페", "편의점", "약국"]) {
+  const q = `${a}과 ${b2} 사이 ${k}`, r = flow(q); n5++;
+  if (!/사이\(두 곳을 잇는 직선에서/.test(r.text)) bad5.push(["두 곳 사이를 읽지 못함", q, r.text.slice(0, 80)]);
+}
+console.log(`조건 질문 ${n5}개: 문제 ${bad5.length}개`);
+for (const b of [...bad, ...bad2, ...bad3, ...bad4, ...bad5].slice(0, 80)) console.log("  " + b.join("  |  "));
+const fail = bad.length + bad2.length + bad3.length + bad4.length + bad5.length;
 console.log(fail ? `\n실패 ${fail}건` : "\n통과");
 process.exit(fail ? 1 : 0);
