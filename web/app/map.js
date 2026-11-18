@@ -293,38 +293,67 @@ export function createMapApi(ctx, map) {
     return out;
   };
 
-  // 바라는 여백. 지도가 움직이는 동안 여백을 바꾸면 그 움직임(easeTo, fitBounds)이 시작 때의 여백으로 되돌려 놓는다.
-  // 휴대폰에서 찾기로 장소를 고르면 시트가 오르는 사이 지도가 움직여, 고른 곳이 옛 여백의 가운데(시트 경계)에 남았다.
-  // 그래서 움직임이 멎을 때 실제 여백이 바라는 여백과 다르면 다시 맞춘다. 가운데 점은 그대로라 고른 곳이 보이는 지도 가운데로 온다
+  // 바라는 여백. 지도가 움직이는 동안 map.setPadding을 부르면 지도 라이브러리가 그 움직임을 멈춘다(jumpTo가 stop을 부른다).
+  // 그래서 장소로 가는 움직임(fitPlaces)은 최종 여백까지 함께 움직이고, 가는 중에 여백이 바뀌면(패널이 펴지거나 시트가 오르면)
+  // 같은 목적지로 새 여백을 넣어 이어 간다. 다른 움직임(끌기, 키) 중에 바뀐 여백은 그 움직임이 멎은 뒤 맞춘다
   let wantPad = null;
-  const samePad = (a, b) => ["top", "right", "bottom", "left"].every(k => Math.round(a[k] || 0) === Math.round(b[k] || 0));
+  let placeMove = null;   // 지금 가는 장소 움직임 {b, one, maxZoom, minZoom, until}
+  const SIDES = ["top", "right", "bottom", "left"];
+  const samePad = (a, b) => SIDES.every(k => Math.round(a[k] || 0) === Math.round(b[k] || 0));
+  let starting = false;   // 새 장소 움직임을 거는 중. 그때 끊긴 앞 움직임의 moveend로 여백을 따로 맞추지 않는다
   map.on("moveend", () => {
-    if (!wantPad || map.isMoving()) return;
+    if (starting || map.isMoving()) return;
+    if (placeMove && performance.now() >= placeMove.until - 20) placeMove = null;
+    if (!wantPad) return;
     if (samePad(map.getPadding(), wantPad)) { wantPad = null; return; }
     map.easeTo({ padding: wantPad, duration: dur(200) });
   });
+  // 장소 움직임의 목적지: 여백 pad를 뺀 화면 가운데에 범위 가운데가 오고, 범위가 가장자리 48px 안에 다 들어가는 배율
+  function placeCamera(m, pad) {
+    const cur = map.getPadding();
+    const sw = maplibregl.MercatorCoordinate.fromLngLat(m.b.getSouthWest()), ne = maplibregl.MercatorCoordinate.fromLngLat(m.b.getNorthEast());
+    const center = new maplibregl.MercatorCoordinate((sw.x + ne.x) / 2, (sw.y + ne.y) / 2).toLngLat();
+    if (m.one) return { center, zoom: Math.max(map.getZoom(), m.minZoom + 1) };
+    // cameraForBounds는 지금 여백에 주어진 여백을 더해 배율을 잰다. 바랄 여백과의 차이를 더해 준다
+    const extra = {}; for (const k of SIDES) extra[k] = 48 + (pad[k] || 0) - (cur[k] || 0);
+    const cam = map.cameraForBounds(m.b, { padding: extra, bearing: map.getBearing(), maxZoom: m.maxZoom });
+    return { center, zoom: cam && Number.isFinite(cam.zoom) ? cam.zoom : map.getZoom() };
+  }
+  function goPlace(m, ms) {
+    const pad = wantPad || map.getPadding();
+    const cam = placeCamera(m, pad);
+    m.until = performance.now() + ms;
+    placeMove = m;
+    // 입체 보기에서 돌려 둔 방위각과 기울기는 그대로 둔다
+    starting = true;
+    try { map.easeTo({ center: cam.center, zoom: cam.zoom, padding: pad, duration: ms, essential: true }); } finally { starting = false; }
+    if (!ms) placeMove = null;
+  }
 
   const api = {
     get ready() { return ready; },
     whenReady,
     setPadding(padding, { animate = true } = {}) {
       const cur = map.getPadding();
-      const next = { top: 0, right: 0, bottom: 0, left: 0, ...cur, ...padding };
+      const next = { top: 0, right: 0, bottom: 0, left: 0, ...(wantPad || cur), ...padding };
       wantPad = next;
-      if (["top", "right", "bottom", "left"].every(k => Math.round(cur[k]) === Math.round(next[k]))) return;
-      if (animate && !map.isMoving()) map.easeTo({ padding: next, duration: dur(180) });
+      if (samePad(cur, next)) return;
+      if (map.isMoving()) {
+        // 장소로 가는 중이면 같은 목적지로 새 여백을 넣어 남은 시간 동안 이어 간다
+        if (placeMove) goPlace(placeMove, Math.max(dur(250), placeMove.until - performance.now()));
+        return;   // 다른 움직임은 멎은 뒤 moveend에서 맞춘다
+      }
+      if (animate) map.easeTo({ padding: next, duration: dur(180) });
       else map.setPadding(next);
     },
-    // 장소들이 다 보이게 옮긴다. 점 하나면 그 점으로, 여럿이면 범위로
+    // 장소들이 다 보이게 옮긴다. 점 하나면 그 점으로, 여럿이면 범위로. 바로 미끄러져 간다(멀어졌다 가까워지는 날아가기는 쓰지 않는다)
     fitPlaces(paths, { maxZoom = 17.5, minZoom = 16 } = {}) {
       const c = pts(paths);
       if (!c.length) return false;
       const b = new maplibregl.LngLatBounds(c[0], c[0]);
       c.forEach(x => b.extend(x));
       const one = b.getNorthEast().distanceTo(b.getSouthWest()) < 60;
-      // 입체 보기에서 돌려 둔 방위각과 기울기를 지킨다 (fitBounds는 bearing을 주지 않으면 북쪽으로 돌린다)
-      if (one) map.easeTo({ center: b.getCenter(), zoom: Math.max(map.getZoom(), minZoom + 1), duration: dur(400) });
-      else map.fitBounds(b, { padding: 48, maxZoom, duration: dur(400), bearing: map.getBearing(), pitch: map.getPitch() });
+      goPlace({ b, one, maxZoom, minZoom }, dur(450));
       return true;
     },
     // style: select(파랑, 고른 장소) 또는 graph(보라, 번짐). label이 {pt, text}면 고른 장소 글자를 늘 보이게 한다.

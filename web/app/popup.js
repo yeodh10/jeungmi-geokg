@@ -1,9 +1,12 @@
 // 지도 말풍선 (명세 3.6절 1단): 장소를 고르면 이름, 구분, 자세히가 든 말풍선을 그 자리에 띄운다.
 // '자세히'는 패널(휴대폰은 시트)의 카드로 보낸다. 점이 없는 유형(길, 동네)은 말풍선이 없다.
 
-// 말풍선이 찾기창, 칩 줄, 아래 시트에 가리면 지도를 조금 옮겨 보이게 한다
+// 말풍선이 찾기창, 칩 줄, 아래 시트에 가리면 지도를 조금 옮겨 보이게 한다.
+// 지도가 고른 곳으로 가는 중이면 그 움직임이 끝난 뒤에 본다. 움직이는 중에 밀면 고른 곳으로 가던 움직임이 끊겨 엉뚱한 곳에 멎는다
 function keepVisible(map, popup) {
+  if (map.isMoving()) { map.once("moveend", () => { if (!map.isMoving()) keepVisible(map, popup); else map.once("moveend", () => keepVisible(map, popup)); }); return; }
   requestAnimationFrame(() => {
+    if (map.isMoving()) return;
     const el = popup.getElement && popup.getElement();
     if (!el || !el.isConnected) return;
     const r = el.getBoundingClientRect();

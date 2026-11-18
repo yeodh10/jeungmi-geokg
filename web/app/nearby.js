@@ -136,7 +136,7 @@ export function init(ctx) {
       const c = circle(b.pt, r).geometry.coordinates[0];
       const bb = new maplibregl.LngLatBounds(c[0], c[0]);
       c.forEach(x => bb.extend(x));
-      map.fitBounds(bb, { padding: 32, maxZoom: 18, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 });
+      map.fitBounds(bb, { padding: 32, maxZoom: 18, linear: true, bearing: map.getBearing(), pitch: map.getPitch(), duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 });
     }
     if (ownMarkers) { ownMarkers = false; bus.emit("results:clear"); }
     st.list = null;
