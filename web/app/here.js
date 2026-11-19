@@ -133,7 +133,7 @@ export function init(ctx) {
       if (a === "nearby") bus.emit("nearby:open", { center: pt, label: "누른 곳", radius: 300 });
       else if (a === "measure") bus.emit("measure:start", { mode: "distance", from: pt });
       else if (a === "basis") { ctx.basis.set({ pt, n: "누른 곳", p: null }); ui.toast("누른 곳을 거리 기준으로 정했습니다. 카드와 목록의 거리가 여기서 잽니다"); }
-      else if (a === "station") map.easeTo({ center: station, zoom: Math.max(map.getZoom(), 15), duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400 });
+      else if (a === "station") ctx.mapApi.goTo(station, { atLeast: 15 });
     }));
     popup = new maplibregl.Popup({ className: "pp", closeButton: true, closeOnClick: false, focusAfterOpen: false, offset: 8, maxWidth: "280px" })
       .setLngLat(pt).setDOMContent(box).addTo(map);

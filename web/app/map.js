@@ -313,9 +313,11 @@ export function createMapApi(ctx, map) {
     const cur = map.getPadding();
     const sw = maplibregl.MercatorCoordinate.fromLngLat(m.b.getSouthWest()), ne = maplibregl.MercatorCoordinate.fromLngLat(m.b.getNorthEast());
     const center = new maplibregl.MercatorCoordinate((sw.x + ne.x) / 2, (sw.y + ne.y) / 2).toLngLat();
-    if (m.one) return { center, zoom: Math.max(map.getZoom(), m.minZoom + 1) };
+    if (m.zoom != null) return { center, zoom: m.zoom };
+    if (m.one) return { center, zoom: Math.max(map.getZoom(), m.atLeast) };
     // cameraForBounds는 지금 여백에 주어진 여백을 더해 배율을 잰다. 바랄 여백과의 차이를 더해 준다
-    const extra = {}; for (const k of SIDES) extra[k] = 48 + (pad[k] || 0) - (cur[k] || 0);
+    const edge = m.edge ?? 48;
+    const extra = {}; for (const k of SIDES) extra[k] = edge + (pad[k] || 0) - (cur[k] || 0);
     const cam = map.cameraForBounds(m.b, { padding: extra, bearing: map.getBearing(), maxZoom: m.maxZoom });
     return { center, zoom: cam && Number.isFinite(cam.zoom) ? cam.zoom : map.getZoom() };
   }
@@ -353,7 +355,20 @@ export function createMapApi(ctx, map) {
       const b = new maplibregl.LngLatBounds(c[0], c[0]);
       c.forEach(x => b.extend(x));
       const one = b.getNorthEast().distanceTo(b.getSouthWest()) < 60;
-      goPlace({ b, one, maxZoom, minZoom }, dur(450));
+      goPlace({ b, one, maxZoom, atLeast: minZoom + 1 }, dur(450));
+      return true;
+    },
+    // 한 점으로 옮긴다. zoom을 주면 그 배율로, atLeast를 주면 지금 배율과 그것 가운데 큰 쪽으로. 패널과 시트의 여백까지 한 번에 맞춘다
+    goTo(pt, { zoom = null, atLeast = 16, ms = 450 } = {}) {
+      if (!pt) return false;
+      goPlace({ b: new maplibregl.LngLatBounds(pt, pt), one: true, zoom, atLeast }, dur(ms));
+      return true;
+    },
+    // 범위가 다 보이게 옮긴다 (가장자리 edge px)
+    fitBounds(b, { maxZoom = 17.5, edge = 48, ms = 450 } = {}) {
+      const bb = maplibregl.LngLatBounds.convert(b);
+      const one = bb.getNorthEast().distanceTo(bb.getSouthWest()) < 60;
+      goPlace({ b: bb, one, maxZoom, atLeast: 17, edge }, dur(ms));
       return true;
     },
     // style: select(파랑, 고른 장소) 또는 graph(보라, 번짐). label이 {pt, text}면 고른 장소 글자를 늘 보이게 한다.
@@ -421,7 +436,7 @@ export function createMapApi(ctx, map) {
 // WebGL이 없을 때 쓰는 빈 api. 다른 모듈이 map을 확인하지 않고 불러도 오류가 나지 않는다
 export function nullMapApi() {
   const noop = () => {};
-  return { ready: false, whenReady: noop, setPadding: noop, fitPlaces: () => false, highlight: noop, clearHighlight: noop,
+  return { ready: false, whenReady: noop, setPadding: noop, fitPlaces: () => false, goTo: () => false, fitBounds: () => false, highlight: noop, clearHighlight: noop,
     setMarkers: noop, clearMarkers: noop, setActiveMarker: noop, setEntrances: noop, setMe: noop, onTheme: noop,
     setBuildingPaint: noop, resetBuildingPaint: noop, defaultBuildingColor: () => null, hitTest: () => [], restyle: noop };
 }

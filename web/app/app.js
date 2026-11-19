@@ -196,7 +196,7 @@ if (ctx.map) {
   ui.toolButton({ id: "tool-zoom-in", icon: "plus", label: "확대", group: "zoom", order: 0, onClick: () => m.zoomIn({ duration: M.dur(250) }) });
   ui.toolButton({ id: "tool-zoom-out", icon: "minus", label: "축소", group: "zoom", order: 1, onClick: () => m.zoomOut({ duration: M.dur(250) }) });
   ui.toolButton({ id: "tool-station", icon: "station", label: "증미역으로", group: "place", order: 0,
-    onClick: () => m.easeTo({ center: (ctx.data && ctx.data.station && ctx.data.station.pt) || MAP_CENTER, zoom: Math.max(m.getZoom(), 16), duration: M.dur(400) }) });
+    onClick: () => ctx.mapApi.goTo((ctx.data && ctx.data.station && ctx.data.station.pt) || MAP_CENTER, { atLeast: 16 }) });
   ui.toolButton({ id: "tool-locate", icon: "locate", label: "내 위치", group: "place", order: 1, onClick: locate });
 }
 
@@ -209,7 +209,7 @@ function locate() {
     const [w, s, e, n] = MAP_BOUNDS;
     if (!(pt[0] >= w && pt[0] <= e && pt[1] >= s && pt[1] <= n)) { ui.toast("현재 위치가 지도 범위(증미역 중심 가로세로 약 2.5km) 밖에 있습니다."); return; }
     ctx.mapApi.setMe(pt);
-    ctx.map.easeTo({ center: pt, zoom: Math.max(ctx.map.getZoom(), 16), duration: M.dur(400) });
+    ctx.mapApi.goTo(pt, { atLeast: 16 });
     ui.live("지도를 내 위치로 옮겼습니다");
   }, err => {
     ui.toast(err && err.code === 1 ? "위치 권한이 없어 내 위치를 볼 수 없습니다." : "내 위치를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
@@ -290,7 +290,7 @@ function onSelect(sel) {
   // 장소를 골랐다고 어느 곳과 잇는 선을 긋지 않는다. 선 그리기 층 자체를 없앴다 (거리는 사용자가 거리재기나 '거리 기준'으로 직접 잰다)
   if (sel.fit && ctx.map) {
     if (r.paths.length && ctx.mapApi.fitPlaces(r.paths)) { /* 옮김 */ }
-    else if (r.pt) ctx.map.easeTo({ center: r.pt, zoom: Math.max(ctx.map.getZoom(), 17), duration: M.dur(400) });
+    else if (r.pt) ctx.mapApi.goTo(r.pt, { atLeast: 17 });
   }
   const fromMap = sel.from === "map";
   panel.show({ id: "place", title: r.name, onBack: closePlace, focus: !fromMap && sel.from !== "link",

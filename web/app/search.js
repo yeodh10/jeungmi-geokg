@@ -386,7 +386,7 @@ export async function init(ctx) {
     if (!ctx.map) return;
     markProgrammatic();
     const st = ctx.data.station && ctx.data.station.pt;
-    ctx.map.easeTo({ center: st || MAP_CENTER, zoom: ctx.sheet && ctx.sheet.active() ? 14 : 14.6, duration: 400 });
+    ctx.mapApi.goTo(st || MAP_CENTER, { zoom: ctx.sheet && ctx.sheet.active() ? 14 : 14.6, ms: 400 });
   }
 
   function setRowActive(no) {
@@ -492,9 +492,8 @@ export async function init(ctx) {
     if (!pts.length) return;
     const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
     pts.forEach(p => b.extend(p));
-    const dur = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 400;
-    if (b.getNorthEast().distanceTo(b.getSouthWest()) < 60) ctx.map.easeTo({ center: b.getCenter(), zoom: Math.max(ctx.map.getZoom(), 17), duration: dur });
-    else ctx.map.fitBounds(b, { padding: 64, maxZoom: 17.5, duration: dur, bearing: ctx.map.getBearing(), pitch: ctx.map.getPitch() });
+    // 패널과 시트의 여백까지 한 번에 맞춰 미끄러져 간다 (map.js fitBounds)
+    ctx.mapApi.fitBounds(b, { maxZoom: 17.5, edge: 64, ms: 400 });
   }
 
   // 주소창의 focus를 목록 위에 다시 연다 (주소창은 그대로)

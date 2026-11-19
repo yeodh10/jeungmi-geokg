@@ -39,7 +39,7 @@ export function init(ctx) {
         panel.selectTab("search");
         if (map) {
           const r = 1000, c = data.center, dLat = r / 110574, dLng = r / (111320 * Math.cos(c[1] * Math.PI / 180));
-          map.fitBounds([[c[0] - dLng, c[1] - dLat], [c[0] + dLng, c[1] + dLat]], { padding: 16, duration: reduced() ? 0 : 600 });
+          ctx.mapApi.fitBounds([[c[0] - dLng, c[1] - dLat], [c[0] + dLng, c[1] + dLat]], { maxZoom: 18, edge: 16, ms: 600 });
         }
         if (ctx.sheet && ctx.sheet.active()) ctx.sheet.snap("peek");
       } },

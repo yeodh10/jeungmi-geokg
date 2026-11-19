@@ -439,7 +439,7 @@ export function init(ctx) {
         if (refit && refit.sel === s && performance.now() - refit.at < 2000) {
           refit = null;
           if (s.paths && s.paths.length && ctx.mapApi.fitPlaces(s.paths)) return;
-          if (pt) { map.easeTo({ center: pt, zoom: Math.max(map.getZoom(), 17), duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300 }); return; }
+          if (pt) { ctx.mapApi.goTo(pt, { atLeast: 17, ms: 300 }); return; }
         }
         refit = null;
         if (!pt) return;
